@@ -1,0 +1,30 @@
+name: Sync to GitLab
+
+on:
+  push:
+    branches:
+      - '**'  # 监听所有分支的更新
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # 确保检出完整的历史记录
+
+    - name: Set up Git
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+    - name: Push to GitLab
+      env:
+        GITLAB_URL: ${{ secrets.GITLAB_URL }}
+        GITLAB_USERNAME: ${{ secrets.GITLAB_USERNAME }}
+        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      run: |
+        git remote add gitlab https://${{ secrets.GITLAB_USERNAME }}:${{ secrets.GITLAB_TOKEN }}@gitlab.eduxiji.net/T202410008992750/oskernel2024-chaos.git
+        git push gitlab --force --all
