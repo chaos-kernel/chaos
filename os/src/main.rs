@@ -66,9 +66,25 @@ fn clear_bss() {
     }
 }
 
+fn show_logo() {
+    println!(
+        r#"
+        .d88888b.                     .d88888b.   .d8888b.
+        d88P" "Y88b 888               d88P" "Y88b d88P  Y88b
+        888     888 888               888     888 Y88b.
+        888         888d88b.  .d88b.8 888     888  "Y888b.
+        888         888PY888 d8P""Y88 888     888     "Y88b.
+        888     888 888  888 888  888 888     888       "888
+        Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
+         "Y88888P"  888  888  "Y88P`8  "Y88888P"   "Y8888P"       
+"#
+    );
+}
+
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
+    show_logo();
     clear_bss();
     println!("[kernel] Hello, world!");
     logging::init();
