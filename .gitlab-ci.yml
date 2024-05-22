@@ -1,0 +1,12 @@
+default:
+  image: tkf2023/env:rcore-ci
+
+stages:
+  - test
+
+test-code-job:
+  stage: test
+  script:
+    - git clone https://token:${RCORE_CHECKER_REPO_READ_TOKEN_2024S}@git.tsinghua.edu.cn/os-lab/2024s/ta/rcore-tutorial-checker-2024s.git ci-user
+    - git clone https://token:${RCORE_TEST_REPO_READ_TOKEN_2024S}@git.tsinghua.edu.cn/os-lab/2024s/public/rcore-tutorial-test-2024s.git ci-user/user
+    - cd ci-user && make test CHAPTER=`echo $CI_COMMIT_REF_NAME | grep -oP 'ch\K[0-9]'` passwd=$BASE_TEST_TOKEN OFFLINE=1
