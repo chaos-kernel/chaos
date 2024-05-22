@@ -1,51 +1,22 @@
-# rCore-Tutorial-Code-2024S
+# ChaOS
 
-### Code
-- [Soure Code of labs for 2024S](https://github.com/LearningOS/rCore-Tutorial-Code-2024S)
-### Documents
+## 提交注意事项
 
-- Concise Manual: [rCore-Tutorial-Guide-2024S](https://LearningOS.github.io/rCore-Tutorial-Guide-2024S/)
+对于 RISCV 平台：
 
-- Detail Book [rCore-Tutorial-Book-v3](https://rcore-os.github.io/rCore-Tutorial-Book-v3/)
+本次大赛的初赛阶段评测使用 QEMU 虚拟环境，提交的项目根目录中必须包含一个 Makefile 文件，评测时会自动在您的项目中执行 `make all` 命令，您应该在 `Makefile` 中的 `all` 目标对操作系统进行编译，并生成 ELF 格式的 `sbi-qemu` 和 `kernel-qemu` 两个文件，即与 xv6-k210 运行 qemu 时的方式一致。
 
+如果你的系统使用默认 SBI，则不需要生成 `sbi-qemu` 文件，运行QEMU时会自动设置 `-bios` 参数为 `default`。
 
-### OS API docs of rCore Tutorial Code 2024S
-- [OS API docs of ch1](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch1/os/index.html)
-  AND [OS API docs of ch2](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch2/os/index.html)
-- [OS API docs of ch3](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch3/os/index.html)
-  AND [OS API docs of ch4](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch4/os/index.html)
-- [OS API docs of ch5](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch5/os/index.html)
-  AND [OS API docs of ch6](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch6/os/index.html)
-- [OS API docs of ch7](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch7/os/index.html)
-  AND [OS API docs of ch8](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch8/os/index.html)
-- [OS API docs of ch9](https://learningos.github.io/rCore-Tutorial-Code-2024S/ch9/os/index.html)
+同时 QEMU 启动时还会使用 `-drive file` 参数挂载 SD 卡镜像，SD 卡镜像为 FAT32 文件系统，没有分区表。在 SD 卡镜像的根目录里包含若干个预先编译好的 ELF 可执行文件（以下简称测试点），您的操作系统在启动后需要主动扫描 SD 卡，并依次运行其中每一个测试点，将其运行结果输出到串口上，评测系统会根据您操作系统的串口输出内容进行评分。您可以根据操作系统的完成度自由选择跳过其中若干个测试点，未被运行的测试点将不计分。测试点的执行顺序与评分无关，多个测试点只能串行运行，不可同时运行多个测试点。具体测试点的数量、内容以及编译方式将在赛题公布时同步发布。
 
-### Related Resources
-- [Learning Resource](https://github.com/LearningOS/rust-based-os-comp2022/blob/main/relatedinfo.md)
+当您的操作系统执行完所有测试点后，应该主动调用关机命令，评测机会在检测到 QEMU 进程退出后进行打分。
 
 
-### Build & Run
+
+运行 Riscv QEMU 的完整命令为：
 
 ```bash
-# setup build&run environment first
-$ git clone https://github.com/LearningOS/rCore-Tutorial-Code-2024S.git
-$ cd rCore-Tutorial-Code-2024S
-$ git clone https://github.com/LearningOS/rCore-Tutorial-Test-2024S.git user
-$ cd os
-$ git checkout ch$ID
-# run OS in ch$ID
-$ make run
+qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 -bios sbi-qemu -drive file=sdcard.img,if=none,format=raw,id=x0  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -device virtio-net-device,netdev=net -netdev user,id=net -initrd initrd.img
 ```
-Notice: $ID is from [1-9]
-
-### Grading
-
-```bash
-# setup build&run environment first
-$ git clone https://github.com/LearningOS/rCore-Tutorial-Code-2024S.git
-$ cd rCore-Tutorial-Code-2024S
-$ git clone https://github.com/LearningOS/rCore-Tutorial-Checker-2024S.git ci-user
-$ git clone https://github.com/LearningOS/rCore-Tutorial-Test-2024S.git ci-user/user
-$ cd ci-user && make test CHAPTER=$ID
-```
-Notice: $ID is from [3,4,5,6,8]
+在运行 QEMU 的命令中，`-initrd initrd.img` 为可选项。如果你的 Makefile 生成了 `initrd.img`，则会在运行命令中添加此参数，否则运行命令中不包含 `-intird initrd.img` 参数。
