@@ -7,41 +7,32 @@ OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 PY := python3
 
+TEST_ELF_DIR := ../testcases
+
 ifeq ($(MODE), release)
 	MODE_ARG := --release
 endif
 
-BASE ?= 0
-CHAPTER ?= 0
-TEST ?= $(CHAPTER)
+APPS := $(wildcard $(APP_DIR)/*.rs)
 
-ifeq ($(TEST), 0) # No test, deprecated, previously used in v3
-	APPS :=  $(filter-out $(wildcard $(APP_DIR)/ch*.rs), $(wildcard $(APP_DIR)/*.rs))
-else ifeq ($(TEST), 1) # All test
-	APPS :=  $(wildcard $(APP_DIR)/ch*.rs)
-else
-	TESTS := $(shell seq $(BASE) $(TEST))
-	ifeq ($(BASE), 0) # Normal tests only
-		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)/ch$(T)_*.rs))
-	else ifeq ($(BASE), 1) # Basic tests only
-		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)/ch$(T)b_*.rs))
-	else # Basic and normal
-		APPS := $(foreach T, $(TESTS), $(wildcard $(APP_DIR)/ch$(T)*.rs))
-	endif
-endif
+TEST_CASES := $(filter-out %.sh %/ %txt,$(wildcard $(TEST_ELF_DIR)/*))
 
 ELFS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%, $(APPS))
 
+TEST_CASES_ELFS := $(patsubst $(TEST_ELF_DIR)/%, $(TARGET_DIR)/%, $(TEST_CASES))
+
 binary:
 	@echo $(ELFS)
-	@if [ ${CHAPTER} -gt 3 ]; then \
-		cargo build $(MODE_ARG) ;\
-	else \
-		CHAPTER=$(CHAPTER) python3 build.py ;\
-	fi
+	@echo $(TEST_CASES_ELFS)
+	cargo build $(MODE_ARG) ;
+	@$(foreach test_elf, $(TEST_CASES), \
+		cp $(test_elf) $(TARGET_DIR)/;)
 	@$(foreach elf, $(ELFS), \
 		$(OBJCOPY) $(elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(elf)); \
-		cp $(elf) $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.elf, $(elf));)
+		cp $(elf) $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.elf, $(elf));) 
+	@$(foreach test_elf, $(TEST_CASES_ELFS), \
+		$(OBJCOPY) $(test_elf) --strip-all -O binary $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.bin, $(test_elf)); \
+		cp $(test_elf) $(patsubst $(TARGET_DIR)/%, $(TARGET_DIR)/%.elf, $(test_elf));)
 
 disasm:
 	@$(foreach elf, $(ELFS), \
@@ -58,6 +49,8 @@ pre:
 build: clean pre binary
 	@$(foreach t, $(ELFS), cp $(t).bin $(BUILD_DIR)/bin/;)
 	@$(foreach t, $(ELFS), cp $(t).elf $(BUILD_DIR)/elf/;)
+	@$(foreach t, $(TEST_CASES_ELFS), cp $(t).bin $(BUILD_DIR)/bin/;)
+	@$(foreach t, $(TEST_CASES_ELFS), cp $(t).elf $(BUILD_DIR)/elf/;)
 
 clean:
 	@cargo clean
