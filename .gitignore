@@ -1,6 +1,6 @@
 .*/*
 !.github/*
-!.vscode/settings.json
+.vscode/
 .idea/*
 os/target/*
 os/.idea/*
