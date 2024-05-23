@@ -55,9 +55,7 @@ pub fn main() -> i32 {
         } else {
             pids[i] = pid;
         }
-    }
-    let mut xstate: i32 = Default::default();
-    for (i, &test) in TESTS.iter().enumerate() {
+        let mut xstate: i32 = Default::default();
         let wait_pid = waitpid(pids[i] as usize, &mut xstate);
         assert_eq!(pids[i], wait_pid);
         println!(
@@ -65,7 +63,7 @@ pub fn main() -> i32 {
             test, pids[i], xstate
         );
     }
-    println!("Basic usertests passed!");
+    println!("============Basic usertests passed!===========");
     0
 }
 
