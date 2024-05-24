@@ -26,7 +26,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
             .res
             .as_ref()
             .unwrap()
-            .ustack_base,
+            .ustack_top,
         true,
     ));
     // add new task to scheduler

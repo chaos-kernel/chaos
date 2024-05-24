@@ -1,10 +1,12 @@
 use core::{borrow::BorrowMut, mem::size_of, ptr};
 use crate::{
-    config::{BIG_STRIDE, MAX_SYSCALL_NUM, SYS_NAME, SYS_NODENAME, SYS_RELEASE, SYS_VERSION}, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
+    config::*, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, SignalFlags, TaskStatus
     }, timer::{get_time_ms, get_time_us}
 };
 
+#[allow(unused)]
+use super::errno::{EINVAL, EPERM, SUCCESS};
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -310,14 +312,32 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 }
 
 /// change data segment size
-// pub fn sys_sbrk(size: i32) -> isize {
-//     trace!("kernel:pid[{}] sys_sbrk", current_task().unwrap().process.upgrade().unwrap().getpid());
-//     if let Some(old_brk) = current_task().unwrap().change_program_brk(size) {
-//         old_brk as isize
-//     } else {
-//     -1
-//     }
-// }
+pub fn sys_brk(addr: usize) -> isize {
+    // println!("[sys_brk] addr = {:#x}", addr);
+    let process = current_process();
+    let mut inner = process.inner_exclusive_access();
+    if addr == 0 {
+        inner.heap_end.0 as isize
+    } else if addr < inner.heap_base.0 {
+        EINVAL
+    } else {
+        // We need to calculate to determine if we need a new page table
+        // current end page address
+        let align_addr = ((addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        // the end of 'addr' value
+        let align_end = ((inner.heap_end.0) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        if align_end >= addr {
+            inner.heap_end = addr.into();
+            align_addr as isize
+        } else {
+            let heap_end = inner.heap_end;
+            // map heap
+            inner.memory_set.map_heap(heap_end, align_addr.into());
+            inner.heap_end = align_addr.into();
+            addr as isize
+        }
+    }
+}
 
 /// spawn syscall
 /// YOUR JOB: Implement spawn.

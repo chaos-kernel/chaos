@@ -6,7 +6,7 @@ use super::TaskControlBlock;
 use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::{File, Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
+use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
@@ -66,6 +66,10 @@ pub struct ProcessControlBlockInner {
     pub user_clock: usize,
     /// kernel clock time
     pub kernel_clock: usize,
+    /// Record the usage of heap_area in MemorySet
+    pub heap_base: VirtAddr,
+    ///
+    pub heap_end: VirtAddr,
 }
 
 impl ProcessControlBlockInner {
@@ -145,7 +149,7 @@ impl ProcessControlBlock {
     pub fn new(elf_data: &[u8]) -> Arc<Self> {
         trace!("kernel: ProcessControlBlock::new");
         // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, ustack_base, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
         // allocate a pid
         let pid_handle = pid_alloc();
         let process = Arc::new(Self {
@@ -179,13 +183,15 @@ impl ProcessControlBlock {
                     clock_stop_watch: 0,
                     user_clock: 0,
                     kernel_clock: 0,
+                    heap_base: user_heap_base.into(),
+                    heap_end: user_heap_base.into(),
                 })
             },
         });
         // create a main thread, we should allocate ustack and trap_cx here
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
-            ustack_base,
+            ustack_top,
             true,
         ));
         // prepare trap_cx of main thread
@@ -222,17 +228,20 @@ impl ProcessControlBlock {
         assert_eq!(self.inner_exclusive_access().thread_count(), 1);
         // memory_set with elf program headers/trampoline/trap context/user stack
         trace!("kernel: exec .. MemorySet::from_elf");
-        let (memory_set, ustack_base, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
         let new_token = memory_set.token();
         // substitute memory_set
         trace!("kernel: exec .. substitute memory_set");
         self.inner_exclusive_access().memory_set = memory_set;
+        // set heap position
+        self.inner_exclusive_access().heap_base = user_heap_base.into();
+        self.inner_exclusive_access().heap_end = user_heap_base.into();
         // then we alloc user resource for main thread again
         // since memory_set has been changed
         trace!("kernel: exec .. alloc user resource for main thread again");
         let task = self.inner_exclusive_access().get_task(0);
         let mut task_inner = task.inner_exclusive_access();
-        task_inner.res.as_mut().unwrap().ustack_base = ustack_base;
+        task_inner.res.as_mut().unwrap().ustack_top = ustack_top;
         task_inner.res.as_mut().unwrap().alloc_user_res();
         task_inner.trap_cx_ppn = task_inner.res.as_mut().unwrap().trap_cx_ppn();
         // push arguments on user stack
@@ -318,6 +327,8 @@ impl ProcessControlBlock {
                     clock_stop_watch: 0,
                     user_clock: 0,
                     kernel_clock: 0,
+                    heap_base: parent.heap_base,
+                    heap_end: parent.heap_base,
                 })
             },
         });
@@ -332,7 +343,7 @@ impl ProcessControlBlock {
                 .res
                 .as_ref()
                 .unwrap()
-                .ustack_base(),
+                .ustack_top(),
             // here we do not allocate trap_cx or ustack again
             // but mention that we allocate a new kstack here
             false,
