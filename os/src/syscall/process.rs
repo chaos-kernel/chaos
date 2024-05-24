@@ -1,10 +1,10 @@
 use core::{borrow::BorrowMut, mem::size_of, ptr};
-
 use crate::{
-    config::{BIG_STRIDE, MAX_SYSCALL_NUM}, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
+    config::{BIG_STRIDE, MAX_SYSCALL_NUM, SYS_NAME, SYS_NODENAME, SYS_RELEASE, SYS_VERSION}, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, SignalFlags, TaskStatus
     }, timer::{get_time_ms, get_time_us}
 };
+
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -23,6 +23,15 @@ pub struct Tms {
     tms_cstime: i64,
 }
 
+#[allow(dead_code)]
+pub struct Utsname {
+    sysname: [u8; 65],
+    nodename: [u8; 65],
+    release: [u8; 65],
+    version: [u8; 65],
+    machine: [u8; 65],
+    domainname: [u8; 65],
+}
 /// Task information
 #[allow(dead_code)]
 pub struct TaskInfo {
@@ -170,7 +179,7 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_get_time",
         current_task().unwrap().process.upgrade().unwrap().getpid()
@@ -284,6 +293,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 //         old_brk as isize
 //     } else {
 //     -1
+//     }
 // }
 
 /// spawn syscall
@@ -351,6 +361,42 @@ pub fn sys_times(tms: *mut Tms) -> isize {
     unsafe {
         let mut p = sys_tms.borrow_mut() as *mut Tms as *mut u8;
         for slice in tms_k.iter_mut() {
+            let len = slice.len();
+            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
+            p = p.add(len);
+        }
+    }
+    (tms_stime + tms_utime) as isize
+}
+
+///get OS informations
+pub fn sys_uname(uts: *mut Utsname) -> isize {
+    let mut uts_k = translated_byte_buffer(current_user_token(), uts as *const u8, size_of::<Utsname>());
+    let mut sys_uts = Utsname {
+        sysname: [0; 65],
+        nodename: [0; 65],
+        release: [0; 65],
+        version: [0; 65],
+        machine: [0; 65],
+        domainname: [0; 65],
+    };
+
+    let sysname_bytes = SYS_NAME.as_bytes();
+    let nodename_bytes = SYS_NODENAME.as_bytes();
+    let release_bytes = SYS_RELEASE.as_bytes();
+    let version_bytes = SYS_VERSION.as_bytes();
+    let machine_bytes = "Machine: riscv64".as_bytes();
+    let domainname_bytes = "None".as_bytes();
+
+    sys_uts.sysname[..sysname_bytes.len()].copy_from_slice(sysname_bytes);
+    sys_uts.nodename[..nodename_bytes.len()].copy_from_slice(nodename_bytes);
+    sys_uts.release[..release_bytes.len()].copy_from_slice(release_bytes);
+    sys_uts.version[..version_bytes.len()].copy_from_slice(version_bytes);
+    sys_uts.machine[..machine_bytes.len()].copy_from_slice(machine_bytes);
+    sys_uts.domainname[..domainname_bytes.len()].copy_from_slice(domainname_bytes);
+    unsafe {
+        let mut p = sys_uts.borrow_mut() as *mut Utsname as *mut u8;
+        for slice in uts_k.iter_mut() {
             let len = slice.len();
             ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
             p = p.add(len);

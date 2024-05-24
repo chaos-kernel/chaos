@@ -5,11 +5,9 @@
 extern crate user_lib;
 
 const TESTS: &[&str] = &[
-    "dup2\0",
+
     "times\0",
     "uname\0",
-    "munmap\0",
-    "mmap\0",
     "gettimeofday\0",
     "waitpid\0",
     "brk\0",
@@ -17,6 +15,9 @@ const TESTS: &[&str] = &[
     "sleep\0",
     "yield\0",
     "getppid\0",
+    "munmap\0",
+    "mmap\0",
+    "dup2\0",
     "pipe\0",
     "mount\0",
     "execve\0",

@@ -24,3 +24,12 @@ pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 pub use crate::board::{CLOCK_FREQ, MMIO};
 /// Big stride (lcm of 2..20)
 pub const BIG_STRIDE: usize = 232792560;
+/// system name
+pub const SYS_NAME: &str = "Chaos";
+/// system nodename
+pub const SYS_NODENAME: &str = "None";
+/// system release
+pub const SYS_RELEASE: &str = "0.0.1";
+/// system version
+pub const SYS_VERSION: &str = "#1-Chaos RISC-V 64bit Version 0.0.1";
+
