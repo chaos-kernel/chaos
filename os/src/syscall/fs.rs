@@ -2,7 +2,8 @@ use core::borrow::Borrow;
 use core::mem::size_of;
 use core::ptr;
 
-use crate::fs::{make_pipe, open_file, OpenFlags, Stat, link, unlink};
+use crate::fs::inode::{link, open_file, unlink, OpenFlags};
+use crate::fs::{make_pipe, Stat};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;

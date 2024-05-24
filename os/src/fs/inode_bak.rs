@@ -1,10 +1,12 @@
-//! inode
-
-use alloc::{string::String, sync::Arc, vec::Vec};
+use super::File;
+use crate::drivers::BLOCK_DEVICE;
+use crate::mm::UserBuffer;
+use crate::sync::UPSafeCell;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use bitflags::*;
+use super::efs::{EasyFileSystem, Inode};
 use lazy_static::*;
-use spin::Mutex;
-use crate::{drivers::BLOCK_DEVICE, fs::efs::vfs::EfsInode, mm::UserBuffer, sync::UPSafeCell};
-use super::{efs::{BlockDevice, EasyFileSystem}, File};
 
 /// inode in memory
 pub struct OSInode {
@@ -12,21 +14,20 @@ pub struct OSInode {
     writable: bool,
     inner: UPSafeCell<OSInodeInner>,
 }
-
 /// inner of inode in memory
 pub struct OSInodeInner {
-    pos: usize,
-    inode: Arc<dyn Inode>,
+    offset: usize,
+    inode: Arc<Inode>,
 }
 
 impl OSInode {
     /// create a new inode in memory
-    pub fn new(readable: bool, writable: bool, inode: Arc<dyn Inode>) -> Self {
+    pub fn new(readable: bool, writable: bool, inode: Arc<Inode>) -> Self {
         trace!("kernel: OSInode::new");
         Self {
             readable,
             writable,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, inode }) },
+            inner: unsafe { UPSafeCell::new(OSInodeInner { offset: 0, inode }) },
         }
     }
     /// read all data from the inode in memory
@@ -36,76 +37,19 @@ impl OSInode {
         let mut buffer = [0u8; 512];
         let mut v: Vec<u8> = Vec::new();
         loop {
-            let len = inner.inode.read_at(inner.pos, &mut buffer);
+            let len = inner.inode.read_at(inner.offset, &mut buffer);
             if len == 0 {
                 break;
             }
-            inner.pos += len;
+            inner.offset += len;
             v.extend_from_slice(&buffer[..len]);
         }
         v
     }
 }
 
-/// Inode metadata
-#[derive(Clone)]
-pub struct InodeMeta {
-    /// block id
-    pub block_id: usize,
-    /// block offset
-    pub block_offset: usize,
-    /// file system
-    pub fs: Arc<Mutex<EasyFileSystem>>,
-    /// block device
-    pub block_device: Arc<dyn BlockDevice>,
-}
-
-impl InodeMeta {
-    /// create a new InodeMeta
-    pub fn new(
-        block_id: usize,
-        block_offset: usize,
-        fs: Arc<Mutex<EasyFileSystem>>,
-        block_device: Arc<dyn BlockDevice>,
-    ) -> Self {
-        Self {
-            block_id,
-            block_offset,
-            fs,
-            block_device,
-        }
-    }
-}
-
-/// Inode trait
-pub trait Inode: Send + Sync {
-    /// get metadata
-    fn meta(&self) -> InodeMeta;
-    /// set metadata
-    fn set_meta(&mut self, meta: InodeMeta);
-    /// get status of file
-    fn fstat(&self) -> (usize, u32);
-    /// find the disk inode of the file with 'name'
-    fn find(&self, name: &str) -> Option<Arc<dyn Inode>>;
-    /// create a file with 'name' in the root directory
-    fn create(&self, name: &str) -> Option<Arc<dyn Inode>>;
-    /// create a link with a disk inode under current inode
-    fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>>;
-    /// Remove a link under current inode
-    fn unlink(&self, name: &str) -> bool;
-    /// list the file names in the root directory
-    fn ls(&self) -> Vec<String>;
-    /// Read the content in offset position of the file into 'buf'
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize;
-    /// Write the content in 'buf' into offset position of the file
-    fn write_at(&self, offset: usize, buf: &[u8]) -> usize;
-    /// Set the file(disk inode) length to zero, delloc all data blocks of the file.
-    fn clear(&self);
-}
-
 lazy_static! {
-    /// The root inode
-    pub static ref ROOT_INODE: Arc<EfsInode> = {
+    pub static ref ROOT_INODE: Arc<Inode> = {
         let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
         Arc::new(EasyFileSystem::root_inode(&efs))
     };
@@ -176,7 +120,7 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
 }
 
 /// Link a file
-pub fn link(old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
+pub fn link(old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
     ROOT_INODE.link(old_name, new_name)
 }
 
@@ -200,11 +144,11 @@ impl File for OSInode {
         let mut inner = self.inner.exclusive_access();
         let mut total_read_size = 0usize;
         for slice in buf.buffers.iter_mut() {
-            let read_size = inner.inode.read_at(inner.pos, *slice);
+            let read_size = inner.inode.read_at(inner.offset, *slice);
             if read_size == 0 {
                 break;
             }
-            inner.pos += read_size;
+            inner.offset += read_size;
             total_read_size += read_size;
         }
         total_read_size
@@ -215,9 +159,9 @@ impl File for OSInode {
         let mut inner = self.inner.exclusive_access();
         let mut total_write_size = 0usize;
         for slice in buf.buffers.iter() {
-            let write_size = inner.inode.write_at(inner.pos, *slice);
+            let write_size = inner.inode.write_at(inner.offset, *slice);
             assert_eq!(write_size, slice.len());
-            inner.pos += write_size;
+            inner.offset += write_size;
             total_write_size += write_size;
         }
         total_write_size

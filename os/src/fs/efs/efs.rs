@@ -4,8 +4,7 @@
 //!
 //! NOTICE: from this level, all data structures are in memory.
 use super::{
-    block_cache_sync_all, get_block_cache, Bitmap, BlockDevice, DiskInode, DiskInodeType, Inode,
-    SuperBlock,
+    block_cache_sync_all, get_block_cache, vfs::EfsInode, Bitmap, BlockDevice, DiskInode, DiskInodeType, SuperBlock
 };
 use alloc::sync::Arc;
 use spin::Mutex;
@@ -114,12 +113,12 @@ impl EasyFileSystem {
             })
     }
     /// Get the root inode
-    pub fn root_inode(efs: &Arc<Mutex<Self>>) -> Inode {
+    pub fn root_inode(efs: &Arc<Mutex<Self>>) -> EfsInode {
         let block_device = Arc::clone(&efs.lock().block_device);
         // acquire efs lock temporarily
         let (block_id, block_offset) = efs.lock().get_disk_inode_pos(0);
         // release efs lock
-        Inode::new(block_id, block_offset, Arc::clone(efs), block_device)
+        EfsInode::new(block_id, block_offset, Arc::clone(efs), block_device)
     }
     /// Get inode block position (the block id and offset in this block) according to the inode id
     pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {

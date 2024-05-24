@@ -1,6 +1,6 @@
 //! File trait & inode(dir, file, pipe, stdin, stdout)
 
-mod inode;
+pub mod inode;
 mod pipe;
 mod stdio;
 pub(crate) mod efs;
@@ -8,7 +8,7 @@ pub(crate) mod efs;
 use crate::mm::UserBuffer;
 
 /// trait File for all file types
-pub trait File: Send + Sync {
+pub trait File: {
     /// the file readable?
     fn readable(&self) -> bool;
     /// the file writable?
@@ -63,6 +63,5 @@ bitflags! {
     }
 }
 
-pub use inode::{list_apps, open_file, OSInode, OpenFlags, link, unlink};
 pub use pipe::{make_pipe, Pipe};
 pub use stdio::{Stdin, Stdout};

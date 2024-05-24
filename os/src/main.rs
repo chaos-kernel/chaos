@@ -51,6 +51,7 @@ pub mod task;
 pub mod timer;
 pub mod trap;
 
+use crate::fs::inode::list_apps;
 use core::arch::global_asm;
 
 global_asm!(include_str!("entry.asm"));
@@ -93,7 +94,7 @@ pub fn rust_main() -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    fs::list_apps();
+    list_apps();
     task::add_initproc();
     task::run_tasks();
     panic!("Unreachable in rust_main!");

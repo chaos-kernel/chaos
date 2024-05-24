@@ -20,8 +20,8 @@ mod switch;
 mod task;
 
 use self::id::TaskUserRes;
-use crate::fs::{open_file, OpenFlags};
-use crate::task::manager::add_stopping_task;
+use crate::fs::inode::OpenFlags;
+use crate::{fs::inode::open_file, task::manager::add_stopping_task};
 use crate::timer::remove_timer;
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
