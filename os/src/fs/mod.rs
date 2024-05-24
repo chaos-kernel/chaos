@@ -3,6 +3,7 @@
 mod inode;
 mod pipe;
 mod stdio;
+pub(crate) mod efs;
 
 use crate::mm::UserBuffer;
 
