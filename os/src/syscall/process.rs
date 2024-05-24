@@ -5,6 +5,7 @@ use crate::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, SignalFlags, TaskStatus
     }, timer::{get_time_ms, get_time_us}
 };
+
 use alloc::{string::String, sync::Arc, vec::Vec};
 
 #[repr(C)]
@@ -12,6 +13,14 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
+}
+
+#[repr(C)]
+pub struct Tms {
+    tms_utime: i64,
+    tms_stime: i64,
+    tms_cutime: i64,
+    tms_cstime: i64,
 }
 
 /// Task information
@@ -163,7 +172,7 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_get_time",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let us = get_time_us();
@@ -190,7 +199,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_task_info",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let mut v = translated_byte_buffer(current_user_token(), ti as *const u8, size_of::<TaskInfo>());
@@ -217,7 +226,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_mmap",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     if port & !0x7 != 0 {
@@ -249,7 +258,7 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
 /// YOUR JOB: Implement munmap.
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_munmap",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let start_va: VirtAddr = start.into();
@@ -282,7 +291,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_spawn",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     -1
@@ -305,7 +314,7 @@ pub fn sys_spawn(_path: *const u8) -> isize {
 /// YOUR JOB: Set task priority
 pub fn sys_set_priority(prio: isize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     if prio < 2 {
@@ -317,4 +326,35 @@ pub fn sys_set_priority(prio: isize) -> isize {
     inner.priority = prio;
     inner.pass = BIG_STRIDE / prio;
     prio as isize
+}
+
+/// get current process times
+#[allow(unused)]
+pub fn sys_times(tms: *mut Tms) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_get_time",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    let mut tms_k = translated_byte_buffer(current_user_token(), tms as *const u8, size_of::<Tms>());
+    let (tms_stime, tms_utime) = current_process()
+    .inner_exclusive_access()
+    .get_process_clock_time();
+    let (tms_cstime, tms_cutime) = current_process()
+    .inner_exclusive_access()
+    .get_children_process_clock_time();
+    let mut sys_tms = Tms {
+        tms_utime,
+        tms_stime,
+        tms_cutime,
+        tms_cstime,
+    };
+    unsafe {
+        let mut p = sys_tms.borrow_mut() as *mut Tms as *mut u8;
+        for slice in tms_k.iter_mut() {
+            let len = slice.len();
+            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
+            p = p.add(len);
+        }
+    }
+    0
 }

@@ -17,8 +17,7 @@ mod context;
 use crate::config::TRAMPOLINE;
 use crate::syscall::syscall;
 use crate::task::{
-    check_signals_of_current, current_add_signal, current_trap_cx, current_trap_cx_user_va,
-    current_user_token, exit_current_and_run_next, suspend_current_and_run_next, SignalFlags,
+    check_signals_of_current, current_add_signal, current_process, current_trap_cx, current_trap_cx_user_va, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, SignalFlags
 };
 use crate::timer::{check_timer, set_next_trigger};
 use core::arch::{asm, global_asm};
@@ -66,6 +65,10 @@ pub fn trap_handler() -> ! {
     // trace!("into {:?}", scause.cause());
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
+
+            //进入内核态之前，计算用户态已运行的时间
+            current_process().inner_exclusive_access().user_clock_time_end();
+
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
@@ -118,6 +121,10 @@ pub fn trap_handler() -> ! {
 pub fn trap_return() -> ! {
     //disable_supervisor_interrupt();
     set_user_trap_entry();
+
+    //从内核态返回后，计算内核态运行时间
+    current_process().inner_exclusive_access().user_clock_time_start();
+
     let trap_cx_user_va = current_trap_cx_user_va();
     let user_satp = current_user_token();
     extern "C" {

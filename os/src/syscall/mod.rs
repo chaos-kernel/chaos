@@ -40,6 +40,8 @@ pub const SYSCALL_SIGPROCMASK: usize = 135;
 /// sigreturn syscall
 pub const SYSCALL_SIGRETURN: usize = 139;
 */
+/// times syscall
+pub const SYSCALL_TIMES: usize = 153;
 /// gettimeofday syscall
 pub const SYSCALL_GETTIMEOFDAY: usize = 169;
 /// getpid syscall
@@ -133,6 +135,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_SLEEP => sys_sleep(args[0]),
         SYSCALL_YIELD => sys_yield(),
+        SYSCALL_TIMES => sys_times(args[0] as *mut Tms),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETTID => sys_gettid(),
         SYSCALL_FORK => sys_fork(),

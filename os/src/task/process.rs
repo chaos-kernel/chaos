@@ -8,6 +8,7 @@ use super::{pid_alloc, PidHandle};
 use crate::fs::{File, Stdin, Stdout};
 use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
+use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -58,7 +59,13 @@ pub struct ProcessControlBlockInner {
     /// nedd matrix
     pub need: Vec<Vec<u32>>,
     /// finish list
-    pub finish: Vec<bool>
+    pub finish: Vec<bool>,
+    /// clock time stop watch
+    pub clock_stop_watch: usize,
+    /// user clock time
+    pub user_clock: usize,
+    /// kernel clock time
+    pub kernel_clock: usize,
 }
 
 impl ProcessControlBlockInner {
@@ -91,6 +98,41 @@ impl ProcessControlBlockInner {
     /// get a task with tid in this process
     pub fn get_task(&self, tid: usize) -> Arc<TaskControlBlock> {
         self.tasks[tid].as_ref().unwrap().clone()
+    }
+    /// count clock time
+    pub fn clock_time_refresh(&mut self) {
+        self.clock_stop_watch = get_time();
+    } 
+    /// count user clock time and start to count kernel clock time
+    pub fn user_clock_time_end(&mut self) -> usize {
+        let last_stop = self.clock_stop_watch;
+        self.clock_stop_watch = get_time();
+        self.user_clock += self.clock_stop_watch - last_stop;
+        self.user_clock
+    }
+    /// count kernel clock time and start to count user clock time
+    pub fn user_clock_time_start(&mut self) -> usize {
+        let last_stop = self.clock_stop_watch;
+        self.clock_stop_watch = get_time();
+        self.kernel_clock += self.clock_stop_watch - last_stop;
+        self.kernel_clock
+    }
+    /// get clock time
+    pub fn get_process_clock_time(&mut self) -> (i64, i64) {
+        let last_stop = self.clock_stop_watch;
+        self.clock_stop_watch = get_time();
+        self.kernel_clock += self.clock_stop_watch - last_stop;
+        (self.kernel_clock as i64, self.user_clock as i64)
+    }
+    /// get children's clock time
+    pub fn get_children_process_clock_time(&self) -> (i64, i64) {
+        let mut children_kernel_clock: usize = 0;
+        let mut children_user_clock: usize = 0;
+        for c in &self.children {
+            children_kernel_clock += c.inner_exclusive_access().kernel_clock;
+            children_user_clock += c.inner_exclusive_access().user_clock; 
+        }
+        (children_kernel_clock as i64, children_user_clock as i64)
     }
 }
 
@@ -134,6 +176,9 @@ impl ProcessControlBlock {
                     allocation: Vec::new(),
                     need: Vec::new(),
                     finish: Vec::new(),
+                    clock_stop_watch: 0,
+                    user_clock: 0,
+                    kernel_clock: 0,
                 })
             },
         });
@@ -270,6 +315,9 @@ impl ProcessControlBlock {
                     allocation: Vec::new(),
                     need: Vec::new(),
                     finish: Vec::new(),
+                    clock_stop_watch: 0,
+                    user_clock: 0,
+                    kernel_clock: 0,
                 })
             },
         });
