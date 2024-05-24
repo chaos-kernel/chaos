@@ -1,7 +1,9 @@
 //! Disk layout & data structure layer: about bitmaps
 //!
 //! There are two different types of [`Bitmap`] in the easy-fs layout that manage inodes and blocks, respectively. Each bitmap consists of several blocks, each of which is 512 bytes, or 4096 bits. Each bit represents the allocation status of an inode/data block, 0 means unallocated, and 1 means allocated. What the bitmap does is allocate and de-allocate inodes/data blocks via bit-based allocation (looking for a bit of 0 and setting it to 1) and de-allocation (clearing the bit).
-use super::{get_block_cache, BlockDevice, BLOCK_SZ};
+use crate::block::BLOCK_SZ;
+
+use super::{get_block_cache, BlockDevice};
 use alloc::sync::Arc;
 /// A bitmap block
 type BitmapBlock = [u64; 64];

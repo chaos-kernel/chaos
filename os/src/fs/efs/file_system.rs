@@ -3,13 +3,14 @@
 //! Disk block manager  knows the disk location of each layout area, and the allocation and reclamation of disk blocks need to be completed through it.
 //!
 //! NOTICE: from this level, all data structures are in memory.
+use crate::block::BLOCK_SZ;
+
 use super::{
-    block_cache_sync_all, get_block_cache, vfs::EfsInode, Bitmap, BlockDevice, DiskInode, DiskInodeType, SuperBlock
+    block_cache_sync_all, get_block_cache, inode::EfsInode, Bitmap, BlockDevice, DiskInode, DiskInodeType, SuperBlock
 };
 use alloc::sync::Arc;
 use spin::Mutex;
 
-const BLOCK_SZ: usize = 512;
 
 /// EasyFileSystem struct
 pub struct EasyFileSystem {

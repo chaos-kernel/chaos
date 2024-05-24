@@ -17,15 +17,13 @@
 extern crate alloc;
 
 pub mod bitmap;
-pub mod block_cache;
-pub mod block_dev;
-pub mod efs;
+pub mod file_system;
 pub mod layout;
-pub mod vfs;
+pub mod inode;
 
-pub const BLOCK_SZ: usize = 512;
 use bitmap::Bitmap;
-use block_cache::{block_cache_sync_all, get_block_cache};
+use crate::block::block_dev;
+use crate::block::block_cache::*;
 pub use block_dev::BlockDevice;
-pub use efs::EasyFileSystem;
+pub use file_system::EasyFileSystem;
 pub use layout::*;

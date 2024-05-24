@@ -3,7 +3,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
 use spin::Mutex;
-use crate::{drivers::BLOCK_DEVICE, fs::efs::vfs::EfsInode, mm::UserBuffer, sync::UPSafeCell};
+use crate::{drivers::BLOCK_DEVICE, fs::efs::inode::EfsInode, mm::UserBuffer, sync::UPSafeCell};
 use super::{efs::{BlockDevice, EasyFileSystem}, File};
 
 /// inode in memory

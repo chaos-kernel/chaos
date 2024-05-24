@@ -1,12 +1,14 @@
 //! Block Cache Layer
 //! Implements about the disk block cache functionality
-use super::{BlockDevice, BLOCK_SZ};
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use lazy_static::*;
 use spin::Mutex;
+
+use super::block_dev::BlockDevice;
+use super::BLOCK_SZ;
 /// BlockCache is a cache for a block in disk.
 pub struct BlockCache {
     cache: Vec<u8>,

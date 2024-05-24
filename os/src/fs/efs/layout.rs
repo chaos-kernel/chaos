@@ -8,7 +8,9 @@
 //!  - data bitmap
 //!  - data area with DataBlock
 
-use super::{get_block_cache, BlockDevice, BLOCK_SZ};
+use crate::block::BLOCK_SZ;
+
+use super::{get_block_cache, BlockDevice};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result};

@@ -50,6 +50,7 @@ pub mod syscall;
 pub mod task;
 pub mod timer;
 pub mod trap;
+pub mod block;
 
 use crate::fs::inode::list_apps;
 use core::arch::global_asm;
