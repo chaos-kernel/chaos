@@ -20,12 +20,10 @@ mod switch;
 mod task;
 
 use self::id::TaskUserRes;
-use crate::fs::inode::OpenFlags;
-use crate::{fs::inode::open_file, task::manager::add_stopping_task};
-use crate::timer::remove_timer;
+use crate::{fs::{open_file, OpenFlags}, timer::remove_timer};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
-use manager::fetch_task;
+use manager::{add_stopping_task, fetch_task};
 use process::ProcessControlBlock;
 use switch::__switch;
 

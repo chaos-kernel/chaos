@@ -52,8 +52,9 @@ pub mod timer;
 pub mod trap;
 pub mod block;
 
-use crate::fs::inode::list_apps;
 use core::arch::global_asm;
+
+use fs::list_apps;
 
 global_asm!(include_str!("entry.asm"));
 

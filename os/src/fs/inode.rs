@@ -4,7 +4,7 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
 use spin::Mutex;
 use crate::{drivers::BLOCK_DEVICE, fs::efs::inode::EfsInode, mm::UserBuffer, sync::UPSafeCell};
-use super::{efs::{BlockDevice, EasyFileSystem}, File};
+use super::{efs::{BlockDevice, EasyFileSystem}, file::File};
 
 /// inode in memory
 pub struct OSInode {
@@ -103,86 +103,54 @@ pub trait Inode: Send + Sync {
     fn clear(&self);
 }
 
+/// The stat of a inode
+#[repr(C)]
+#[derive(Debug)]
+pub struct Stat {
+    /// ID of device containing file
+    pub dev: u64,
+    /// inode number
+    pub ino: u64,
+    /// file type and mode
+    pub mode: StatMode,
+    /// number of hard links
+    pub nlink: u32,
+    /// unused pad
+    pad: [u64; 7],
+}
+
+impl Stat {
+    /// create a new Stat, assuming is a file
+    pub fn new(ino: u64, nlink: u32) -> Self {
+        Self {
+            dev: 0,
+            ino,
+            mode: StatMode::FILE,
+            nlink,
+            pad: [0; 7]
+        }
+    }
+}
+
+bitflags! {
+    /// The mode of a inode
+    /// whether a directory or a file
+    pub struct StatMode: u32 {
+        /// null
+        const NULL  = 0;
+        /// directory
+        const DIR   = 0o040000;
+        /// ordinary regular file
+        const FILE  = 0o100000;
+    }
+}
+
 lazy_static! {
     /// The root inode
     pub static ref ROOT_INODE: Arc<EfsInode> = {
         let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
         Arc::new(EasyFileSystem::root_inode(&efs))
     };
-}
-
-/// List all apps in the root directory
-pub fn list_apps() {
-    println!("/**** APPS ****");
-    for app in ROOT_INODE.ls() {
-        println!("{}", app);
-    }
-    println!("**************/");
-}
-
-bitflags! {
-    ///  The flags argument to the open() system call is constructed by ORing together zero or more of the following values:
-    pub struct OpenFlags: u32 {
-        /// readyonly
-        const RDONLY = 0;
-        /// writeonly
-        const WRONLY = 1 << 0;
-        /// read and write
-        const RDWR = 1 << 1;
-        /// create new file
-        const CREATE = 1 << 9;
-        /// truncate file size to 0
-        const TRUNC = 1 << 10;
-    }
-}
-
-impl OpenFlags {
-    /// Do not check validity for simplicity
-    /// Return (readable, writable)
-    pub fn read_write(&self) -> (bool, bool) {
-        if self.is_empty() {
-            (true, false)
-        } else if self.contains(Self::WRONLY) {
-            (false, true)
-        } else {
-            (true, true)
-        }
-    }
-}
-
-/// Open a file
-pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
-    trace!("kernel: open_file: name = {}, flags = {:?}", name, flags);
-    let (readable, writable) = flags.read_write();
-    if flags.contains(OpenFlags::CREATE) {
-        if let Some(inode) = ROOT_INODE.find(name) {
-            // clear size
-            inode.clear();
-            Some(Arc::new(OSInode::new(readable, writable, inode)))
-        } else {
-            // create file
-            ROOT_INODE
-                .create(name)
-                .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
-        }
-    } else {
-        ROOT_INODE.find(name).map(|inode| {
-            if flags.contains(OpenFlags::TRUNC) {
-                inode.clear();
-            }
-            Arc::new(OSInode::new(readable, writable, inode))
-        })
-    }
-}
-
-/// Link a file
-pub fn link(old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
-    ROOT_INODE.link(old_name, new_name)
-}
-
-/// Unlink a file
-pub fn unlink(name: &str) -> bool {
-    ROOT_INODE.unlink(name)
 }
 
 impl File for OSInode {

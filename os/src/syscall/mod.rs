@@ -111,7 +111,8 @@ use process::*;
 use sync::*;
 use thread::*;
 
-use crate::{fs::Stat, task::current_task};
+use crate::{fs::inode::Stat, task::current_task};
+
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
