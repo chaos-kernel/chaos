@@ -50,6 +50,8 @@ pub const SYSCALL_UNAME: usize = 160;
 pub const SYSCALL_GETTIMEOFDAY: usize = 169;
 /// getpid syscall
 pub const SYSCALL_GETPID: usize = 172;
+/// getppid syscall
+pub const SYSCALL_GETPPID: usize = 173;
 /// gettid syscall
 pub const SYSCALL_GETTID: usize = 178;
 /// fork syscall
@@ -140,6 +142,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_TIMES => sys_times(args[0] as *mut Tms),
         SYSCALL_UNAME => sys_uname(args[0] as *mut Utsname),
         SYSCALL_GETPID => sys_getpid(),
+        SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_GETTID => sys_gettid(),
         SYSCALL_FORK => sys_fork(),
         SYSCALL_BRK => sys_brk(args[0] as usize),
