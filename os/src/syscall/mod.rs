@@ -135,7 +135,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
-        SYSCALL_SLEEP => sys_sleep(args[0]),
+        SYSCALL_SLEEP => sys_sleep(args[0] as *const u64, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut Tms),
         SYSCALL_UNAME => sys_uname(args[0] as *mut Utsname),
