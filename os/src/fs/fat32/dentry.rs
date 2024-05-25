@@ -70,6 +70,10 @@ impl Fat32Dentry {
         self.name = name;
     }
 
+    pub fn start_cluster(&self) -> u32 {
+        self.start_cluster
+    }
+
     pub fn is_system(&self) -> bool {
         self.attr.contains(FileAttributes::SYSTEM)
     }

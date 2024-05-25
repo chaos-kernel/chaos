@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::{efs::BlockDevice, fat32::dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, inode::Inode}};
+use crate::fs::{efs::BlockDevice, inode::Inode};
 
 use super::file_system::Fat32FS;
 
@@ -17,7 +17,21 @@ impl Inode for Fat32Inode {
     }
     
     fn find(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
-        todo!()
+        debug!("find: {}", name);
+        let fs = self.fs.lock();
+        let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
+        let mut offset = 0;
+        while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
+            if dentry.name() == name {
+                let inode = Fat32Inode {
+                    start_cluster: dentry.start_cluster(),
+                    fs: Arc::clone(&self.fs),
+                    bdev: Arc::clone(&self.bdev),
+                };
+                return Some(Arc::new(inode));
+            }
+        }
+        None
     }
     
     fn create(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
