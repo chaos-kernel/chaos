@@ -20,3 +20,11 @@
 qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 -bios sbi-qemu -drive file=sdcard.img,if=none,format=raw,id=x0  -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -device virtio-net-device,netdev=net -netdev user,id=net -initrd initrd.img
 ```
 在运行 QEMU 的命令中，`-initrd initrd.img` 为可选项。如果你的 Makefile 生成了 `initrd.img`，则会在运行命令中添加此参数，否则运行命令中不包含 `-intird initrd.img` 参数。
+
+## TODO
+
+- [ ] FAT32 文件系统
+  - [x] 读
+  - [ ] 写
+
+
