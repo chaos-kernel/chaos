@@ -3,7 +3,7 @@ use spin::Mutex;
 
 use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::efs::BlockDevice};
 
-use super::{dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::Fat32Inode, super_block::{Fat32SB, Fat32SBLayout}};
+use super::{dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
 
 pub struct Fat32FS {
     pub sb: Fat32SB,
@@ -34,8 +34,10 @@ impl Fat32FS {
         let bdev = Arc::clone(&fs_.bdev);
         drop(fs_);
         Fat32Inode {
+            type_: Fat32InodeType::Dir,
             start_cluster,
             fs: Arc::clone(fs),
+            fize_size: 0,
             bdev,
         }
     }

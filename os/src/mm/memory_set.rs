@@ -254,6 +254,7 @@ impl MemorySet {
         let max_end_va: VirtAddr = max_end_vpn.into();
         let mut user_heap_base: usize = max_end_va.into();
         user_heap_base += PAGE_SIZE;
+        debug!("user heap base: {:#x}", user_heap_base);
         (
             memory_set,
             user_heap_base,

@@ -8,7 +8,9 @@ use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::Inode};
 use super::file_system::Fat32FS;
 
 pub struct Fat32Inode {
+    pub type_: Fat32InodeType,
     pub start_cluster: u32,
+    pub fize_size: u32,
     pub fs: Arc<Mutex<Fat32FS>>,
     pub bdev: Arc<dyn BlockDevice>,
 }
@@ -26,7 +28,9 @@ impl Inode for Fat32Inode {
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
             if dentry.name() == name {
                 let inode = Fat32Inode {
+                    type_: Fat32InodeType::File,
                     start_cluster: dentry.start_cluster(),
+                    fize_size: dentry.file_size(),
                     fs: Arc::clone(&self.fs),
                     bdev: Arc::clone(&self.bdev),
                 };
@@ -77,11 +81,11 @@ impl Inode for Fat32Inode {
                 }
             }
             fs.read_cluster(cluster_id, &mut cluster_buf);
-            let copy_size = min(CLUSTER_SIZE - pos % CLUSTER_SIZE, buf.len() - read_size);
+            let copy_size = min(self.fize_size as usize - pos, buf.len() - read_size);
             buf[read_size..read_size + copy_size].copy_from_slice(&cluster_buf[pos % CLUSTER_SIZE..pos % CLUSTER_SIZE + copy_size]);
             read_size += copy_size;
             pos += copy_size;
-            if read_size >= buf.len() {
+            if read_size >= buf.len() || pos >= self.fize_size as usize {
                 break;
             }
         }
@@ -95,4 +99,10 @@ impl Inode for Fat32Inode {
     fn clear(&self) {
         todo!()
     } 
+}
+
+pub enum Fat32InodeType {
+    File,
+    Dir,
+    VolumeId,
 }
