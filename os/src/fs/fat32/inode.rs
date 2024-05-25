@@ -70,8 +70,9 @@ impl Inode for Fat32Inode {
         let mut cluster_buf = [0u8; CLUSTER_SIZE];
         for cluster_id in cluster_chain {
             if pos < offset {
-                pos += min(CLUSTER_SIZE, offset - pos);
-                if pos < offset {
+                let pass_size = min(CLUSTER_SIZE, offset - pos);
+                pos += pass_size;
+                if pass_size == CLUSTER_SIZE {
                     continue;
                 }
             }

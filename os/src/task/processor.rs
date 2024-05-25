@@ -79,7 +79,7 @@ pub fn run_tasks() {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
         } else {
-            panic!("no tasks available in run_tasks");
+            return;
         }
     }
 }

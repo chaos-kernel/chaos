@@ -84,37 +84,37 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
 
 const ALL_TASKS: [&str; 32] = [
     "brk",
-    "dup",
-    "execve",
-    "fork",
-    "getcwd",
-    "getpid",
-    "gettimeofday",
-    "mmap",
-    "mount",
-    "open",
-    "pipe",
-    "test_echo",
-    "times",
-    "uname",
-    "wait",
-    "write",
     "chdir",
     "close",
+    "dup",
     "dup2",
+    "execve",
     "exit",
+    "fork",
     "fstat",
+    "getcwd",
     "getdents",
+    "getpid",
     "getppid",
+    "gettimeofday",
     "mkdir_",
+    "mmap",
+    "mount",
     "munmap",
+    "pipe",
     "openat",
     "read",
     "sleep",
+    "test_echo",
+    "times",
     "umount",
+    "uname",
     "unlink",
+    "wait",
+    "write",
     "waitpid",
     "yield",
+    "open",
 ];
 
 #[no_mangle]
@@ -129,7 +129,9 @@ pub fn rust_main() -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    task::add_all_files(ALL_TASKS.to_vec());
-    task::run_tasks();
+    for file in ALL_TASKS.iter() {
+        task::add_file(file);
+        task::run_tasks();
+    }
     panic!("Unreachable in rust_main!");
 }

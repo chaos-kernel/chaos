@@ -106,72 +106,71 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     }
     // however, if this is the main thread of current process
     // the process should terminate at once
-    // 没有 main thread 了
-    // if tid == 0 {
-    //     let pid = process.getpid();
-    //     if pid == IDLE_PID {
-    //         println!(
-    //             "[kernel] Idle process exit with exit_code {} ...",
-    //             exit_code
-    //         );
-    //         if exit_code != 0 {
-    //             //crate::sbi::shutdown(255); //255 == -1 for err hint
-    //             crate::board::QEMU_EXIT_HANDLE.exit_failure();
-    //         } else {
-    //             //crate::sbi::shutdown(0); //0 for success hint
-    //             crate::board::QEMU_EXIT_HANDLE.exit_success();
-    //         }
-    //     }
-    //     remove_from_pid2process(pid);
-    //     let mut process_inner = process.inner_exclusive_access();
-    //     // mark this process as a zombie process
-    //     process_inner.is_zombie = true;
-    //     // record exit code of main process
-    //     process_inner.exit_code = exit_code;
+    if tid == 0 {
+        let pid = process.getpid();
+        // if pid == IDLE_PID {
+        //     println!(
+        //         "[kernel] Idle process exit with exit_code {} ...",
+        //         exit_code
+        //     );
+        //     if exit_code != 0 {
+        //         //crate::sbi::shutdown(255); //255 == -1 for err hint
+        //         crate::board::QEMU_EXIT_HANDLE.exit_failure();
+        //     } else {
+        //         //crate::sbi::shutdown(0); //0 for success hint
+        //         crate::board::QEMU_EXIT_HANDLE.exit_success();
+        //     }
+        // }
+        remove_from_pid2process(pid);
+        let mut process_inner = process.inner_exclusive_access();
+        // mark this process as a zombie process
+        process_inner.is_zombie = true;
+        // record exit code of main process
+        process_inner.exit_code = exit_code;
 
-    //     {
-    //         // move all child processes under init process
-    //         let mut initproc_inner = INITPROC.inner_exclusive_access();
-    //         for child in process_inner.children.iter() {
-    //             child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
-    //             initproc_inner.children.push(child.clone());
-    //         }
-    //     }
+        // {
+        //     // move all child processes under init process
+        //     let mut initproc_inner = INITPROC.inner_exclusive_access();
+        //     for child in process_inner.children.iter() {
+        //         child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
+        //         initproc_inner.children.push(child.clone());
+        //     }
+        // }
 
-    //     // deallocate user res (including tid/trap_cx/ustack) of all threads
-    //     // it has to be done before we dealloc the whole memory_set
-    //     // otherwise they will be deallocated twice
-    //     let mut recycle_res = Vec::<TaskUserRes>::new();
-    //     for task in process_inner.tasks.iter().filter(|t| t.is_some()) {
-    //         let task = task.as_ref().unwrap();
-    //         // if other tasks are Ready in TaskManager or waiting for a timer to be
-    //         // expired, we should remove them.
-    //         //
-    //         // Mention that we do not need to consider Mutex/Semaphore since they
-    //         // are limited in a single process. Therefore, the blocked tasks are
-    //         // removed when the PCB is deallocated.
-    //         trace!("kernel: exit_current_and_run_next .. remove_inactive_task");
-    //         remove_inactive_task(Arc::clone(&task));
-    //         let mut task_inner = task.inner_exclusive_access();
-    //         if let Some(res) = task_inner.res.take() {
-    //             recycle_res.push(res);
-    //         }
-    //     }
-    //     // dealloc_tid and dealloc_user_res require access to PCB inner, so we
-    //     // need to collect those user res first, then release process_inner
-    //     // for now to avoid deadlock/double borrow problem.
-    //     drop(process_inner);
-    //     recycle_res.clear();
+        // deallocate user res (including tid/trap_cx/ustack) of all threads
+        // it has to be done before we dealloc the whole memory_set
+        // otherwise they will be deallocated twice
+        let mut recycle_res = Vec::<TaskUserRes>::new();
+        for task in process_inner.tasks.iter().filter(|t| t.is_some()) {
+            let task = task.as_ref().unwrap();
+            // if other tasks are Ready in TaskManager or waiting for a timer to be
+            // expired, we should remove them.
+            //
+            // Mention that we do not need to consider Mutex/Semaphore since they
+            // are limited in a single process. Therefore, the blocked tasks are
+            // removed when the PCB is deallocated.
+            trace!("kernel: exit_current_and_run_next .. remove_inactive_task");
+            remove_inactive_task(Arc::clone(&task));
+            let mut task_inner = task.inner_exclusive_access();
+            if let Some(res) = task_inner.res.take() {
+                recycle_res.push(res);
+            }
+        }
+        // dealloc_tid and dealloc_user_res require access to PCB inner, so we
+        // need to collect those user res first, then release process_inner
+        // for now to avoid deadlock/double borrow problem.
+        drop(process_inner);
+        recycle_res.clear();
 
-    //     let mut process_inner = process.inner_exclusive_access();
-    //     process_inner.children.clear();
-    //     // deallocate other data in user space i.e. program code/data section
-    //     process_inner.memory_set.recycle_data_pages();
-    //     // drop file descriptors
-    //     process_inner.fd_table.clear();
-    //     // remove all tasks
-    //     process_inner.tasks.clear();
-    // }
+        let mut process_inner = process.inner_exclusive_access();
+        process_inner.children.clear();
+        // deallocate other data in user space i.e. program code/data section
+        process_inner.memory_set.recycle_data_pages();
+        // drop file descriptors
+        process_inner.fd_table.clear();
+        // remove all tasks
+        process_inner.tasks.clear();
+    }
     drop(process);
     // we do not have to save task context
     let mut _unused = TaskContext::zero_init();
@@ -196,12 +195,10 @@ pub fn add_initproc() {
 }
 
 /// Run all files in the root directory
-pub fn add_all_files(files: Vec<&str>) {
-    for file in files {
-        let inode = open_file(&file, OpenFlags::RDONLY).unwrap();
-        let v = inode.read_all();
-        let _pcb = ProcessControlBlock::new(v.as_slice());
-    }
+pub fn add_file(file: &str) {
+    let inode = open_file(&file, OpenFlags::RDONLY).unwrap();
+    let v = inode.read_all();
+    let _pcb = ProcessControlBlock::new(v.as_slice());
 }
 
 /// Check if the current task has any signal to handle
