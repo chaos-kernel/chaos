@@ -63,7 +63,7 @@ impl Fat32FS {
         for i in 0..self.sb.sectors_per_cluster {
             get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .read(0, |data: &[u8; 4096]| {
+                .read(0, |data: &[u8; BLOCK_SZ]| {
                     let copy_size = core::cmp::min(cluster_size - read_size, data.len());
                     buf[read_size..read_size + copy_size].copy_from_slice(&data[..copy_size]);
                     read_size += copy_size;
@@ -79,7 +79,7 @@ impl Fat32FS {
         for i in 0..self.sb.sectors_per_cluster {
             get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .modify(0, |data: &mut [u8; 4096]| {
+                .modify(0, |data: &mut [u8; BLOCK_SZ]| {
                     let copy_size = core::cmp::min(cluster_size - write_size, data.len());
                     data[..copy_size].copy_from_slice(&buf[write_size..write_size + copy_size]);
                     write_size += copy_size;

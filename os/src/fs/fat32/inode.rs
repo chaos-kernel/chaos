@@ -1,7 +1,9 @@
+use core::cmp::min;
+
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::fs::{efs::BlockDevice, inode::Inode};
+use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::Inode};
 
 use super::file_system::Fat32FS;
 
@@ -60,7 +62,29 @@ impl Inode for Fat32Inode {
     }
     
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
-        todo!()
+        let fs = self.fs.lock();
+        let cluster_id = self.start_cluster;
+        let cluster_chain = fs.cluster_chain(cluster_id);
+        let mut read_size = 0;
+        let mut pos = 0;
+        let mut cluster_buf = [0u8; CLUSTER_SIZE];
+        for cluster_id in cluster_chain {
+            if pos < offset {
+                pos += min(CLUSTER_SIZE, offset - pos);
+                if pos < offset {
+                    continue;
+                }
+            }
+            fs.read_cluster(cluster_id, &mut cluster_buf);
+            let copy_size = min(CLUSTER_SIZE - pos % CLUSTER_SIZE, buf.len() - read_size);
+            buf[read_size..read_size + copy_size].copy_from_slice(&cluster_buf[pos % CLUSTER_SIZE..pos % CLUSTER_SIZE + copy_size]);
+            read_size += copy_size;
+            pos += copy_size;
+            if read_size >= buf.len() {
+                break;
+            }
+        }
+        read_size
     }
     
     fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
