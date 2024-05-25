@@ -45,6 +45,7 @@ pub struct SuperBlock {
 impl Debug for SuperBlock {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("SuperBlock")
+            .field("magic", &self.magic)
             .field("total_blocks", &self.total_blocks)
             .field("inode_bitmap_blocks", &self.inode_bitmap_blocks)
             .field("inode_area_blocks", &self.inode_area_blocks)

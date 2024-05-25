@@ -4,7 +4,7 @@ MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-FS_IMG := fs.img
+FS_IMG := sdcard-riscv.img
 APPS := ../user/src/bin/*
 OFFLINE :=
 

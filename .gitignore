@@ -19,3 +19,4 @@ tools/
 pushall.sh
 .vscode/*.log
 *.bak
+sdcard-riscv.img

@@ -3,6 +3,7 @@
 pub mod inode;
 mod pipe;
 mod stdio;
+mod fat32;
 pub(crate) mod file;
 pub(crate) mod efs;
 

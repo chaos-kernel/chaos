@@ -2,7 +2,7 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
-use crate::{drivers::BLOCK_DEVICE, mm::UserBuffer, sync::UPSafeCell};
+use crate::{drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell};
 use super::{efs::EasyFileSystem, file::File};
 
 /// inode in memory
@@ -160,8 +160,8 @@ bitflags! {
 lazy_static! {
     /// The root inode
     pub static ref ROOT_INODE: Arc<OSInode> = {
-        let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
-        let root_inode = EasyFileSystem::root_inode(&efs);
+        let fs = Fat32FS::load(BLOCK_DEVICE.clone());
+        let root_inode = Fat32FS::root_inode(&fs);
         let inode: Arc<dyn Inode> = Arc::new(root_inode);
         Arc::new(OSInode { 
             readable: true, 
