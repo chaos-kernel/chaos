@@ -53,6 +53,7 @@ lazy_static! {
 ///Loop `fetch_task` to get the process that needs to run, and switch the process through `__switch`
 pub fn run_tasks() {
     loop {
+        debug!("run_tasks");
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
@@ -74,7 +75,7 @@ pub fn run_tasks() {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
         } else {
-            warn!("no tasks available in run_tasks");
+            panic!("no tasks available in run_tasks");
         }
     }
 }

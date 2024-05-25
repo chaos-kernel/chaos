@@ -24,6 +24,8 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
+use core::arch::global_asm;
+
 #[macro_use]
 extern crate log;
 
@@ -50,10 +52,6 @@ pub mod task;
 pub mod timer;
 pub mod trap;
 pub mod block;
-
-use core::arch::global_asm;
-
-use fs::list_apps;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -83,6 +81,41 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
     );
 }
 
+const ALL_TASKS: [&str; 32] = [
+    "brk",
+    "dup",
+    "execve",
+    "fork",
+    "getcwd",
+    "getpid",
+    "gettimeofday",
+    "mmap",
+    "mount",
+    "open",
+    "pipe",
+    "test_echo",
+    "times",
+    "uname",
+    "wait",
+    "write",
+    "chdir",
+    "close",
+    "dup2",
+    "exit",
+    "fstat",
+    "getdents",
+    "getppid",
+    "mkdir_",
+    "munmap",
+    "openat",
+    "read",
+    "sleep",
+    "umount",
+    "unlink",
+    "waitpid",
+    "yield",
+];
+
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
@@ -95,8 +128,7 @@ pub fn rust_main() -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    list_apps();
-    task::add_initproc();
+    task::add_all_files(ALL_TASKS.to_vec());
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }
