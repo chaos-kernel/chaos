@@ -2,9 +2,8 @@
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
-use spin::Mutex;
-use crate::{drivers::BLOCK_DEVICE, fs::efs::inode::EfsInode, mm::UserBuffer, sync::UPSafeCell};
-use super::{efs::{BlockDevice, EasyFileSystem}, file::File};
+use crate::{drivers::BLOCK_DEVICE, mm::UserBuffer, sync::UPSafeCell};
+use super::{efs::EasyFileSystem, file::File};
 
 /// inode in memory
 pub struct OSInode {
@@ -47,42 +46,55 @@ impl OSInode {
     }
 }
 
-/// Inode metadata
-#[derive(Clone)]
-pub struct InodeMeta {
-    /// block id
-    pub block_id: usize,
-    /// block offset
-    pub block_offset: usize,
-    /// file system
-    pub fs: Arc<Mutex<EasyFileSystem>>,
-    /// block device
-    pub block_device: Arc<dyn BlockDevice>,
-}
+impl Inode for OSInode {
+    fn fstat(&self) -> (usize, u32) {
+        let inner = self.inner.exclusive_access();
+        inner.inode.fstat()
+    }
 
-impl InodeMeta {
-    /// create a new InodeMeta
-    pub fn new(
-        block_id: usize,
-        block_offset: usize,
-        fs: Arc<Mutex<EasyFileSystem>>,
-        block_device: Arc<dyn BlockDevice>,
-    ) -> Self {
-        Self {
-            block_id,
-            block_offset,
-            fs,
-            block_device,
-        }
+    fn find(&self, name: &str) -> Option<Arc<dyn Inode>> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.find(name)
+    }
+
+    fn create(&self, name: &str) -> Option<Arc<dyn Inode>> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.create(name)
+    }
+
+    fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.link(old_name, new_name)
+    }
+
+    fn unlink(&self, name: &str) -> bool {
+        let inner = self.inner.exclusive_access();
+        inner.inode.unlink(name)
+    }
+
+    fn ls(&self) -> Vec<String> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.ls()
+    }
+
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.inode.read_at(offset, buf)
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.inode.write_at(offset, buf)
+    }
+
+    fn clear(&self) {
+        let inner = self.inner.exclusive_access();
+        inner.inode.clear();
     }
 }
 
 /// Inode trait
 pub trait Inode: Send + Sync {
-    /// get metadata
-    fn meta(&self) -> InodeMeta;
-    /// set metadata
-    fn set_meta(&mut self, meta: InodeMeta);
     /// get status of file
     fn fstat(&self) -> (usize, u32);
     /// find the disk inode of the file with 'name'
@@ -147,9 +159,15 @@ bitflags! {
 
 lazy_static! {
     /// The root inode
-    pub static ref ROOT_INODE: Arc<EfsInode> = {
+    pub static ref ROOT_INODE: Arc<OSInode> = {
         let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
-        Arc::new(EasyFileSystem::root_inode(&efs))
+        let root_inode = EasyFileSystem::root_inode(&efs);
+        let inode: Arc<dyn Inode> = Arc::new(root_inode);
+        Arc::new(OSInode { 
+            readable: true, 
+            writable: true,
+            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, inode }) }
+        })
     };
 }
 

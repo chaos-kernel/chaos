@@ -122,12 +122,12 @@ impl EasyFileSystem {
         EfsInode::new(block_id, block_offset, Arc::clone(efs), block_device)
     }
     /// Get inode block position (the block id and offset in this block) according to the inode id
-    pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
+    pub fn get_disk_inode_pos(&self, inode_id: u32) -> (usize, usize) {
         let inode_size = core::mem::size_of::<DiskInode>();
         let inodes_per_block = (BLOCK_SZ / inode_size) as u32;
         let block_id = self.inode_area_start_block + inode_id / inodes_per_block;
         (
-            block_id,
+            block_id as usize,
             (inode_id % inodes_per_block) as usize * inode_size,
         )
     }
