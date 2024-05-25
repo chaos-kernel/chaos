@@ -28,5 +28,15 @@ impl FAT {
             });
         next_cluster
     }
+
+    #[allow(unused)]
+    /// cluster id to sector id
+    pub fn cluster_id_to_sector_id(&self, cluster: u32, sb: &Fat32SB) -> Option<u32> {
+        if cluster < 2 {
+            return None;
+        }
+        let res = sb.root_sector() + (cluster - 2) * sb.sectors_per_cluster as u32;
+        Some(res)
+    }
 }
 

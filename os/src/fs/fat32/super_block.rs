@@ -1,8 +1,5 @@
 use core::fmt::Debug;
 
-use crate::block::BLOCK_SZ;
-
-
 /// the super block of a fat32 file system
 pub struct Fat32SB {
     pub bytes_per_sector: u16,

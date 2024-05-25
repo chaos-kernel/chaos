@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::{efs::BlockDevice, fat32::dentry::{self, Fat32Dentry, Fat32DentryLayout}, inode::Inode}};
+use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::{efs::BlockDevice, fat32::dentry::{Fat32Dentry, Fat32DentryLayout}, inode::Inode}};
 
 use super::file_system::Fat32FS;
 
@@ -50,7 +50,7 @@ impl Inode for Fat32Inode {
                         .read(offset, | layout: &Fat32DentryLayout | {
                             if let Some(dentry) = Fat32Dentry::from_layout(layout) {
                                 if dentry.is_file() {
-                                    v.push(dentry.name());
+                                    v.push(dentry.fullname());
                                 }
                             } else {
                                 finished = true;
