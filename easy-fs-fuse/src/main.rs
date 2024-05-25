@@ -39,6 +39,13 @@ fn easy_fs_pack() -> std::io::Result<()> {
                 .help("Executable source dir(with backslash)"),
         )
         .arg(
+            Arg::with_name("testsource")
+                .short("c")
+                .long("testsource")
+                .takes_value(true)
+                .help("External testcases dir"),
+        )
+        .arg(
             Arg::with_name("target")
                 .short("t")
                 .long("target")
@@ -47,6 +54,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
         )
         .get_matches();
     let src_path = matches.value_of("source").unwrap();
+    let testcases_path = matches.value_of("testsource").unwrap();
     let target_path = matches.value_of("target").unwrap();
     println!("src_path = {}\ntarget_path = {}", src_path, target_path);
     let block_file = Arc::new(BlockFile(Mutex::new({
@@ -71,6 +79,27 @@ fn easy_fs_pack() -> std::io::Result<()> {
         })
         .collect();
     for app in apps {
+        // load app data from host file system
+        let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();
+        let mut all_data: Vec<u8> = Vec::new();
+        host_file.read_to_end(&mut all_data).unwrap();
+        // create a file in easy-fs
+        let inode = root_inode.create(app.as_str()).unwrap();
+        // write data to easy-fs
+        inode.write_at(0, all_data.as_slice());
+    }
+
+    //下面单独加载初赛样例（除了mnt
+    let test_apps: Vec<_> = read_dir(testcases_path)
+        .unwrap()
+        .into_iter()
+        .map(|dir_entry| {
+            let elf_name = dir_entry.unwrap().file_name().into_string().unwrap();
+            elf_name
+        })
+        .collect();
+    for app in test_apps {
+        println!("{}{}", target_path, app);
         // load app data from host file system
         let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();
         let mut all_data: Vec<u8> = Vec::new();

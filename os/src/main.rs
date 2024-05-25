@@ -23,6 +23,7 @@
 #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
+#![feature(ascii_char)]
 
 use core::arch::global_asm;
 

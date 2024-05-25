@@ -37,24 +37,18 @@ pub struct TaskControlBlockInner {
     pub trap_cx_ppn: PhysPageNum,
     /// Save task context
     pub task_cx: TaskContext,
-
     /// Maintain the execution status of the current process
     pub task_status: TaskStatus,
     /// It is set when active exit or execution error occurs
     pub exit_code: Option<i32>,
-
     /// syscall times of tasks
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
-
     /// the time task was first run
     pub first_time: Option<usize>,
-
     /// priority
     pub priority: usize,
-
     /// stride
     pub stride: usize,
-
     /// pass
     pub pass: usize,
 }

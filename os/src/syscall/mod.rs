@@ -9,6 +9,8 @@
 //! For clarity, each single syscall is implemented as its own function, named
 //! `sys_` then the name of the syscall. You can find functions like this in
 //! submodules, and you should also implement syscalls this way.
+///
+pub mod errno;
 
 /// openat syscall
 pub const SYSCALL_OPENAT: usize = 56;
@@ -40,10 +42,16 @@ pub const SYSCALL_SIGPROCMASK: usize = 135;
 /// sigreturn syscall
 pub const SYSCALL_SIGRETURN: usize = 139;
 */
+/// times syscall
+pub const SYSCALL_TIMES: usize = 153;
+/// uname syscall
+pub const SYSCALL_UNAME: usize = 160;
 /// gettimeofday syscall
 pub const SYSCALL_GETTIMEOFDAY: usize = 169;
 /// getpid syscall
 pub const SYSCALL_GETPID: usize = 172;
+/// getppid syscall
+pub const SYSCALL_GETPPID: usize = 173;
 /// gettid syscall
 pub const SYSCALL_GETTID: usize = 178;
 /// fork syscall
@@ -51,13 +59,11 @@ pub const SYSCALL_FORK: usize = 220;
 /// exec syscall
 pub const SYSCALL_EXEC: usize = 221;
 /// waitpid syscall
-pub const SYSCALL_WAITPID: usize = 260;
+pub const SYSCALL_WAIT4: usize = 260;
 /// set priority syscall
 pub const SYSCALL_SET_PRIORITY: usize = 140;
-/*
 /// sbrk syscall
-pub const SYSCALL_SBRK: usize = 214;
-*/
+pub const SYSCALL_BRK: usize = 214;
 /// munmap syscall
 pub const SYSCALL_MUNMAP: usize = 215;
 /// mmap syscall
@@ -132,14 +138,18 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
-        SYSCALL_SLEEP => sys_sleep(args[0]),
+        SYSCALL_SLEEP => sys_sleep(args[0] as *const u64, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
+        SYSCALL_TIMES => sys_times(args[0] as *mut Tms),
+        SYSCALL_UNAME => sys_uname(args[0] as *mut Utsname),
         SYSCALL_GETPID => sys_getpid(),
+        SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_GETTID => sys_gettid(),
         SYSCALL_FORK => sys_fork(),
+        SYSCALL_BRK => sys_brk(args[0] as usize),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
-        SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
-        SYSCALL_GETTIMEOFDAY => sys_get_time(args[0] as *mut TimeVal, args[1]),
+        SYSCALL_WAIT4 => sys_wait4(args[0] as isize,args[1] as *mut i32, args[2] as u32, args[3],) ,
+        SYSCALL_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1]),
         SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2]),
         SYSCALL_MUNMAP => sys_munmap(args[0], args[1]),
         SYSCALL_SET_PRIORITY => sys_set_priority(args[0] as isize),

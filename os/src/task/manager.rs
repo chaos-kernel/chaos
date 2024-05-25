@@ -11,6 +11,7 @@ use lazy_static::*;
 ///A array of `TaskControlBlock` that is thread-safe
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
+    block_queue: VecDeque<Arc<TaskControlBlock>>,
     
     /// The stopping task, leave a reference so that the kernel stack will not be recycled when switching tasks
     stop_task: Option<Arc<TaskControlBlock>>,
@@ -22,12 +23,17 @@ impl TaskManager {
     pub fn new() -> Self {
         Self {
             ready_queue: VecDeque::new(),
+            block_queue: VecDeque::new(),
             stop_task: None,
         }
     }
     /// Add process back to ready queue
     pub fn add(&mut self, task: Arc<TaskControlBlock>) {
         self.ready_queue.push_back(task);
+    }
+    /// add process back to block queue
+    pub fn add_block(&mut self, task: Arc<TaskControlBlock>) {
+        self.block_queue.push_back(task);
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
@@ -80,6 +86,12 @@ pub fn add_task(task: Arc<TaskControlBlock>) {
     TASK_MANAGER.exclusive_access().add(task);
 }
 
+/// Add a task to block queue
+pub fn add_block_task(task: Arc<TaskControlBlock>) {
+    //trace!("kernel: TaskManager::add_block_task");
+    TASK_MANAGER.exclusive_access().add_block(task);
+}
+
 /// Wake up a task
 pub fn wakeup_task(task: Arc<TaskControlBlock>) {
     trace!("kernel: TaskManager::wakeup_task");
@@ -124,3 +136,20 @@ pub fn remove_from_pid2process(pid: usize) {
         panic!("cannot find pid {} in pid2task!", pid);
     }
 }
+
+#[allow(unused)]
+pub fn unblock_task(task: Arc<TaskControlBlock>) {
+    // println!("[unblock_task] unblock thread");
+    let mut task_manager = TASK_MANAGER.exclusive_access();
+    task.inner_exclusive_access().task_status = TaskStatus::Ready;
+    if let Some((idx, t)) = task_manager
+        .block_queue
+        .iter()
+        .enumerate()
+        .find(|(_, t)| Arc::ptr_eq(t, &task))
+    {
+        task_manager.block_queue.remove(idx);
+        task_manager.ready_queue.push_front(task);
+    }
+}
+

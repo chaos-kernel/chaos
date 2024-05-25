@@ -4,7 +4,7 @@ use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
+use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE};
 use crate::sync::UPSafeCell;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -43,6 +43,8 @@ pub struct MemorySet {
     pub page_table: PageTable,
     /// areas
     pub areas: Vec<MapArea>,
+    /// heap
+    heap_area: BTreeMap<VirtPageNum, FrameTracker>,
 }
 
 impl MemorySet {
@@ -51,6 +53,7 @@ impl MemorySet {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
+            heap_area: BTreeMap::new(),
         }
     }
     /// Get he page table token
@@ -207,7 +210,7 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp_base and entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
@@ -244,11 +247,12 @@ impl MemorySet {
         }
         // map user stack with U flags
         let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_stack_base: usize = max_end_va.into();
-        user_stack_base += PAGE_SIZE;
+        let mut user_heap_base: usize = max_end_va.into();
+        user_heap_base += PAGE_SIZE;
         (
             memory_set,
-            user_stack_base,
+            user_heap_base,
+            STACK_TOP,
             elf.header.pt2.entry_point() as usize,
         )
     }
@@ -269,6 +273,21 @@ impl MemorySet {
                     .get_bytes_array()
                     .copy_from_slice(src_ppn.get_bytes_array());
             }
+        }
+        // copy heap_area
+        for (vpn, src_frame) in user_space.heap_area.iter() {
+            let dst_frame = frame_alloc().unwrap();
+            let dst_ppn = dst_frame.ppn;
+            memory_set
+                .page_table
+                .map(*vpn, dst_ppn, PTEFlags::U | PTEFlags::R | PTEFlags::W);
+            memory_set.heap_area.insert(*vpn, dst_frame);
+
+            let src_ppn = src_frame.ppn;
+            // copy data
+            dst_ppn
+                .get_bytes_array()
+                .copy_from_slice(src_ppn.get_bytes_array());
         }
         memory_set
     }
@@ -318,6 +337,27 @@ impl MemorySet {
         } else {
             false
         }
+    }
+
+    /// map new heap area
+    pub fn map_heap(&mut self, mut current_addr: VirtAddr, aim_addr: VirtAddr) -> isize {
+        // log!("[map_heap] start_addr = {:#x}, end_addr = {:#x}", current_addr.0, aim_addr.0);
+        loop {
+            if current_addr.0 >= aim_addr.0 {
+                break;
+            }
+            // We use BTreeMap to save FrameTracker which makes management quite easy
+            // alloc a new FrameTracker
+            let frame = frame_alloc().unwrap();
+            let ppn = frame.ppn;
+            let vpn: VirtPageNum = current_addr.floor();
+            // log!("[map_heap] map vpn = {:#x}, ppn = {:#x}", vpn.0, ppn.0);
+            self.page_table
+                .map(vpn, ppn, PTEFlags::U | PTEFlags::R | PTEFlags::W);
+            self.heap_area.insert(vpn, frame);
+            current_addr = VirtAddr::from(current_addr.0 + PAGE_SIZE);
+        }
+        0
     }
 }
 

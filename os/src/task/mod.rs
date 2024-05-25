@@ -20,6 +20,7 @@ mod switch;
 mod task;
 
 use self::id::TaskUserRes;
+use self::manager::add_block_task;
 use crate::{fs::{inode::{ROOT_INODE, Inode}, open_file, OpenFlags}, timer::remove_timer};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
@@ -63,6 +64,7 @@ pub fn block_current_and_run_next() {
     let task_cx_ptr = &mut task_inner.task_cx as *mut TaskContext;
     task_inner.task_status = TaskStatus::Blocked;
     drop(task_inner);
+    add_block_task(task);
     schedule(task_cx_ptr);
 }
 

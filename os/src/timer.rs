@@ -10,6 +10,12 @@ use alloc::collections::BinaryHeap;
 use alloc::sync::Arc;
 use lazy_static::*;
 use riscv::register::time;
+///纳秒转换关系
+pub const NSEC_PER_SEC: usize = 1_000_000_000;
+///纳秒转换关系
+pub const NSEC_PER_MSEC: usize = 1_000_000;
+///纳秒转换关系
+pub const NSEC_PER_USEC: usize = 1_000;
 /// The number of ticks per second
 const TICKS_PER_SEC: usize = 100;
 /// The number of milliseconds per second
