@@ -151,7 +151,6 @@ impl ProcessControlBlock {
         trace!("kernel: ProcessControlBlock::new");
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
-        debug!("entry_point: {:#x}", entry_point);
         // allocate a pid
         let pid_handle = pid_alloc();
         let process = Arc::new(Self {

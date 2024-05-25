@@ -237,11 +237,6 @@ impl MemorySet {
                 if ph_flags.is_execute() {
                     map_perm |= MapPermission::X;
                 }
-                debug!(
-                    "map [{:#x}, {:#x}) with perm {:?}",
-                    start_va.0, end_va.0, map_perm
-                );
-                debug!("data: {:?}", elf.input[ph.offset() as usize..(ph.offset() + 4) as usize].to_vec());
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
                 max_end_vpn = map_area.vpn_range.get_end();
                 memory_set.push(
@@ -254,7 +249,6 @@ impl MemorySet {
         let max_end_va: VirtAddr = max_end_vpn.into();
         let mut user_heap_base: usize = max_end_va.into();
         user_heap_base += PAGE_SIZE;
-        debug!("user heap base: {:#x}", user_heap_base);
         (
             memory_set,
             user_heap_base,

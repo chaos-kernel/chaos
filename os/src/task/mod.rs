@@ -21,7 +21,7 @@ mod task;
 
 use self::id::TaskUserRes;
 use self::manager::add_block_task;
-use crate::{fs::{inode::{ROOT_INODE, Inode}, open_file, OpenFlags}, timer::remove_timer};
+use crate::{fs::{open_file, OpenFlags}, timer::remove_timer};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
 use manager::{add_stopping_task, fetch_task};
@@ -67,8 +67,6 @@ pub fn block_current_and_run_next() {
     add_block_task(task);
     schedule(task_cx_ptr);
 }
-
-use crate::board::QEMUExit;
 
 /// Exit the current 'Running' task and run the next task in task list.
 pub fn exit_current_and_run_next(exit_code: i32) {

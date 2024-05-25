@@ -3,7 +3,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
 use crate::{drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell};
-use super::{efs::EasyFileSystem, file::File};
+use super::file::File;
 
 /// inode in memory
 pub struct OSInode {

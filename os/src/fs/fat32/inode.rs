@@ -21,7 +21,6 @@ impl Inode for Fat32Inode {
     }
     
     fn find(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
-        debug!("find: {}", name);
         let fs = self.fs.lock();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
@@ -53,13 +52,11 @@ impl Inode for Fat32Inode {
     }
     
     fn ls(&self) -> Vec<String> {
-        debug!("ls");
         let fs = self.fs.lock();
         let mut v = Vec::new();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
-            debug!("ls: {}", dentry.name());
             v.push(dentry.name());
         }
         v
