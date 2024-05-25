@@ -1,7 +1,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::{efs::BlockDevice, fat32::dentry::{Fat32Dentry, Fat32DentryLayout}, inode::Inode}};
+use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::{efs::BlockDevice, fat32::dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, inode::Inode}};
 
 use super::file_system::Fat32FS;
 
@@ -33,37 +33,16 @@ impl Inode for Fat32Inode {
     }
     
     fn ls(&self) -> Vec<String> {
+        debug!("ls");
         let fs = self.fs.lock();
-        let cluster_chain = fs.cluster_chain(self.start_cluster);
         let mut v = Vec::new();
-        let mut finished = false;
-        for cluster in cluster_chain {
-            let start_sector_id = (fs.sb.root_sector() + (cluster - 2) * fs.sb.sectors_per_cluster as u32) as usize;
-            for i in 0..fs.sb.sectors_per_cluster as usize {
-                let sector_id = start_sector_id + i;
-                let dentrys_per_sector = BLOCK_SZ / 32;
-                for j in 0..dentrys_per_sector {
-                    let offset = (j * 32) as usize;
-                    debug!("sector_id: {}, offset: {}", sector_id, offset);
-                    get_block_cache(sector_id, Arc::clone(&fs.bdev))
-                        .lock()
-                        .read(offset, | layout: &Fat32DentryLayout | {
-                            if let Some(dentry) = Fat32Dentry::from_layout(layout) {
-                                if dentry.is_file() {
-                                    v.push(dentry.fullname());
-                                }
-                            } else {
-                                finished = true;
-                            }
-                        });
-                    if finished {
-                        return v;
-                    }
-                }
-            }
+        let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
+        let mut offset = 0;
+        while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
+            debug!("ls: {}", dentry.name());
+            v.push(dentry.name());
         }
         v
-
     }
     
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {

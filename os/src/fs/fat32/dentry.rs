@@ -2,7 +2,6 @@ use alloc::string::String;
 
 pub struct Fat32Dentry {
     name: String,
-    ext: String,
     attr: FileAttributes,
     file_size: u32,
     start_cluster: u32,
@@ -51,9 +50,12 @@ impl Fat32Dentry {
             };
             ext.push(c as char);
         }
+        if !ext.is_empty() {
+            name.push('.');
+            name.push_str(&ext);
+        }
         Some(Self {
             name,
-            ext,
             attr: FileAttributes::from_bits_truncate(layout.attr),
             file_size: layout.file_size,
             start_cluster: (layout.start_cluster_high as u32) << 16 | layout.start_cluster_low as u32,
@@ -64,17 +66,8 @@ impl Fat32Dentry {
         self.name.clone()
     }
 
-    pub fn ext(&self) -> String {
-        self.ext.clone()
-    }
-
-    pub fn fullname(&self) -> String {
-        let mut fullname = self.name.clone();
-        if !self.ext.is_empty() {
-            fullname.push('.');
-            fullname.push_str(&self.ext);
-        }
-        fullname
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 
     pub fn is_system(&self) -> bool {
@@ -109,6 +102,20 @@ pub struct Fat32DentryLayout {
     pub last_modify_date: u16,
     pub start_cluster_low: u16,
     pub file_size: u32,
+}
+
+impl Fat32DentryLayout {
+    pub fn is_long(&self) -> bool {
+        self.attr & 0x0F == 0x0F
+    }
+
+    pub fn is_deleted(&self) -> bool {
+        self.name[0] == 0xE5
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.name[0] == 0x00
+    }
 }
 
 
@@ -158,7 +165,7 @@ impl Fat32LDentryLayout {
         })
     }
 
-    pub fn is_last(&self) -> bool {
+    pub fn is_end(&self) -> bool {
         self.order & 0x40 != 0
     }
 
@@ -171,7 +178,7 @@ impl Fat32LDentryLayout {
     }
 
     pub fn is_valid(&self) -> bool {
-        !self.is_last() && !self.is_deleted() && !self.is_empty()
+        !self.is_end() && !self.is_deleted() && !self.is_empty()
     }
 
     pub fn name(&self) -> String {

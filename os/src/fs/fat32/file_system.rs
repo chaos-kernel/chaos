@@ -1,9 +1,9 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::block_cache::get_block_cache, fs::efs::BlockDevice};
+use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::efs::BlockDevice};
 
-use super::{fat::FAT, inode::Fat32Inode, super_block::{Fat32SB, Fat32SBLayout}};
+use super::{dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::Fat32Inode, super_block::{Fat32SB, Fat32SBLayout}};
 
 pub struct Fat32FS {
     pub sb: Fat32SB,
@@ -20,7 +20,7 @@ impl Fat32FS {
                 assert!(sb_layout.is_valid(), "Error loading FAT32!");
                 let fat32fs = Self {
                     sb: Fat32SB::from_layout(sb_layout),
-                    fat: FAT::from_sb(&Fat32SB::from_layout(sb_layout)),
+                    fat: FAT::from_sb(Arc::new(Fat32SB::from_layout(sb_layout))),
                     bdev,
                 };
                 Arc::new(Mutex::new(fat32fs))
@@ -44,9 +44,13 @@ impl Fat32FS {
     pub fn cluster_chain(&self, start_cluster: u32) -> Vec<u32> {
         let mut cluster_chain = Vec::new();
         let mut cluster = start_cluster;
-        while cluster < 0x0FFFFFF8 {
+        loop {
             cluster_chain.push(cluster);
-            cluster = self.fat.next_cluster_id(cluster, &self.bdev);
+            if let Some(next_cluster) = self.fat.next_cluster_id(cluster, &self.bdev) {
+                cluster = next_cluster;
+            } else {
+                break;
+            }
         }
         cluster_chain
     }
@@ -83,6 +87,76 @@ impl Fat32FS {
         }
     }
 
+    /// get next dentry sector id and offset
+    fn next_dentry_id(&self, sector_id: u32, offset: usize) -> Option<(u32, usize)> {
+        if offset >= 512 || offset % 32 != 0 {
+            return None;
+        }
+        let next_offset = offset + 32;
+        if next_offset >= 512 {
+            let next_sector_id = sector_id + 1;
+            if next_sector_id % self.sb.sectors_per_cluster as u32 == 0 {
+                if let Some(next_sector_id) = self.fat.next_cluster_id(sector_id, &self.bdev) {
+                    Some((next_sector_id, 0))
+                } else {
+                    None
+                }
+            } else {
+                Some((next_sector_id, 0))
+            }
+        } else {
+            Some((sector_id, next_offset))
+        }
+    }
 
+    /// get a dentry with sector id and offset
+    pub fn get_dentry(&self, sector_id: &mut u32, offset: &mut usize) -> Option<Fat32Dentry> {
+        if *offset >= 512 || *offset % 32 != 0 {
+            return None;
+        }
+        let mut is_long_entry = false;
+        let dentry = get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
+            .lock()
+            .read(*offset, |layout: &Fat32DentryLayout| {
+                if layout.is_long() {
+                    is_long_entry = true;
+                    return None;
+                }
+                Fat32Dentry::from_layout(layout)
+            });
+        if is_long_entry {
+            let mut name = String::new();
+            let mut is_end = false;
+            loop {
+                get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
+                    .lock()
+                    .read(*offset, |layout: &Fat32LDentryLayout| {
+                        name.push_str(&layout.name());
+                        if layout.is_end() {
+                            is_end = true;
+                        }
+                    });
+                (*sector_id, *offset) = self.next_dentry_id(*sector_id, *offset).unwrap();
+                if is_end {
+                    break;
+                }
+            }
+            if let Some(mut dentry) = get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
+                .lock()
+                .read(*offset, |layout: &Fat32DentryLayout| {
+                    Fat32Dentry::from_layout(layout)
+                })
+            {
+                dentry.set_name(name);
+                (*sector_id, *offset) = self.next_dentry_id(*sector_id, *offset).unwrap();
+                return Some(dentry);
+            } else {
+                None
+            }
+        } else {
+            (*sector_id, *offset) = self.next_dentry_id(*sector_id, *offset).unwrap();
+            dentry
+        }
+    }
     
 }
