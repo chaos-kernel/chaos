@@ -27,4 +27,35 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] 读
   - [ ] 写
 
+- [ ] syscalls
+  - [ ] SYS_getcwd 17
+  - [ ] SYS_pipe2 59
+  - [ ] SYS_dup 23
+  - [ ] SYS_dup3 24
+  - [ ] SYS_chdir 49
+  - [ ] SYS_openat 56
+  - [ ] SYS_close 57
+  - [ ] SYS_getdents64 61
+  - [ ] SYS_read 63
+  - [ ] SYS_write 64
+  - [ ] SYS_linkat 37
+  - [ ] SYS_unlinkat 35
+  - [ ] SYS_mkdirat 34
+  - [ ] SYS_umount2 39
+  - [ ] SYS_mount 40
+  - [ ] SYS_fstat 80
+  - [ ] SYS_clone 220
+  - [ ] SYS_execve 221
+  - [x] SYS_wait4 260
+  - [x] SYS_exit 93
+  - [x] SYS_getppid 173
+  - [x] SYS_getpid 172
+  - [x] SYS_brk 214
+  - [ ] SYS_munmap 215
+  - [ ] SYS_mmap 222
+  - [x] SYS_times 153
+  - [x] SYS_uname 160
+  - [x] SYS_sched_yield 124
+  - [x] SYS_gettimeofday 169
+  - [x] SYS_nanosleep 101
 
