@@ -63,7 +63,7 @@ pub const SYSCALL_GETPPID: usize = 173;
 /// gettid syscall
 pub const SYSCALL_GETTID: usize = 178;
 /// fork syscall
-pub const SYSCALL_FORK: usize = 220;
+pub const SYSCALL_CLONE: usize = 220;
 /// exec syscall
 pub const SYSCALL_EXEC: usize = 221;
 /// waitpid syscall
@@ -127,7 +127,7 @@ use crate::{fs::inode::Stat, task::current_task};
 
 
 /// handle syscall exception with `syscall_id` and other arguments
-pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access();
     inner.syscall_times[syscall_id] += 1;
@@ -153,7 +153,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_GETTID => sys_gettid(),
-        SYSCALL_FORK => sys_fork(),
+        SYSCALL_CLONE => sys_clone(args[0], args[1], args[2] as *mut usize, args[3], args[4] as *mut usize),
         SYSCALL_BRK => sys_brk(args[0] as usize),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize,args[1] as *mut i32, args[2] as u32, args[3],) ,

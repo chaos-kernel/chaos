@@ -12,7 +12,7 @@
 mod context;
 mod id;
 mod manager;
-mod process;
+pub mod process;
 mod processor;
 mod signal;
 mod switch;
@@ -27,6 +27,8 @@ use lazy_static::*;
 use manager::{add_stopping_task, fetch_task};
 use process::ProcessControlBlock;
 use switch::__switch;
+pub use process::CloneFlags;
+pub use process::CSIGNAL;
 
 pub use context::TaskContext;
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};

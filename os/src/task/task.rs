@@ -52,6 +52,8 @@ pub struct TaskControlBlockInner {
     pub stride: usize,
     /// pass
     pub pass: usize,
+    ///
+    pub clear_child_tid: usize,
     /// working directory
     pub work_dir: Arc<OSInode>,
 }
@@ -65,16 +67,20 @@ impl TaskControlBlockInner {
     fn get_status(&self) -> TaskStatus {
         self.task_status
     }
+
+    pub fn gettid(&self) -> usize {
+        self.res.as_ref().unwrap().tid
+    }
 }
 
 impl TaskControlBlock {
     /// Create a new task
     pub fn new(
         process: Arc<ProcessControlBlock>,
-        ustack_base: usize,
+        ustack_top: usize,
         alloc_user_res: bool,
     ) -> Self {
-        let res = TaskUserRes::new(Arc::clone(&process), ustack_base, alloc_user_res);
+        let res = TaskUserRes::new(Arc::clone(&process), ustack_top, alloc_user_res);
         let trap_cx_ppn = res.trap_cx_ppn();
         let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
@@ -97,6 +103,7 @@ impl TaskControlBlock {
                     stride: 0,
                     pass: BIG_STRIDE / 16,
                     work_dir,
+                    clear_child_tid: 0,
                 })
             },
         }

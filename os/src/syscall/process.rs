@@ -1,7 +1,7 @@
 use core::{borrow::BorrowMut, mem::size_of, ptr};
 use crate::{
     config::*, fs::{inode::ROOT_INODE, open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
-        current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, SignalFlags, TaskStatus
+        current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL
     }, timer::{get_time_ms, get_time_us}
 };
 
@@ -10,7 +10,6 @@ use super::errno::{EINVAL, EPERM, SUCCESS};
 
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -96,26 +95,67 @@ pub fn sys_getppid() -> isize {
         parent.upgrade().unwrap().getpid()  as isize
     }
     else {
-        -1
+        warn!("kwenel: getppid NOT IMPLEMENTED YET!!");
+        1
     }
 }
 /// fork child process syscall
-pub fn sys_fork() -> isize {
-    trace!(
-        "kernel:pid[{}] sys_fork",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+pub fn sys_clone(
+    flags: usize,
+    stack_ptr: usize,
+    ptid: *mut usize,
+    tls: usize,
+    ctid: *mut usize,
+) -> isize {
+    trace!("[sys_clone] flags {:?} stack_ptr {:x?} ptid {:x?} tls {:x?} ctid {:x?}", flags , stack_ptr, ptid, tls, ctid);
     let current_process = current_process();
-    let new_process = current_process.fork();
-    let new_pid = new_process.getpid();
-    // modify trap context of new_task, because it returns immediately after switching
-    let new_process_inner = new_process.inner_exclusive_access();
-    let task = new_process_inner.tasks[0].as_ref().unwrap();
-    let trap_cx = task.inner_exclusive_access().get_trap_cx();
-    // we do not have to move to next instruction since we have done it before
-    // for child process, fork returns 0
-    trap_cx.x[10] = 0;
-    new_pid as isize
+
+    let exit_signal = SignalFlags::from_bits(1 << ((flags & CSIGNAL) - 1)).unwrap();
+    let clone_signals = CloneFlags::from_bits((flags & !CSIGNAL) as u32).unwrap();
+    
+    trace!(
+        "[sys_clone] exit_signal = {:?}, clone_signals = {:?}, stack_ptr = {:#x}, ptid = {:#x}, tls = {:#x}, ctid = {:#x}",
+         exit_signal, clone_signals, stack_ptr, ptid as usize, tls, ctid as usize
+    );
+    if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
+        // assert!(stack_ptr == 0);
+        if stack_ptr == 0 {
+            return current_process.fork() as isize;
+        } else {
+            return current_process.fork2(stack_ptr) as isize; //todo仅用于初赛
+        }
+    } else {
+        println!("[sys_clone] create thread");
+        let new_thread = current_process.clone2(exit_signal, clone_signals, stack_ptr, tls);
+
+        // The thread ID of the main thread needs to be the same as the Process ID,
+        // so we will exchange the thread whose thread ID is equal to Process ID with the thread whose thread ID is equal to 0,
+        // but the system will not exchange it internally
+        let process_pid = current_process.getpid();
+        let mut new_thread_ttid = new_thread.inner_exclusive_access().gettid();
+        if new_thread_ttid == process_pid {
+            new_thread_ttid = 0;
+        }
+
+        let token = current_user_token();
+        if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) {
+            if !ptid.is_null() {
+                *translated_refmut(token, ptid) = new_thread_ttid;
+            }
+        }
+        if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) {
+            if !ctid.is_null() {
+                *translated_refmut(token, ctid) = new_thread_ttid;
+            }
+        }
+        if clone_signals.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
+            let mut thread_inner = new_thread.inner_exclusive_access();
+            thread_inner.clear_child_tid = ctid as usize;
+        }
+
+        return new_thread_ttid as isize;
+    }
+    
 }
 /// exec syscall
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
@@ -206,7 +246,7 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     if let Some(process) = pid2process(pid) {
-        if let Some(flag) = SignalFlags::from_bits(signal) {
+        if let Some(flag) = SignalFlags::from_bits(signal as usize) {
             process.inner_exclusive_access().signals |= flag;
             0
         } else {

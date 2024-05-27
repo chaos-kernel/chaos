@@ -2,7 +2,7 @@
 
 use super::id::RecycleAllocator;
 use super::manager::insert_into_pid2process;
-use super::TaskControlBlock;
+use super::{current_task, TaskControlBlock};
 use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::file::File;
@@ -17,6 +17,63 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+
+#[allow(unused)]
+#[allow(missing_docs)]
+pub const CSIGNAL: usize = 0x000000ff; /* signal mask to be sent at exit */
+bitflags! {
+    ///
+    pub struct CloneFlags: u32 {
+        ///set if VM shared between processes
+        const CLONE_VM	            = 0x00000100;
+        ///set if fs info shared between processes
+        const CLONE_FS	            = 0x00000200;
+        ///set if open files shared between processes
+        const CLONE_FILES	        = 0x00000400;
+        ///set if signal handlers and blocked signals shared
+        const CLONE_SIGHAND	        = 0x00000800;
+        ///set if a pidfd should be placed in parent
+        const CLONE_PIDFD	        = 0x00001000;
+        ///set if we want to let tracing continue on the child too
+        const CLONE_PTRACE	        = 0x00002000;
+        ///set if the parent wants the child to wake it up on mm_release
+        const CLONE_VFORK	        = 0x00004000;
+        ///set if we want to have the same parent as the cloner
+        const CLONE_PARENT	        = 0x00008000;
+        ///Same thread group?
+        const CLONE_THREAD	        = 0x00010000;
+        ///New mount namespace group
+        const CLONE_NEWNS	        = 0x00020000;
+        ///share system V SEM_UNDO semantics
+        const CLONE_SYSVSEM	        = 0x00040000;
+        ///create a new TLS for the child
+        const CLONE_SETTLS	        = 0x00080000;
+        ///set the TID in the parent
+        const CLONE_PARENT_SETTID	= 0x00100000;
+        ///clear the TID in the child
+        const CLONE_CHILD_CLEARTID	= 0x00200000;
+        ///Unused, ignored
+        const CLONE_DETACHED		= 0x00400000;
+        ///set if the tracing process can't force CLONE_PTRACE on this clone
+        const CLONE_UNTRACED		= 0x00800000;
+        ///set the TID in the child
+        const CLONE_CHILD_SETTID	= 0x01000000;
+        ///New cgroup namespace
+        const CLONE_NEWCGROUP		= 0x02000000;
+        ///New utsname namespace
+        const CLONE_NEWUTS		    = 0x04000000;
+        ///New ipc namespace
+        const CLONE_NEWIPC		    = 0x08000000;
+        ///New user namespace
+        const CLONE_NEWUSER		    = 0x10000000;
+        ///New pid namespace
+        const CLONE_NEWPID		    = 0x20000000;
+        ///New network namespace
+        const CLONE_NEWNET		    = 0x40000000;
+        ///Clone io context
+        const CLONE_IO		        = 0x80000000;
+    }
+}
 
 /// Process Control Block
 pub struct ProcessControlBlock {
@@ -290,8 +347,8 @@ impl ProcessControlBlock {
     }
 
     /// Only support processes with a single thread.
-    pub fn fork(self: &Arc<Self>) -> Arc<Self> {
-        trace!("kernel: fork");
+    pub fn fork(self: &Arc<Self>) ->usize {
+        trace!("kernel: sys_fork");
         let mut parent = self.inner_exclusive_access();
         assert_eq!(parent.thread_count(), 1);
         // clone parent's memory_set completely including trampoline/ustacks/trap_cxs
@@ -359,22 +416,174 @@ impl ProcessControlBlock {
         child_inner.tasks.push(Some(Arc::clone(&task)));
         let mut res = child_inner.available.clone();
         res.fill(0);
+        // 防死锁算法
         child_inner.allocation.push(res.clone());
         child_inner.need.push(res.clone());
         child_inner.finish.push(false);
         drop(child_inner);
+
         // modify kstack_top in trap_cx of this thread
         let task_inner = task.inner_exclusive_access();
         let trap_cx = task_inner.get_trap_cx();
         trap_cx.kernel_sp = task.kstack.get_top();
+        trap_cx.x[10] = 0;
         drop(task_inner);
+        let pid = child.getpid();
         insert_into_pid2process(child.getpid(), Arc::clone(&child));
         // add this thread to scheduler
         add_task(task);
-        child
+        pid
+    }
+    /// clone2
+    pub fn clone2(
+        self: &Arc<Self>,
+        _exit_signals: SignalFlags,
+        _clone_signals: CloneFlags,
+        stack_ptr: usize,
+        tls: usize,
+    ) -> Arc<TaskControlBlock> {
+        trace!("kernel: clone");
+        let task = current_task().unwrap();
+        let process = task.process.upgrade().unwrap();
+        // create a new thread.
+        // We did not alloc for stack space here
+        let thread_stack_top = if stack_ptr != 0 {
+            stack_ptr
+        } else {
+            task.inner_exclusive_access()
+                .res
+                .as_ref()
+                .unwrap()
+                .ustack_top
+        };
+        debug!("setting child's stack top");
+        let new_task = Arc::new(TaskControlBlock::new(
+            Arc::clone(&process),
+            thread_stack_top,
+            true,
+        ));
+        debug!("setting child's stack top success");
+        let new_task_inner = new_task.inner_exclusive_access();
+        let new_task_res = new_task_inner.res.as_ref().unwrap();
+        let new_task_tid = new_task_res.tid;
+        let mut process_inner = process.inner_exclusive_access();
+        // add new thread to current process
+        let tasks = &mut process_inner.tasks;
+        while tasks.len() < new_task_tid + 1 {
+            tasks.push(None);
+        }
+        tasks[new_task_tid] = Some(Arc::clone(&new_task));
+        let new_task_trap_cx = new_task_inner.get_trap_cx();
+
+        // I don't know if this is correct
+        *new_task_trap_cx = *task.inner_exclusive_access().get_trap_cx();
+
+        // for child process, fork returns 0
+        new_task_trap_cx.x[10] = 0;
+        // set tp reg
+        new_task_trap_cx.x[4] = tls;
+        // set sp reg
+        new_task_trap_cx.set_sp(new_task_res.ustack_top());
+        // modify kernel_sp in trap_cx
+        new_task_trap_cx.kernel_sp = new_task.kstack.get_top();
+
+        // add new task to scheduler
+        add_task(Arc::clone(&new_task));
+
+        drop(new_task_inner);
+        new_task
     }
     /// get pid
     pub fn getpid(&self) -> usize {
         self.pid.0
+    }
+
+    pub fn fork2(self: &Arc<Self>, stack_ptr: usize) ->usize {
+        trace!("kernel: sys_fork2");
+        let mut parent = self.inner_exclusive_access();
+        assert_eq!(parent.thread_count(), 1);
+        // clone parent's memory_set completely including trampoline/ustacks/trap_cxs
+        let memory_set = MemorySet::from_existed_user(&parent.memory_set);
+        // alloc a pid
+        let pid = pid_alloc();
+        // copy fd table
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
+        // create child process pcb
+        let child = Arc::new(Self {
+            pid,
+            inner: unsafe {
+                UPSafeCell::new(ProcessControlBlockInner {
+                    is_zombie: false,
+                    memory_set,
+                    parent: Some(Arc::downgrade(self)),
+                    children: Vec::new(),
+                    exit_code: 0,
+                    fd_table: new_fd_table,
+                    signals: SignalFlags::empty(),
+                    tasks: Vec::new(),
+                    task_res_allocator: RecycleAllocator::new(),
+                    mutex_list: Vec::new(),
+                    semaphore_list: Vec::new(),
+                    condvar_list: Vec::new(),
+                    deadlock_detect: false,
+                    available: Vec::new(),
+                    allocation: Vec::new(),
+                    need: Vec::new(),
+                    finish: Vec::new(),
+                    clock_stop_watch: 0,
+                    user_clock: 0,
+                    kernel_clock: 0,
+                    heap_base: parent.heap_base,
+                    heap_end: parent.heap_base,
+                    work_dir: parent.work_dir.clone()
+                })
+            },
+        });
+        // add child
+        parent.children.push(Arc::clone(&child));
+        // create main thread of child process
+        let task = Arc::new(TaskControlBlock::new(
+            Arc::clone(&child),
+            parent
+                .get_task(0)
+                .inner_exclusive_access()
+                .res
+                .as_ref()
+                .unwrap()
+                .ustack_top(),
+            // here we do not allocate trap_cx or ustack again
+            // but mention that we allocate a new kstack here
+            false,
+        ));
+        // attach task to child process
+        let mut child_inner = child.inner_exclusive_access();
+        child_inner.tasks.push(Some(Arc::clone(&task)));
+        let mut res = child_inner.available.clone();
+        res.fill(0);
+        // 防死锁算法
+        child_inner.allocation.push(res.clone());
+        child_inner.need.push(res.clone());
+        child_inner.finish.push(false);
+        drop(child_inner);
+
+        // modify kstack_top in trap_cx of this thread
+        let task_inner = task.inner_exclusive_access();
+        let trap_cx = task_inner.get_trap_cx();
+        trap_cx.kernel_sp = task.kstack.get_top();
+        trap_cx.x[10] = 0;
+        trap_cx.x[2] = stack_ptr;
+        drop(task_inner);
+        let pid = child.getpid();
+        insert_into_pid2process(child.getpid(), Arc::clone(&child));
+        // add this thread to scheduler
+        add_task(task);
+        pid
     }
 }

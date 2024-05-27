@@ -18,12 +18,12 @@
 //! We then call [`task::run_tasks()`] and for the first time go to
 //! userspace.
 
-#![deny(missing_docs)]
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(ascii_char)]
+
 
 use core::arch::global_asm;
 
