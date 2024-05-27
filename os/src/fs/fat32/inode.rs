@@ -20,7 +20,17 @@ impl Inode for Fat32Inode {
         todo!()
     }
     
-    fn find(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
+    fn find(&self, path: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
+        let mut split = path.splitn(2, '/');
+        let name = split.next().unwrap();
+        let next = split.next();
+        if name == "." {
+            if next.is_some() {
+                return self.find(next.unwrap());
+            } else {
+                todo!()
+            }
+        }
         let fs = self.fs.lock();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
@@ -33,7 +43,11 @@ impl Inode for Fat32Inode {
                     fs: Arc::clone(&self.fs),
                     bdev: Arc::clone(&self.bdev),
                 };
-                return Some(Arc::new(inode));
+                if next.is_some() {
+                    return inode.find(split.next().unwrap());
+                } else {
+                    return Some(Arc::new(inode));
+                }
             }
         }
         None
