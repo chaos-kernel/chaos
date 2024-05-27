@@ -35,12 +35,12 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [ ] SYS_pipe2 59
   - [x] SYS_dup 23
   - [x] SYS_dup3 24
-  - [ ] SYS_chdir 49
+  - [x] SYS_chdir 49
   - [x] SYS_openat 56
   - [x] SYS_close 57
   - [ ] SYS_getdents64 61
-  - [ ] SYS_read 63
-  - [ ] SYS_write 64
+  - [x] SYS_read 63
+  - [x] SYS_write 64
   - [ ] SYS_linkat 37
   - [ ] SYS_unlinkat 35
   - [ ] SYS_mkdirat 34
