@@ -28,7 +28,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 # Disassembly
 DISASM ?= -x
 
-build: env $(KERNEL_BIN)
+build: $(KERNEL_BIN)
 
 env:
 ifeq ($(OFFLINE),)
