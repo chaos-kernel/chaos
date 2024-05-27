@@ -2,7 +2,7 @@ use core::borrow::Borrow;
 use core::mem::size_of;
 use core::ptr;
 
-use crate::fs::inode::Stat;
+use crate::fs::inode::{Stat, Inode};
 use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
@@ -190,6 +190,29 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
     let name = translated_str(token, name);
     if unlink(name.as_str()) {
         0
+    } else {
+        -1
+    }
+}
+
+pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_getcwd",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    let token = current_user_token();
+    if let Some(path) = current_task().unwrap().inner_exclusive_access().work_dir.clone().current_dirname() {
+        let len = core::cmp::min(len, path.len());
+        let mut v = translated_byte_buffer(token, buf, len);
+        unsafe {
+            let mut p = path.as_bytes().as_ptr();
+            for slice in v.iter_mut() {
+                let len = slice.len();
+                ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
+                p = p.add(len);
+            }
+        }
+        buf as isize
     } else {
         -1
     }

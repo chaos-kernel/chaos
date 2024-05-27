@@ -12,6 +12,8 @@
 ///
 pub mod errno;
 
+/// getcwd syscall
+pub const SYSCALL_GETCWD: usize = 17;
 /// openat syscall
 pub const SYSCALL_OPENAT: usize = 56;
 /// close syscall
@@ -128,6 +130,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
     drop(inner);
     drop(task);
     match syscall_id {
+        SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_LINKAT => sys_linkat(args[1] as *const u8, args[3] as *const u8),
         SYSCALL_UNLINKAT => sys_unlinkat(args[1] as *const u8),
