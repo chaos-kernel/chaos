@@ -4,7 +4,7 @@ use alloc::sync::{Arc, Weak};
 
 use crate::task::suspend_current_and_run_next;
 
-use super::file::File;
+use super::{file::{File}, inode::Stat};
 
 /// IPC pipe
 pub struct Pipe {
@@ -177,7 +177,7 @@ impl File for Pipe {
             }
         }
     }
-    fn fstat(&self) -> Option<(usize, u32)> {
+    fn fstat(&self) -> Option<Stat> {
         panic!("Pipe::fstat not implemented");
     }
 }

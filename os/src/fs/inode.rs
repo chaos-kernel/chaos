@@ -3,7 +3,7 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use lazy_static::*;
 use crate::{drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell};
-use super::file::File;
+use super::file::{File};
 
 /// inode in memory
 pub struct OSInode {
@@ -44,55 +44,65 @@ impl OSInode {
         }
         v
     }
-}
-
-impl Inode for OSInode {
-    fn fstat(&self) -> (usize, u32) {
+    /// get the status of the inode in memory
+    pub fn fstat(&self) -> Stat {
         let inner = self.inner.exclusive_access();
         inner.inode.fstat()
     }
-
-    fn find(&self, name: &str) -> Option<Arc<dyn Inode>> {
+    /// find the inode in memory with 'name'
+    pub fn find(&self, name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
-        inner.inode.find(name)
+        if let Some(inode) = inner.inode.find(name) {
+            Some(Arc::new(OSInode::new(true, true, inode)))
+        } else {
+            None
+        }
     }
-
-    fn create(&self, name: &str) -> Option<Arc<dyn Inode>> {
+    /// create a inode in memory with 'name'
+    pub fn create(&self, name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
-        inner.inode.create(name)
+        if let Some(inode) = inner.inode.create(name) {
+            Some(Arc::new(OSInode::new(true, true, inode)))
+        } else {
+            None
+        }
     }
-
-    fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
+    /// link a inode in memory with 'old_name' and 'new_name'
+    pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
-        inner.inode.link(old_name, new_name)
+        if let Some(inode) = inner.inode.link(old_name, new_name) {
+            Some(Arc::new(OSInode::new(true, true, inode)))
+        } else {
+            None
+        }
     }
-
-    fn unlink(&self, name: &str) -> bool {
+    /// unlink a inode in memory with 'name'
+    pub fn unlink(&self, name: &str) -> bool {
         let inner = self.inner.exclusive_access();
         inner.inode.unlink(name)
     }
-
-    fn ls(&self) -> Vec<String> {
+    /// list the file names in the inode in memory
+    pub fn ls(&self) -> Vec<String> {
         let inner = self.inner.exclusive_access();
         inner.inode.ls()
     }
-
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+    /// read the content in offset position of the inode in memory into 'buf'
+    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let inner = self.inner.exclusive_access();
         inner.inode.read_at(offset, buf)
     }
-
-    fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
+    /// write the content in 'buf' into offset position of the inode in memory
+    pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
         let inner = self.inner.exclusive_access();
         inner.inode.write_at(offset, buf)
     }
-
-    fn clear(&self) {
+    /// set the inode in memory length to zero, delloc all data blocks of the inode
+    pub fn clear(&self) {
         let inner = self.inner.exclusive_access();
         inner.inode.clear();
     }
-
-    fn current_dirname(&self) -> Option<String> {
+    /// get the current directory name
+    pub fn current_dirname(&self) -> Option<String> {
         let inner = self.inner.exclusive_access();
         inner.inode.current_dirname()
     }
@@ -101,7 +111,7 @@ impl Inode for OSInode {
 /// Inode trait
 pub trait Inode: Send + Sync {
     /// get status of file
-    fn fstat(&self) -> (usize, u32);
+    fn fstat(&self) -> Stat;
     /// find the disk inode of the file with 'name'
     fn find(&self, name: &str) -> Option<Arc<dyn Inode>>;
     /// create a file with 'name' in the root directory
@@ -128,8 +138,6 @@ pub trait Inode: Send + Sync {
 pub struct Stat {
     /// ID of device containing file
     pub dev: u64,
-    /// inode number
-    pub ino: u64,
     /// file type and mode
     pub mode: StatMode,
     /// number of hard links
@@ -139,15 +147,23 @@ pub struct Stat {
 }
 
 impl Stat {
-    /// create a new Stat, assuming is a file
-    pub fn new(ino: u64, nlink: u32) -> Self {
+    /// create a new stat
+    pub fn new(mode: StatMode, nlink: u32) -> Self {
         Self {
             dev: 0,
-            ino,
-            mode: StatMode::FILE,
+            mode,
             nlink,
-            pad: [0; 7]
+            pad: [0; 7],
         }
+    }
+    /// check whether the inode is a directory
+    pub fn is_dir(&self) -> bool {
+        self.mode.contains(StatMode::DIR)
+    }
+
+    /// check whether the inode is a file
+    pub fn is_file(&self) -> bool {
+        self.mode.contains(StatMode::FILE)
     }
 }
 
@@ -215,7 +231,7 @@ impl File for OSInode {
         }
         total_write_size
     }
-    fn fstat(&self) -> Option<(usize, u32)> {
+    fn fstat(&self) -> Option<Stat> {
         let inner = self.inner.exclusive_access();
         Some(inner.inode.fstat())
     }

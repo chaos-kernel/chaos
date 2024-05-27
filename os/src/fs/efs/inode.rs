@@ -3,7 +3,7 @@
 //! The data struct and functions for the inode layer that service file-related system calls
 //!
 //! NOTICE: The difference between [`Inode`] and [`DiskInode`]  can be seen from their names: DiskInode in a relatively fixed location within the disk block, while Inode Is a data structure placed in memory that records file inode information.
-use crate::fs::inode::Inode;
+use crate::fs::{inode::{Inode, Stat}};
 
 use super::{
     block_cache_sync_all, get_block_cache, BlockDevice, DirEntry, DiskInode, DiskInodeType,
@@ -27,10 +27,11 @@ pub struct EfsInode {
 
 impl Inode for EfsInode {
 
-    fn fstat(&self) -> (usize, u32) {
-        self.read_disk_inode(|disk_inode| {
-            (self.block_id, disk_inode.nlink)
-        })
+    fn fstat(&self) -> Stat {
+        // self.read_disk_inode(|disk_inode| {
+        //     (self.block_id, disk_inode.nlink)
+        // })
+        todo!()
     }
 
     fn create(&self, name: &str) -> Option<Arc<dyn Inode>> {

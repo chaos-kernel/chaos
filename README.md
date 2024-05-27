@@ -33,10 +33,10 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 - [ ] syscalls
   - [x] SYS_getcwd 17
   - [ ] SYS_pipe2 59
-  - [ ] SYS_dup 23
-  - [ ] SYS_dup3 24
+  - [x] SYS_dup 23
+  - [x] SYS_dup3 24
   - [ ] SYS_chdir 49
-  - [ ] SYS_openat 56
+  - [x] SYS_openat 56
   - [x] SYS_close 57
   - [ ] SYS_getdents64 61
   - [ ] SYS_read 63

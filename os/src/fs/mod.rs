@@ -35,36 +35,37 @@ bitflags! {
         const CREATE = 1 << 6;
         /// truncate file size to 0
         const TRUNC = 1 << 10;
+        /// directory
+        const DIRECTORY = 1 << 21;
     }
 }
 
 /// Open a file
-pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
-    trace!("kernel: open_file: name = {}, flags = {:?}", name, flags);
-    let (readable, writable) = flags.read_write();
+pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
+    debug!("kernel: open_file: name = {}, flags = {:?}", name, flags);
+    // TODO: read_write
+    // let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
         if let Some(inode) = ROOT_INODE.find(name) {
             // clear size
             inode.clear();
-            Some(Arc::new(OSInode::new(readable, writable, inode)))
+            Some(inode)
         } else {
             // create file
-            ROOT_INODE
-                .create(name)
-                .map(|inode| Arc::new(OSInode::new(readable, writable, inode)))
+            inode.create(name)
         }
     } else {
-        ROOT_INODE.find(name).map(|inode| {
+        inode.find(name).map(|inode| {
             if flags.contains(OpenFlags::TRUNC) {
                 inode.clear();
             }
-            Arc::new(OSInode::new(readable, writable, inode))
+            inode
         })
     }
 }
 
 /// Link a file
-pub fn link(old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
+pub fn link(old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
     ROOT_INODE.link(old_name, new_name)
 }
 

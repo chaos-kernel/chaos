@@ -21,7 +21,7 @@ mod task;
 
 use self::id::TaskUserRes;
 use self::manager::add_block_task;
-use crate::{fs::{open_file, OpenFlags}, timer::remove_timer};
+use crate::{fs::{inode::ROOT_INODE, open_file, OpenFlags}, timer::remove_timer};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
 use manager::{add_stopping_task, fetch_task};
@@ -181,7 +181,7 @@ lazy_static! {
     /// the name "initproc" may be changed to any other app name like "usertests",
     /// but we have user_shell, so we don't need to change it.
     pub static ref INITPROC: Arc<ProcessControlBlock> = {
-        let inode = open_file("", OpenFlags::RDONLY).unwrap();
+        let inode = open_file(ROOT_INODE.as_ref(), "", OpenFlags::RDONLY).unwrap();
         let v = inode.read_all();
         ProcessControlBlock::new(v.as_slice())
     };
@@ -194,7 +194,7 @@ pub fn add_initproc() {
 
 /// Run all files in the root directory
 pub fn add_file(file: &str) {
-    let inode = open_file(&file, OpenFlags::RDONLY).unwrap();
+    let inode = open_file(ROOT_INODE.as_ref(), &file, OpenFlags::RDONLY).unwrap();
     let v = inode.read_all();
     let _pcb = ProcessControlBlock::new(v.as_slice());
 }

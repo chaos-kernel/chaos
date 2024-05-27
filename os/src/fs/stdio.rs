@@ -2,7 +2,7 @@ use crate::mm::UserBuffer;
 use crate::sbi::console_getchar;
 use crate::task::suspend_current_and_run_next;
 
-use super::file::File;
+use super::{file::{File}, inode::Stat};
 
 /// stdin file for getting chars from console
 pub struct Stdin;
@@ -39,7 +39,7 @@ impl File for Stdin {
     fn write(&self, _user_buf: UserBuffer) -> usize {
         panic!("Cannot write to stdin!");
     }
-    fn fstat(&self) -> Option<(usize, u32)> {
+    fn fstat(&self) -> Option<Stat> {
         None
     }
 }
@@ -60,7 +60,7 @@ impl File for Stdout {
         }
         user_buf.len()
     }
-    fn fstat(&self) -> Option<(usize, u32)> {
+    fn fstat(&self) -> Option<Stat> {
         None
     }
 }

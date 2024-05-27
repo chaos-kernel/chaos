@@ -1,6 +1,6 @@
 use core::{borrow::BorrowMut, mem::size_of, ptr};
 use crate::{
-    config::*, fs::{open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
+    config::*, fs::{inode::ROOT_INODE, open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, SignalFlags, TaskStatus
     }, timer::{get_time_ms, get_time_us}
 };
@@ -136,7 +136,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
-    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+    if let Some(app_inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let process = current_process();
         let argc = args_vec.len();

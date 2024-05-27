@@ -2,7 +2,8 @@ use core::borrow::Borrow;
 use core::mem::size_of;
 use core::ptr;
 
-use crate::fs::inode::{Stat, Inode};
+use crate::fs::file::File;
+use crate::fs::inode::{Inode, OSInode, Stat, ROOT_INODE};
 use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::syscall::process;
@@ -69,7 +70,8 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let process = current_process();
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+    debug!("open file: {}, flags: {:#x}", path.as_str(), flags);
+    if let Some(inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
         let mut inner = process.inner_exclusive_access();
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(inode);
@@ -86,7 +88,31 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     if dirfd == AT_FDCWD {
         return sys_open(path, flags);
     }
-    todo!()
+    debug!("openat: dirfd: {}, path: {:?}, flags: {:#x}", dirfd, path, flags);
+    let dirfd = dirfd as usize;
+    let process = current_process();
+    let mut inner = process.inner_exclusive_access();
+    if dirfd >= inner.fd_table.len() {
+        return -1;
+    }
+    if inner.fd_table[dirfd].is_none() {
+        return -1;
+    }
+    let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
+    if !dir.is_dir() {
+        return -1;
+    }
+    let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+    let token = inner.memory_set.token();
+    let path = translated_str(token, path);
+    debug!("open file: {}", path.as_str());
+    if let Some(inode) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(inode);
+        fd as isize
+    } else {
+        -1
+    }
 }
 /// close syscall
 pub fn sys_close(fd: usize) -> isize {
@@ -189,9 +215,8 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
         }
         let stat = stat.unwrap();
         let mut v = translated_byte_buffer(inner.get_user_token(), st as *const u8, size_of::<Stat>());
-        let st = Stat::new(stat.0 as u64, stat.1);
         unsafe {
-            let mut p = st.borrow() as *const Stat as *const u8;
+            let mut p = stat.borrow() as *const Stat as *const u8;
             for slice in v.iter_mut() {
                 let len = slice.len();
                 ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);

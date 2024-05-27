@@ -3,7 +3,7 @@ use core::cmp::min;
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::Inode};
+use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::{Inode, Stat, StatMode}};
 
 use super::{dentry::{self, Fat32Dentry, FileAttributes}, file_system::Fat32FS};
 
@@ -16,8 +16,17 @@ pub struct Fat32Inode {
 }
 
 impl Inode for Fat32Inode {
-    fn fstat(&self) -> (usize, u32) {
-        todo!()
+    fn fstat(&self) -> Stat {
+        let mode = match self.type_ {
+            Fat32InodeType::File => StatMode::FILE,
+            Fat32InodeType::Dir => StatMode::DIR,
+            _ => StatMode::NULL,
+            
+        };
+        Stat::new(
+            mode,
+            0,
+        )
     }
     
     fn find(&self, path: &str) -> Option<Arc<dyn Inode>> {
@@ -35,9 +44,16 @@ impl Inode for Fat32Inode {
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
+            let type_ = if dentry.is_file() {
+                Fat32InodeType::File
+            } else if dentry.is_dir() {
+                Fat32InodeType::Dir
+            } else {
+                Fat32InodeType::VolumeId
+            };
             if dentry.name() == name {
                 let inode = Fat32Inode {
-                    type_: Fat32InodeType::File,
+                    type_,
                     start_cluster: dentry.start_cluster(),
                     fize_size: dentry.file_size(),
                     fs: Arc::clone(&self.fs),
