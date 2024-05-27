@@ -26,7 +26,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 - [ ] FAT32 文件系统
   - [x] read
   - [x] write
-  - [ ] create
+  - [x] create
   - [ ] link
   - [ ] unlink
 
@@ -37,7 +37,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [ ] SYS_dup3 24
   - [ ] SYS_chdir 49
   - [ ] SYS_openat 56
-  - [ ] SYS_close 57
+  - [x] SYS_close 57
   - [ ] SYS_getdents64 61
   - [ ] SYS_read 63
   - [ ] SYS_write 64

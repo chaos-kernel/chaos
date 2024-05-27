@@ -32,7 +32,7 @@ bitflags! {
         /// read and write
         const RDWR = 1 << 1;
         /// create new file
-        const CREATE = 1 << 9;
+        const CREATE = 1 << 6;
         /// truncate file size to 0
         const TRUNC = 1 << 10;
     }

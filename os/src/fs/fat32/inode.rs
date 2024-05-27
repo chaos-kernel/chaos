@@ -20,7 +20,7 @@ impl Inode for Fat32Inode {
         todo!()
     }
     
-    fn find(&self, path: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
+    fn find(&self, path: &str) -> Option<Arc<dyn Inode>> {
         let mut split = path.splitn(2, '/');
         let name = split.next().unwrap();
         let next = split.next();
@@ -53,7 +53,7 @@ impl Inode for Fat32Inode {
         None
     }
     
-    fn create(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
+    fn create(&self, name: &str) -> Option<Arc<dyn Inode>> {
         if self.find(name).is_some() {
             return None;
         }
@@ -69,14 +69,21 @@ impl Inode for Fat32Inode {
             sector_id = next_sector_id;
             offset = next_offset;
         }
+        let start_cluster = fs.fat.alloc_new_cluster(&self.bdev).unwrap();
         let dentry = Fat32Dentry::new(
             name.to_string(),
             FileAttributes::ARCHIVE,
             0,
-            0,
+            start_cluster,
         );
         fs.insert_dentry(sector_id, offset, dentry);
-        None
+        Some(Arc::new(Fat32Inode {
+            type_: Fat32InodeType::File,
+            start_cluster,
+            fize_size: 0,
+            fs: Arc::clone(&self.fs),
+            bdev: Arc::clone(&self.bdev),
+        }))
     }
     
     fn link(&self, old_name: &str, new_name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
