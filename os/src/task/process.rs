@@ -6,6 +6,7 @@ use super::TaskControlBlock;
 use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::file::File;
+use crate::fs::inode::{Inode, OSInode, ROOT_INODE};
 use crate::fs::{Stdin, Stdout};
 use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
@@ -71,6 +72,8 @@ pub struct ProcessControlBlockInner {
     pub heap_base: VirtAddr,
     ///
     pub heap_end: VirtAddr,
+    /// working directory
+    pub work_dir: Arc<OSInode>,
 }
 
 impl ProcessControlBlockInner {
@@ -186,6 +189,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: user_heap_base.into(),
                     heap_end: user_heap_base.into(),
+                    work_dir: ROOT_INODE.clone(),
                 })
             },
         });
@@ -330,6 +334,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: parent.heap_base,
                     heap_end: parent.heap_base,
+                    work_dir: parent.work_dir.clone()
                 })
             },
         });

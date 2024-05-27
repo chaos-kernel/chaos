@@ -203,6 +203,10 @@ impl Inode for EfsInode {
         });
         block_cache_sync_all();
     }
+
+    fn current_dirname(&self) -> Option<String> {
+        todo!()
+    }
 }
 
 impl EfsInode {

@@ -120,8 +120,37 @@ impl Inode for Fat32Inode {
     fn clear(&self) {
         todo!()
     } 
+
+    /// Get the current directory name
+    fn current_dirname(&self) -> Option<String> {
+        if self.type_ != Fat32InodeType::Dir {
+            return None;
+        }
+        let fs = self.fs.lock();
+        let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
+        let mut offset = 0;
+        while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
+            if dentry.name() == "." {
+                return Some(dentry.name());
+            }
+        }
+        None
+    }
 }
 
+impl Fat32Inode {
+    
+    pub fn is_dir(&self) -> bool {
+        self.type_ == Fat32InodeType::Dir
+    }
+
+    pub fn is_file(&self) -> bool {
+        self.type_ == Fat32InodeType::File
+    }
+
+}
+
+#[derive(PartialEq)]
 pub enum Fat32InodeType {
     File,
     Dir,

@@ -91,6 +91,11 @@ impl Inode for OSInode {
         let inner = self.inner.exclusive_access();
         inner.inode.clear();
     }
+
+    fn current_dirname(&self) -> Option<String> {
+        let inner = self.inner.exclusive_access();
+        inner.inode.current_dirname()
+    }
 }
 
 /// Inode trait
@@ -113,6 +118,8 @@ pub trait Inode: Send + Sync {
     fn write_at(&self, offset: usize, buf: &[u8]) -> usize;
     /// Set the file(disk inode) length to zero, delloc all data blocks of the file.
     fn clear(&self);
+    /// Get the current directory name
+    fn current_dirname(&self) -> Option<String>;
 }
 
 /// The stat of a inode
