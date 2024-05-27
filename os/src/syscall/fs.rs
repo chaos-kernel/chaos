@@ -7,6 +7,9 @@ use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
+
+pub const AT_FDCWD: i32 = -100;
+
 /// write syscall
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!(
@@ -56,7 +59,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         -1
     }
 }
-/// open sys
+/// openat sys
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
     trace!(
         "kernel:pid[{}] sys_open",
@@ -73,6 +76,16 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     } else {
         -1
     }
+}
+pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_open",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    if dirfd == AT_FDCWD {
+        return sys_open(path, flags);
+    }
+    todo!()
 }
 /// close syscall
 pub fn sys_close(fd: usize) -> isize {
