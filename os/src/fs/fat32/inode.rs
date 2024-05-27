@@ -90,7 +90,31 @@ impl Inode for Fat32Inode {
     }
     
     fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
-        todo!()
+        let fs = self.fs.lock();
+        let cluster_id = self.start_cluster;
+        let cluster_chain = fs.cluster_chain(cluster_id);
+        let mut write_size = 0;
+        let mut pos = 0;
+        let mut cluster_buf = [0u8; CLUSTER_SIZE];
+        for cluster_id in cluster_chain {
+            if pos < offset {
+                let pass_size = min(CLUSTER_SIZE, offset - pos);
+                pos += pass_size;
+                if pass_size == CLUSTER_SIZE {
+                    continue;
+                }
+            }
+            fs.read_cluster(cluster_id, &mut cluster_buf);
+            let copy_size = min(buf.len() - write_size, CLUSTER_SIZE - pos % CLUSTER_SIZE);
+            cluster_buf[pos % CLUSTER_SIZE..pos % CLUSTER_SIZE + copy_size].copy_from_slice(&buf[write_size..write_size + copy_size]);
+            fs.write_cluster(cluster_id, &cluster_buf);
+            write_size += copy_size;
+            pos += copy_size;
+            if write_size >= buf.len() {
+                break;
+            }
+        }
+        write_size
     }
     
     fn clear(&self) {
