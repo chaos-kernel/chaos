@@ -5,6 +5,7 @@ use core::ptr;
 use crate::fs::inode::{Stat, Inode};
 use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+use crate::syscall::process;
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
 
@@ -137,6 +138,30 @@ pub fn sys_dup(fd: usize) -> isize {
         return -1;
     }
     let new_fd = inner.alloc_fd();
+    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+    new_fd as isize
+}
+
+/// dup3 syscall
+pub fn sys_dup3(fd: usize, new_fd: usize) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_dup3",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    let process = current_process();
+    let mut inner = process.inner_exclusive_access();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if inner.fd_table[fd].is_none() {
+        return -1;
+    }
+    while inner.fd_table.len() <= new_fd {
+        inner.fd_table.push(None);
+    }
+    if inner.fd_table[new_fd].is_some() {
+        return -1;
+    }
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
     new_fd as isize
 }

@@ -14,6 +14,10 @@ pub mod errno;
 
 /// getcwd syscall
 pub const SYSCALL_GETCWD: usize = 17;
+/// dup syscall
+pub const SYSCALL_DUP: usize = 23;
+/// dup3 syscall
+pub const SYSCALL_DUP3: usize = 24;
 /// openat syscall
 pub const SYSCALL_OPENAT: usize = 56;
 /// close syscall
@@ -78,8 +82,6 @@ pub const SYSCALL_MAIL_READ: usize = 401;
 /// mail write syscall
 pub const SYSCALL_MAIL_WRITE: usize = 402;
 */
-/// dup syscall
-pub const SYSCALL_DUP: usize = 24;
 /// pipe syscall
 pub const SYSCALL_PIPE: usize = 59;
 /// task info syscall
@@ -132,6 +134,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
     match syscall_id {
         SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         SYSCALL_DUP => sys_dup(args[0]),
+        SYSCALL_DUP3 => sys_dup3(args[0], args[1]),
         SYSCALL_LINKAT => sys_linkat(args[1] as *const u8, args[3] as *const u8),
         SYSCALL_UNLINKAT => sys_unlinkat(args[1] as *const u8),
         SYSCALL_OPENAT => sys_openat(args[0] as i32, args[1] as *const u8, args[2] as u32),
