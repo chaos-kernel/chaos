@@ -5,10 +5,11 @@ pub struct Fat32Dentry {
     attr: FileAttributes,
     file_size: u32,
     start_cluster: u32,
+    deleted: bool,
 }
 
 bitflags! {
-    struct FileAttributes: u8 {
+    pub struct FileAttributes: u8 {
         const READ_ONLY  = 0b00000001;
         const HIDDEN     = 0b00000010;
         const SYSTEM     = 0b00000100;
@@ -19,10 +20,29 @@ bitflags! {
 }
 
 impl Fat32Dentry {
+    pub fn new(name: String, attr: FileAttributes, file_size: u32, start_cluster: u32) -> Self {
+        Self {
+            name,
+            attr,
+            file_size,
+            start_cluster,
+            deleted: false,
+        }
+    }
+
     pub fn from_layout(layout: &Fat32DentryLayout) -> Option<Self> {
         // not a valid entry
-        if layout.name[0] == 0x00 || layout.name[0] == 0xE5 {
+        if layout.is_empty() {
             return None;
+        }
+        if layout.is_deleted() {
+            return Some(Self {
+                name: String::new(),
+                attr: FileAttributes::empty(),
+                file_size: 0,
+                start_cluster: 0,
+                deleted: true,
+            });
         }
         let name_capital = layout.reserved & 0x08 != 0;
         let ext_capital = layout.reserved & 0x10 != 0;
@@ -59,6 +79,7 @@ impl Fat32Dentry {
             attr: FileAttributes::from_bits_truncate(layout.attr),
             file_size: layout.file_size,
             start_cluster: (layout.start_cluster_high as u32) << 16 | layout.start_cluster_low as u32,
+            deleted: layout.is_deleted(),
         })
     }
 
@@ -93,6 +114,10 @@ impl Fat32Dentry {
     pub fn is_file(&self) -> bool {
         !self.is_dir() && !self.is_volume_id() && !self.is_system()
     }
+
+    pub fn is_deleted(&self) -> bool {
+        self.deleted
+    }
 }
 
 #[repr(C)]
@@ -113,6 +138,47 @@ pub struct Fat32DentryLayout {
 }
 
 impl Fat32DentryLayout {
+    pub fn from_dentry(dentry: &Fat32Dentry) -> Self {
+        let mut name = [0u8; 8];
+        let mut ext = [0u8; 3];
+        let mut name_capital = false;
+        let mut ext_capital = false;
+        let mut i = 0;
+        for c in dentry.name.chars() {
+            if c == '.' {
+                i = 8;
+                continue;
+            }
+            if i < 8 {
+                name[i] = c as u8;
+                if c.is_ascii_uppercase() {
+                    name_capital = true;
+                }
+            } else {
+                ext[i - 8] = c as u8;
+                if c.is_ascii_uppercase() {
+                    ext_capital = true;
+                }
+            }
+            i += 1;
+        }
+        Self {
+            name,
+            ext,
+            attr: dentry.attr.bits(),
+            reserved: if name_capital { 0x08 } else { 0x00 } | if ext_capital { 0x10 } else { 0x00 },
+            create_time_ms: 0,
+            create_time: 0,
+            create_date: 0,
+            last_access_date: 0,
+            start_cluster_high: (dentry.start_cluster >> 16) as u16,
+            last_modify_time: 0,
+            last_modify_date: 0,
+            start_cluster_low: dentry.start_cluster as u16,
+            file_size: dentry.file_size,
+        }
+    }
+
     pub fn is_long(&self) -> bool {
         self.attr & 0x0F == 0x0F
     }

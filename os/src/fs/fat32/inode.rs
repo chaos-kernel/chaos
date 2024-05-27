@@ -1,11 +1,11 @@
 use core::cmp::min;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use spin::Mutex;
 
 use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::Inode};
 
-use super::file_system::Fat32FS;
+use super::{dentry::{self, Fat32Dentry, FileAttributes}, file_system::Fat32FS};
 
 pub struct Fat32Inode {
     pub type_: Fat32InodeType,
@@ -40,7 +40,29 @@ impl Inode for Fat32Inode {
     }
     
     fn create(&self, name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
-        todo!()
+        if self.find(name).is_some() {
+            return None;
+        }
+        let fs = self.fs.lock();
+        let mut next_sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
+        let mut next_offset = 0;
+        let mut sector_id = next_sector_id;
+        let mut offset = next_offset;
+        while let Some(dentry) = fs.get_dentry(&mut next_sector_id, &mut next_offset) {
+            if dentry.is_deleted() {
+                break;
+            }
+            sector_id = next_sector_id;
+            offset = next_offset;
+        }
+        let dentry = Fat32Dentry::new(
+            name.to_string(),
+            FileAttributes::ARCHIVE,
+            0,
+            0,
+        );
+        fs.insert_dentry(sector_id, offset, dentry);
+        None
     }
     
     fn link(&self, old_name: &str, new_name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {

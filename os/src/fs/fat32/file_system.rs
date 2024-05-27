@@ -3,7 +3,7 @@ use spin::Mutex;
 
 use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::efs::BlockDevice};
 
-use super::{dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
+use super::{dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
 
 pub struct Fat32FS {
     pub sb: Fat32SB,
@@ -65,7 +65,7 @@ impl Fat32FS {
         for i in 0..self.sb.sectors_per_cluster {
             get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .read(0, |data: &[u8; BLOCK_SZ]| {
+                .read(0, |data: &[u8; BLOCK_SZ as usize]| {
                     let copy_size = core::cmp::min(cluster_size - read_size, data.len());
                     buf[read_size..read_size + copy_size].copy_from_slice(&data[..copy_size]);
                     read_size += copy_size;
@@ -81,7 +81,7 @@ impl Fat32FS {
         for i in 0..self.sb.sectors_per_cluster {
             get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .modify(0, |data: &mut [u8; BLOCK_SZ]| {
+                .modify(0, |data: &mut [u8; BLOCK_SZ as usize]| {
                     let copy_size = core::cmp::min(cluster_size - write_size, data.len());
                     data[..copy_size].copy_from_slice(&buf[write_size..write_size + copy_size]);
                     write_size += copy_size;
@@ -161,4 +161,14 @@ impl Fat32FS {
         }
     }
     
+    pub fn insert_dentry(&self, sector_id: u32, offset: usize, dentry: Fat32Dentry) {
+        if sector_id >= 512 || offset % 32 != 0 {
+            return;
+        }
+        get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+            .lock()
+            .modify(offset, |layout: &mut Fat32DentryLayout| {
+                *layout = Fat32DentryLayout::from_dentry(&dentry);
+            });
+    }
 }

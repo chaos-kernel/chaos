@@ -31,7 +31,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [ ] unlink
 
 - [ ] syscalls
-  - [ ] SYS_getcwd 17
+  - [x] SYS_getcwd 17
   - [ ] SYS_pipe2 59
   - [ ] SYS_dup 23
   - [ ] SYS_dup3 24

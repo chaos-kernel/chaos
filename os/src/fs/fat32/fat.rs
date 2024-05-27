@@ -16,6 +16,29 @@ impl FAT {
             sb,
         }
     }
+
+    /// allocate a new cluster
+    pub fn alloc_new_cluster(&self, bdev: &Arc<dyn BlockDevice>) -> Option<u32> {
+        let mut offset = self.start_sector * BLOCK_SZ as u32 + 3 * 4;
+        let mut cluster_id = 0;
+        loop {
+            let fat_sector = offset / BLOCK_SZ as u32;
+            let offset_in_sector = offset % BLOCK_SZ as u32;
+            get_block_cache(fat_sector as usize, Arc::clone(bdev))
+                .lock()
+                .read(offset_in_sector as usize, |data: &[u8; 4]| {
+                    let num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                    if num == 0 {
+                        cluster_id = (offset - self.start_sector * BLOCK_SZ as u32) / 4;
+                    }
+                });
+            if cluster_id != 0 {
+                break;
+            }
+            offset += 4;
+        }
+        Some(cluster_id)
+    }
     
     /// get next cluster number
     pub fn next_cluster_id(&self, cluster: u32, bdev: &Arc<dyn BlockDevice>) -> Option<u32> {
