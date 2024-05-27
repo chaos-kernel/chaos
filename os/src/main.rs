@@ -83,6 +83,7 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
 }
 
 const ALL_TASKS: [&str; 32] = [
+    "chdir",
     "times",
     "uname",
     "gettimeofday",
@@ -114,7 +115,6 @@ const ALL_TASKS: [&str; 32] = [
     "openat",
     "write",
     "unlink",
-    "chdi0"
 ];
 
 #[no_mangle]

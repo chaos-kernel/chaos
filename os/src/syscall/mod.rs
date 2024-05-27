@@ -18,6 +18,12 @@ pub const SYSCALL_GETCWD: usize = 17;
 pub const SYSCALL_DUP: usize = 23;
 /// dup3 syscall
 pub const SYSCALL_DUP3: usize = 24;
+/// unlinkat syscall
+pub const SYSCALL_UNLINKAT: usize = 35;
+/// linkat syscall
+pub const SYSCALL_LINKAT: usize = 37;
+/// chdir syscall
+pub const SYSCALL_CHDIR: usize = 49;
 /// openat syscall
 pub const SYSCALL_OPENAT: usize = 56;
 /// close syscall
@@ -26,10 +32,6 @@ pub const SYSCALL_CLOSE: usize = 57;
 pub const SYSCALL_READ: usize = 63;
 /// write syscall
 pub const SYSCALL_WRITE: usize = 64;
-/// unlinkat syscall
-pub const SYSCALL_UNLINKAT: usize = 35;
-/// linkat syscall
-pub const SYSCALL_LINKAT: usize = 37;
 /// fstat syscall
 pub const SYSCALL_FSTAT: usize = 80;
 /// exit syscall
@@ -174,6 +176,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
         SYSCALL_CONDVAR_SIGNAL => sys_condvar_signal(args[0]),
         SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
         SYSCALL_KILL => sys_kill(args[0], args[1] as u32),
+        SYSALLL_CHDIR => sys_chdir(args[0] as *const u8),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

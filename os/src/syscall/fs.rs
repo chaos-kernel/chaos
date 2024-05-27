@@ -264,7 +264,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let token = current_user_token();
-    if let Some(path) = current_task().unwrap().inner_exclusive_access().work_dir.clone().current_dirname() {
+    if let Some(path) = current_task().unwrap().inner_exclusive_access().work_dir.clone().name() {
         let len = core::cmp::min(len, path.len());
         let mut v = translated_byte_buffer(token, buf, len);
         unsafe {
@@ -279,4 +279,19 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
     } else {
         -1
     }
+}
+
+pub fn sys_chdir(path: *const u8) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_chdir",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    let dir = inner.work_dir.clone();
+    let dir = open_file(&dir, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY | OpenFlags::CREATE);
+    inner.work_dir = dir.unwrap();
+    0
 }

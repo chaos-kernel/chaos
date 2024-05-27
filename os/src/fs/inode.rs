@@ -1,6 +1,6 @@
 //! inode
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use lazy_static::*;
 use crate::{drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell};
 use super::file::{File};
@@ -15,17 +15,18 @@ pub struct OSInode {
 /// inner of inode in memory
 pub struct OSInodeInner {
     pos: usize,
+    name: String,
     inode: Arc<dyn Inode>,
 }
 
 impl OSInode {
     /// create a new inode in memory
-    pub fn new(readable: bool, writable: bool, inode: Arc<dyn Inode>) -> Self {
+    pub fn new(readable: bool, writable: bool, name: String, inode: Arc<dyn Inode>) -> Self {
         trace!("kernel: OSInode::new");
         Self {
             readable,
             writable,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, inode }) },
+            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, name, inode }) },
         }
     }
     /// read all data from the inode in memory
@@ -53,7 +54,7 @@ impl OSInode {
     pub fn find(&self, name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.find(name) {
-            Some(Arc::new(OSInode::new(true, true, inode)))
+            Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
         } else {
             None
         }
@@ -62,7 +63,7 @@ impl OSInode {
     pub fn create(&self, name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.create(name) {
-            Some(Arc::new(OSInode::new(true, true, inode)))
+            Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
         } else {
             None
         }
@@ -71,7 +72,7 @@ impl OSInode {
     pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.link(old_name, new_name) {
-            Some(Arc::new(OSInode::new(true, true, inode)))
+            Some(Arc::new(OSInode::new(true, true, new_name.to_string(), inode)))
         } else {
             None
         }
@@ -101,10 +102,10 @@ impl OSInode {
         let inner = self.inner.exclusive_access();
         inner.inode.clear();
     }
-    /// get the current directory name
-    pub fn current_dirname(&self) -> Option<String> {
+    /// get the name
+    pub fn name(&self) -> Option<String> {
         let inner = self.inner.exclusive_access();
-        inner.inode.current_dirname()
+        inner.name.clone().into()
     }
 }
 
@@ -189,7 +190,7 @@ lazy_static! {
         Arc::new(OSInode { 
             readable: true, 
             writable: true,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, inode }) }
+            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, name: "/".to_string(), inode }) }
         })
     };
 }
