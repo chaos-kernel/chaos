@@ -24,8 +24,11 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 ## TODO
 
 - [ ] FAT32 文件系统
-  - [x] 读
-  - [ ] 写
+  - [x] read
+  - [x] write
+  - [ ] create
+  - [ ] link
+  - [ ] unlink
 
 - [ ] syscalls
   - [ ] SYS_getcwd 17
