@@ -3,10 +3,11 @@ use core::cmp::min;
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::fs::{efs::BlockDevice, fat32::CLUSTER_SIZE, inode::{Inode, Stat, StatMode}};
+use crate::{block::block_dev::BlockDevice, fs::{fat32::CLUSTER_SIZE, inode::{Inode, OSInode, Stat, StatMode, ROOT_INODE}}};
 
 use super::{dentry::{self, Fat32Dentry, FileAttributes}, file_system::Fat32FS};
 
+#[derive(Clone)]
 pub struct Fat32Inode {
     pub type_: Fat32InodeType,
     pub start_cluster: u32,
@@ -16,7 +17,7 @@ pub struct Fat32Inode {
 }
 
 impl Inode for Fat32Inode {
-    fn fstat(&self) -> Stat {
+    fn fstat(self: Arc<Self>) -> Stat {
         let mode = match self.type_ {
             Fat32InodeType::File => StatMode::FILE,
             Fat32InodeType::Dir => StatMode::DIR,
@@ -29,7 +30,7 @@ impl Inode for Fat32Inode {
         )
     }
     
-    fn find(&self, path: &str) -> Option<Arc<dyn Inode>> {
+    fn find(self: Arc<Self>, path: &str) -> Option<Arc<dyn Inode>> {
         let mut split = path.splitn(2, '/');
         let name = split.next().unwrap();
         let next = split.next();
@@ -37,7 +38,7 @@ impl Inode for Fat32Inode {
             if next.is_some() {
                 return self.find(next.unwrap());
             } else {
-                todo!()
+                return Some(self);
             }
         }
         let fs = self.fs.lock();
@@ -52,25 +53,25 @@ impl Inode for Fat32Inode {
                 Fat32InodeType::VolumeId
             };
             if dentry.name() == name {
-                let inode = Fat32Inode {
+                let inode = Arc::new(Fat32Inode {
                     type_,
                     start_cluster: dentry.start_cluster(),
                     fize_size: dentry.file_size(),
                     fs: Arc::clone(&self.fs),
                     bdev: Arc::clone(&self.bdev),
-                };
+                });
                 if next.is_some() {
-                    return inode.find(split.next().unwrap());
+                    return Arc::clone(&inode).find(split.next().unwrap());
                 } else {
-                    return Some(Arc::new(inode));
+                    return Some(inode);
                 }
             }
         }
         None
     }
     
-    fn create(&self, name: &str, stat: StatMode) -> Option<Arc<dyn Inode>> {
-        if self.find(name).is_some() {
+    fn create(self: Arc<Self>, name: &str, stat: StatMode) -> Option<Arc<dyn Inode>> {
+        if self.clone().find(name).is_some() {
             return None;
         }
         let fs = self.fs.lock();
@@ -101,19 +102,20 @@ impl Inode for Fat32Inode {
             Fat32InodeType::Dir
         };
         Some(Arc::new(Fat32Inode {
-            type_,
-            start_cluster,
-            fize_size: 0,
-            fs: Arc::clone(&self.fs),
-            bdev: Arc::clone(&self.bdev),
-        }))
+                type_,
+                start_cluster,
+                fize_size: 0,
+                fs: Arc::clone(&self.fs),
+                bdev: Arc::clone(&self.bdev),
+            })
+        )
     }
     
-    fn link(&self, old_name: &str, new_name: &str) -> Option<alloc::sync::Arc<dyn Inode>> {
+    fn link(self: Arc<Self>, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>> {
         todo!()
     }
     
-    fn unlink(&self, path: &str) -> bool {
+    fn unlink(self: Arc<Self>, path: &str) -> bool {
         let mut split = path.splitn(2, '/');
         let name = split.next().unwrap();
         let next = split.next();
@@ -130,7 +132,7 @@ impl Inode for Fat32Inode {
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
             if dentry.name() == name {
                 if next.is_some() {
-                    let inode = Fat32Inode {
+                    let inode = Arc::new(Fat32Inode {
                         type_: if dentry.is_file() {
                             Fat32InodeType::File
                         } else if dentry.is_dir() {
@@ -142,7 +144,7 @@ impl Inode for Fat32Inode {
                         fize_size: dentry.file_size(),
                         fs: Arc::clone(&self.fs),
                         bdev: Arc::clone(&self.bdev),
-                    };
+                    });
                     return inode.unlink(next.unwrap());
                 } else {
                     fs.remove_dentry(sector_id, offset);
@@ -153,7 +155,7 @@ impl Inode for Fat32Inode {
         true
     }
     
-    fn ls(&self) -> Vec<String> {
+    fn ls(self: Arc<Self>) -> Vec<String> {
         let fs = self.fs.lock();
         let mut v = Vec::new();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
@@ -164,7 +166,7 @@ impl Inode for Fat32Inode {
         v
     }
     
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+    fn read_at(self: Arc<Self>, offset: usize, buf: &mut [u8]) -> usize {
         let fs = self.fs.lock();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);
@@ -191,7 +193,7 @@ impl Inode for Fat32Inode {
         read_size
     }
     
-    fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
+    fn write_at(self: Arc<Self>, offset: usize, buf: &[u8]) -> usize {
         let fs = self.fs.lock();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);
@@ -219,12 +221,12 @@ impl Inode for Fat32Inode {
         write_size
     }
     
-    fn clear(&self) {
+    fn clear(self: Arc<Self>) {
         todo!()
     } 
 
     /// Get the current directory name
-    fn current_dirname(&self) -> Option<String> {
+    fn current_dirname(self: Arc<Self>) -> Option<String> {
         if self.type_ != Fat32InodeType::Dir {
             return None;
         }
@@ -238,6 +240,7 @@ impl Inode for Fat32Inode {
         }
         None
     }
+
 }
 
 impl Fat32Inode {
@@ -252,7 +255,7 @@ impl Fat32Inode {
 
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum Fat32InodeType {
     File,
     Dir,

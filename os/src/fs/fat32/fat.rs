@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::efs::BlockDevice};
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 use super::super_block::Fat32SB;
 

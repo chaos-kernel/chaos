@@ -3,7 +3,7 @@ use core::cmp::min;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::{block_cache::{block_cache_sync_all, get_block_cache}, BLOCK_SZ}, fs::efs::{layout, BlockDevice}};
+use crate::block::{block_cache::{block_cache_sync_all, get_block_cache}, block_dev::BlockDevice, BLOCK_SZ};
 
 use super::{dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
 
