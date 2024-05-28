@@ -24,6 +24,10 @@ pub const SYSCALL_MKDIRAT: usize = 34;
 pub const SYSCALL_UNLINKAT: usize = 35;
 /// linkat syscall
 pub const SYSCALL_LINKAT: usize = 37;
+/// umount2 syscall
+pub const SYSCALL_UMOUNT2: usize = 39;
+/// mount syscall
+pub const SYSCALL_MOUNT: usize = 40;
 /// chdir syscall
 pub const SYSCALL_CHDIR: usize = 49;
 /// openat syscall
@@ -183,6 +187,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
         SYSCALL_MKDIRAT => sys_mkdirat64(args[0] as i32, args[1] as *const u8, args[2] as u32),
         SYSCALL_GETDENTS64 => sys_getdents64(args[0] as i32, args[1] as *mut u8, args[2] as usize),
+        SYSCALL_UMOUNT2 => sys_umount2(args[0] as *const u8, args[1] as i32),
+        SYSCALL_MOUNT => sys_mount(args[0] as *const u8, args[1] as *const u8, args[2] as *const u8, args[3] as u32, args[4] as *const u8),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

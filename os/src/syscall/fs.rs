@@ -399,3 +399,19 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     }
     if is_end { 0 } else { read_size as isize }
 }
+
+pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_umount2",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    0
+}
+
+pub fn sys_mount(source: *const u8, target: *const u8, fs: *const u8, flags: u32, data: *const u8) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_mount",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    0
+}
