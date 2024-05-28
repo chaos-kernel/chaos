@@ -376,17 +376,19 @@ pub fn sys_brk(addr: usize) -> isize {
     } else {
         // We need to calculate to determine if we need a new page table
         // current end page address
-        let align_addr = ((addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        let _align_addr = ((addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
         // the end of 'addr' value
         let align_end = ((inner.heap_end.0) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
         if align_end >= addr {
             inner.heap_end = addr.into();
-            align_addr as isize
+            //todo: should return aligned adreess
+            addr as isize
         } else {
             let heap_end = inner.heap_end;
             // map heap
-            inner.memory_set.map_heap(heap_end, align_addr.into());
-            inner.heap_end = align_addr.into();
+            //todo: aim_addr should map aligned adreess
+            inner.memory_set.map_heap(heap_end, addr.into());
+            inner.heap_end = addr.into();
             addr as isize
         }
     }
