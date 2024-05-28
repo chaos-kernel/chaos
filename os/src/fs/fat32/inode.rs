@@ -80,7 +80,7 @@ impl Inode for Fat32Inode {
             StatMode::DIR => FileAttributes::DIRECTORY,
             _ => FileAttributes::ARCHIVE,
         };
-        let start_cluster = fs.fat.alloc_new_cluster(&self.bdev).unwrap();
+        let start_cluster = fs.fat.alloc_new_cluster().unwrap();
         let dentry = fs.insert_dentry(self.start_cluster, name.to_string(), attr, 0, start_cluster).unwrap();
         let type_ = if stat == StatMode::FILE {
             Fat32InodeType::File
@@ -181,7 +181,7 @@ impl Inode for Fat32Inode {
     }
     
     fn write_at(self: Arc<Self>, offset: usize, buf: &[u8]) -> usize {
-        
+        // self.increase_size(offset + buf.len());
         let fs = self.fs.lock();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);
@@ -228,7 +228,6 @@ impl Inode for Fat32Inode {
         }
         None
     }
-
 }
 
 impl Fat32Inode {
@@ -238,6 +237,30 @@ impl Fat32Inode {
 
     pub fn is_file(&self) -> bool {
         self.type_ == Fat32InodeType::File
+    }
+
+    pub fn file_size(&self) -> usize {
+        self.dentry.lock().file_size()
+    }
+
+    pub fn set_file_size(&self, size: usize) {
+        self.dentry.lock().set_file_size(size);
+    }
+
+    pub fn increase_size(&self, size: usize) {
+        if size < self.file_size() {
+            return;
+        }
+        self.set_file_size(size);
+        let fs = self.fs.lock();
+        let cluster_chain = fs.cluster_chain(self.start_cluster);
+        if cluster_chain.len() * CLUSTER_SIZE >= size {
+            return;
+        }
+        let mut last_cluster_id = cluster_chain.last().unwrap().clone();
+        while cluster_chain.len() * CLUSTER_SIZE < size {
+            last_cluster_id = fs.fat.increase_cluster(last_cluster_id).unwrap();
+        }
     }
 }
 

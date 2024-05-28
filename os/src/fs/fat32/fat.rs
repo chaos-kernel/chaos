@@ -1,11 +1,11 @@
 use alloc::sync::Arc;
 
-use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
+use crate::{block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ}, config::PAGE_SIZE};
 
 use super::super_block::Fat32SB;
 
 pub struct FAT {
-    pub start_sector: u32,
+    pub start_sector: usize,
     pub sb: Arc<Fat32SB>,
     pub bdev: Arc<dyn BlockDevice>,
 }
@@ -13,25 +13,24 @@ pub struct FAT {
 impl FAT {
     pub fn from_sb(sb: Arc<Fat32SB>, bdev: &Arc<dyn BlockDevice>) -> Self {
         Self {
-            start_sector: sb.reserved_sectors_cnt as u32,
+            start_sector: sb.reserved_sectors_cnt as usize,
             sb,
             bdev: Arc::clone(bdev),
         }
     }
 
     /// allocate a new cluster
-    pub fn alloc_new_cluster(&self, bdev: &Arc<dyn BlockDevice>) -> Option<usize> {
-        let mut offset = self.start_sector * BLOCK_SZ as u32 + 3 * 4;
+    pub fn alloc_new_cluster(&self) -> Option<usize> {
+        let mut offset = self.start_sector * BLOCK_SZ + 3 * 4;
         let mut cluster_id = 0;
         loop {
-            let fat_sector = offset / BLOCK_SZ as u32;
-            let offset_in_sector = offset % BLOCK_SZ as u32;
-            get_block_cache(fat_sector as usize, Arc::clone(bdev))
+            let sector_id = offset / BLOCK_SZ;
+            let sector_offset = offset % BLOCK_SZ;
+            get_block_cache(sector_id, Arc::clone(&self.bdev))
                 .lock()
-                .read(offset_in_sector as usize, |data: &[u8; 4]| {
-                    let num = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                    if num == 0 {
-                        cluster_id = (offset - self.start_sector * BLOCK_SZ as u32) / 4;
+                .read(sector_offset, |num: &u32| {
+                    if *num == 0 {
+                        cluster_id = (offset - self.start_sector * BLOCK_SZ) / 4;
                     }
                 });
             if cluster_id != 0 {
@@ -39,7 +38,27 @@ impl FAT {
             }
             offset += 4;
         }
+        let sector_id = offset / BLOCK_SZ;
+        let sector_offset = offset % BLOCK_SZ;
+        get_block_cache(sector_id, Arc::clone(&self.bdev))
+            .lock()
+            .modify(sector_offset, | num: &mut u32| {
+                *num = 0x0FFFFFFFu32;
+            });
         Some(cluster_id as usize)
+    }
+
+    pub fn increase_cluster(&self, cluster_id: usize) -> Option<usize> {
+        let new_cluster_id = self.alloc_new_cluster()?;
+        let fat_offset = self.start_sector as usize * BLOCK_SZ + cluster_id * 4;
+        let fat_sector = fat_offset / BLOCK_SZ;
+        let fat_offset_in_sector = fat_offset % BLOCK_SZ;
+        get_block_cache(fat_sector as usize, Arc::clone(&self.bdev))
+            .lock()
+            .modify(fat_offset_in_sector as usize, |num: &mut u32| {
+                *num = new_cluster_id as u32;
+            });
+        Some(new_cluster_id)
     }
     
     /// get next cluster number

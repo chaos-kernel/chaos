@@ -65,44 +65,24 @@ impl Fat32Dentry {
         self.deleted
     }
 
-    pub fn file_size(&self) -> u32 {
-        let mut sector_id = self.sector_id;
-        let mut offset = self.sector_offset;
-        if self.is_long() {
-            loop {
-                let layout = get_block_cache(sector_id, self.bdev.clone())
-                    .lock()
-                    .read(offset, |layout: &Fat32LDentryLayout| {
-                        *layout
-                    });
-                (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
-                if layout.is_end() {
-                    break;
-                }
-            }
-        }
+    pub fn file_size(&self) -> usize {
+        let (sector_id, offset) = self.to_end();
         get_block_cache(sector_id, self.bdev.clone())
             .lock()
             .read(offset, |layout: &Fat32DentryLayout| {
-                layout.file_size() as u32
+                layout.file_size() as usize
             }) 
     }
 
-    fn read_dentry(&self) -> Fat32DentryLayout {
-        get_block_cache(self.sector_id, self.bdev.clone())
+    pub fn set_file_size(&self, size: usize) {
+        let (sector_id, offset) = self.to_end();
+        get_block_cache(sector_id, self.bdev.clone())
             .lock()
-            .read(self.sector_offset, |layout: &Fat32DentryLayout| {
-                *layout
-            })
-    }
-
-    fn write_dentry(&self, layout: &Fat32DentryLayout) {
-        get_block_cache(self.sector_id, self.bdev.clone())
-            .lock()
-            .modify(self.sector_offset, |l: &mut Fat32DentryLayout| {
-                *l = *layout;
+            .modify(offset, |layout: &mut Fat32DentryLayout| {
+                layout.file_size = size as u32;
             });
     }
+
 
     pub fn is_long(&self) -> bool {
         self.read_dentry().is_long()
@@ -136,26 +116,48 @@ impl Fat32Dentry {
     }
 
     pub fn start_cluster_id(&self) -> usize {
-        let mut sector_id = self.sector_id;
-        let mut offset = self.sector_offset;
-        if self.is_long() {
-            loop {
-                let layout = get_block_cache(sector_id, self.bdev.clone())
-                    .lock()
-                    .read(offset, |layout: &Fat32LDentryLayout| {
-                        *layout
-                    });
-                (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
-                if layout.is_end() {
-                    break;
-                }
-            }
-        }
+        let (sector_id, offset) = self.to_end();
         get_block_cache(sector_id, self.bdev.clone())
             .lock()
             .read(offset, |layout: &Fat32DentryLayout| {
                 layout.start_cluster_id() as usize
             }) 
+    }
+
+    fn to_end(&self) -> (usize, usize) {
+        if !self.is_long() {
+            return (self.sector_id, self.sector_offset);
+        }
+        let mut sector_id = self.sector_id;
+        let mut offset = self.sector_offset;
+        loop {
+            let layout = get_block_cache(sector_id, self.bdev.clone())
+                .lock()
+                .read(offset, |layout: &Fat32LDentryLayout| {
+                    *layout
+                });
+            (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
+            if layout.is_end() {
+                break;
+            }
+        }
+        (sector_id, offset)
+    }
+
+    fn read_dentry(&self) -> Fat32DentryLayout {
+        get_block_cache(self.sector_id, self.bdev.clone())
+            .lock()
+            .read(self.sector_offset, |layout: &Fat32DentryLayout| {
+                *layout
+            })
+    }
+
+    fn write_dentry(&self, layout: &Fat32DentryLayout) {
+        get_block_cache(self.sector_id, self.bdev.clone())
+            .lock()
+            .modify(self.sector_offset, |l: &mut Fat32DentryLayout| {
+                *l = *layout;
+            });
     }
 }
 
