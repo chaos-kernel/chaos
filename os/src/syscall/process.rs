@@ -46,6 +46,27 @@ pub struct TaskInfo {
     time: usize,
 }
 
+#[repr(C)]
+pub struct Dirent {
+    ino: u64,
+    off: i64,
+    len: u16,
+    type_: char,
+    name: String,
+}
+
+impl Dirent {
+    pub fn new(off: usize, len: u16, name: String) -> Self {
+        Self {
+            ino: 0,
+            off: off as i64,
+            len,
+            type_: 'f',
+            name,
+        }
+    }
+}
+
 bitflags! {
     struct WaitOption: u32 {
         const WNOHANG    = 1;

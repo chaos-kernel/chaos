@@ -27,8 +27,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] read
   - [x] write
   - [x] create
-  - [ ] link
-  - [ ] unlink
+  - [x] unlink
 
 - [ ] syscalls
   - [x] SYS_getcwd 17
@@ -38,11 +37,11 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] SYS_chdir 49
   - [x] SYS_openat 56
   - [x] SYS_close 57
-  - [ ] SYS_getdents64 61
+  - [x] SYS_getdents64 61
   - [x] SYS_read 63
   - [x] SYS_write 64
   - [ ] SYS_linkat 37
-  - [ ] SYS_unlinkat 35
+  - [x] SYS_unlinkat 35
   - [x] SYS_mkdirat 34
   - [ ] SYS_umount2 39
   - [ ] SYS_mount 40

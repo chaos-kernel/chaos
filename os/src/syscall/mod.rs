@@ -30,6 +30,8 @@ pub const SYSCALL_CHDIR: usize = 49;
 pub const SYSCALL_OPENAT: usize = 56;
 /// close syscall
 pub const SYSCALL_CLOSE: usize = 57;
+/// getdents64 syscall
+pub const SYSCALL_GETDENTS64: usize = 61;
 /// read syscall
 pub const SYSCALL_READ: usize = 63;
 /// write syscall
@@ -180,6 +182,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_KILL => sys_kill(args[0], args[1] as u32),
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
         SYSCALL_MKDIRAT => sys_mkdirat64(args[0] as i32, args[1] as *const u8, args[2] as u32),
+        SYSCALL_GETDENTS64 => sys_getdents64(args[0] as i32, args[1] as *mut u8, args[2] as usize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
