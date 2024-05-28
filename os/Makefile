@@ -52,7 +52,7 @@ fs-img:
 
 kernel:
 	@echo Platform: $(BOARD)
-	@cargo build $(MODE_ARG)
+	@cargo build $(MODE_ARG) --offline
 
 clean:
 	@cargo clean
