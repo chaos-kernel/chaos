@@ -158,9 +158,9 @@ pub fn sys_clone(
     
 }
 /// exec syscall
-pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
+pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_exec",
+        "kernel:pid[{}] sys_execve",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let token = current_user_token();

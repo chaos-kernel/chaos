@@ -67,7 +67,7 @@ pub const SYSCALL_GETTID: usize = 178;
 /// fork syscall
 pub const SYSCALL_CLONE: usize = 220;
 /// exec syscall
-pub const SYSCALL_EXEC: usize = 221;
+pub const SYSCALL_EXECVE: usize = 221;
 /// waitpid syscall
 pub const SYSCALL_WAIT4: usize = 260;
 /// set priority syscall
@@ -157,7 +157,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETTID => sys_gettid(),
         SYSCALL_CLONE => sys_clone(args[0], args[1], args[2] as *mut usize, args[3], args[4] as *mut usize),
         SYSCALL_BRK => sys_brk(args[0] as usize),
-        SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
+        SYSCALL_EXECVE => sys_execve(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize,args[1] as *mut i32, args[2] as u32, args[3],) ,
         SYSCALL_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1]),
         SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2]),

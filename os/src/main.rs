@@ -27,6 +27,8 @@
 
 use core::arch::global_asm;
 
+use fs::inode::ROOT_INODE;
+
 #[macro_use]
 extern crate log;
 
@@ -84,36 +86,37 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
 
 const ALL_TASKS: [&str; 32] = [
     "read",
+    "clone",
     "write",
     "chdir",
+    "dup2",
     "times",
     "uname",
+    "wait",
     "gettimeofday",
     "waitpid",
     "brk",
+    "getpid",
     "fork",
+    "close",
+    "dup",
+    "exit",
     "sleep",
     "yield",
     "getppid",
-    "munmap",
-    "mmap",
-    "dup2",
-    "pipe",
-    "mount",
-    "execve",
-    "exit",
-    "umount",
-    "fstat",
-    "close",
-    "dup",
-    "getdents",
-    "getpid",
-    "wait",
-    "clone",
-    "mkdir_",
-    "getcwd",
     "open",
     "openat",
+    "getcwd",
+    "mkdir_",
+    "execve",
+    
+    "pipe",
+    "mount",
+    "umount",
+    "fstat",
+    "getdents",
+    "munmap",
+    "mmap",
     "unlink",
 ];
 
@@ -129,6 +132,9 @@ pub fn rust_main() -> ! {
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
+    // for file in ROOT_INODE.ls() {
+    //     println!("{}", file);
+    // }
     for file in ALL_TASKS.iter() {
         task::add_file(file);
         task::run_tasks();
