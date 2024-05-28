@@ -61,3 +61,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] SYS_gettimeofday 169
   - [x] SYS_nanosleep 101
 
+- [ ] Bugs
+  - [ ] sys_getdents64 中 vec 导致内核 LoadPageFault
+  - [ ] 初始进程
+
