@@ -368,27 +368,28 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     let mut slice_index = 0usize;
     let mut is_end = true;
     for name in inode.ls() {
-        let dirent_len = 19 + name.len();
+        let dirent_len = 19 + name.len() + 1;
         if read_size + dirent_len > len {
             is_end = false;
             break;
         }
         // TODO: 这里 vec 的长度不同会导致内核 LoadPageFault，先这样处理
-        let mut mbuf = vec![0u8; dirent_len + 20];
-        let p = mbuf.as_mut() as *mut [u8] as *mut u8;
+        let mut mbuf = [0u8; 35];
+        let mut p = mbuf.as_mut() as *mut [u8] as *mut u8;
         let dirent = p as *mut Dirent;
         unsafe { 
-            *dirent = Dirent::new(read_size + dirent_len, dirent_len as u16, name); 
+            *dirent = Dirent::new(read_size + dirent_len, dirent_len as u16, &name); 
         }
-        let copy_size = min(dirent_len, v[slice_index].len() - offset_in_slice);
         let mut copy_len = 0;
         while copy_len < dirent_len {
+            let copy_size = min(dirent_len - copy_len, v[slice_index].len() - offset_in_slice);
             unsafe {
                 ptr::copy_nonoverlapping(p, v[slice_index][offset_in_slice..].as_mut_ptr(), copy_size);
-                copy_len += copy_size;
+                p = p.add(copy_size);
             }
             read_size += copy_size;
             offset_in_slice += copy_size;
+            copy_len += copy_size;
             if offset_in_slice == v[slice_index].len() {
                 offset_in_slice = 0;
                 slice_index += 1;

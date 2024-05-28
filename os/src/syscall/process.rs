@@ -47,24 +47,29 @@ pub struct TaskInfo {
     time: usize,
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct Dirent {
     ino: u64,
     off: i64,
     len: u16,
-    type_: char,
-    name: String,
+    type_: u8,
+    name: [u8; 64],
 }
 
 impl Dirent {
-    pub fn new(off: usize, len: u16, name: String) -> Self {
-        Self {
+    pub fn new(off: usize, len: u16, name: &String) -> Self {
+        let mut dirent = Self {
             ino: 0,
             off: off as i64,
             len,
-            type_: 'f',
-            name,
+            type_: 0,
+            name: [0; 64],
+        };
+        for (i, c) in name.chars().enumerate() {
+            dirent.name[i] = c.as_ascii().unwrap() as u8;
         }
+        dirent
     }
 }
 
