@@ -121,13 +121,16 @@ impl Fat32FS {
         let dentry = get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
             .lock()
             .read(*offset, |layout: &Fat32DentryLayout| {
+                if layout.is_empty() {
+                    return None;
+                }
                 if layout.is_deleted() {
-                    return Fat32Dentry::new_deleted(&self.bdev, &self.fat);
+                    return Some(Fat32Dentry::new_deleted(&self.bdev, &self.fat));
                 }
                 if layout.is_long() {
                     is_long_entry = true;
                 }
-                Fat32Dentry::new(*sector_id, *offset, &self.bdev, &self.fat)
+                Some(Fat32Dentry::new(*sector_id, *offset, &self.bdev, &self.fat))
             });
         if is_long_entry {
             let mut is_end = false;
@@ -146,21 +149,22 @@ impl Fat32FS {
             }
         }
         (*sector_id, *offset) = self.next_dentry_id(*sector_id, *offset).unwrap();
-        Some(dentry)
+        dentry
     }
     
     pub fn insert_dentry(&self, cluster_id: usize, name: String, attr: FileAttributes, file_size: u32, start_cluster: usize) -> Option<Fat32Dentry> {
         let mut sector_id = self.fat.cluster_id_to_sector_id(cluster_id).unwrap();
         let mut offset = 0;
-        let mut found = false;
-        while !found {
-            get_block_cache(sector_id, self.bdev.clone())
+        loop {
+            let found = get_block_cache(sector_id, self.bdev.clone())
                 .lock()
                 .read(offset, |layout: &Fat32DentryLayout| {
-                    if layout.is_empty() {
-                        found = true;
-                    }
-                })
+                    layout.is_empty()
+                });
+            if found {
+                break;
+            }
+            (sector_id, offset) = self.next_dentry_id(sector_id, offset).unwrap();
         }
         let mut order = 1;
         let mut pos = 0;

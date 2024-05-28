@@ -338,7 +338,6 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
         "kernel:pid[{}] sys_getdents64",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    // debug!("dirfd: {}, buf: {:?}, len: {}", dirfd, buf, len);
     let process = current_process();
     let inner = process.inner_exclusive_access();
     let inode;
@@ -366,7 +365,6 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     let mut is_end = true;
     for name in inode.ls() {
         let dirent_len = 19 + name.len();
-        // debug!("offset: {}, dirent_len: {}, name: {}", read_size, dirent_len, name);
         if read_size + dirent_len > len {
             is_end = false;
             break;
@@ -376,15 +374,12 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
         let p = mbuf.as_mut() as *mut [u8] as *mut u8;
         let dirent = p as *mut Dirent;
         unsafe { 
-            // debug!("dirent: {:?}, p: {:?}", dirent, p);
             *dirent = Dirent::new(read_size + dirent_len, dirent_len as u16, name); 
         }
         let copy_size = min(dirent_len, v[slice_index].len() - offset_in_slice);
         let mut copy_len = 0;
         while copy_len < dirent_len {
-            // debug!("copy_size: {}, copy_len: {}, offset_in_slice: {}, slice_index: {}", copy_size, copy_len, offset_in_slice, slice_index);
             unsafe {
-                // debug!("dst: {:?}, src: {:?}", v[slice_index][offset_in_slice..].as_mut_ptr(), p.add(copy_len));
                 ptr::copy_nonoverlapping(p, v[slice_index][offset_in_slice..].as_mut_ptr(), copy_size);
                 copy_len += copy_size;
             }
