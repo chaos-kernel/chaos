@@ -23,7 +23,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 
 ## TODO
 
-- [ ] FAT32 文件系统
+- [x] FAT32 文件系统
   - [x] read
   - [x] write
   - [x] create
@@ -31,7 +31,7 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 
 - [ ] syscalls
   - [x] SYS_getcwd 17
-  - [ ] SYS_pipe2 59
+  - [x] SYS_pipe2 59
   - [x] SYS_dup 23
   - [x] SYS_dup3 24
   - [x] SYS_chdir 49
@@ -53,8 +53,8 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] SYS_getppid 173
   - [x] SYS_getpid 172
   - [x] SYS_brk 214
-  - [ ] SYS_munmap 215
-  - [ ] SYS_mmap 222
+  - [x] SYS_munmap 215
+  - [x] SYS_mmap 222
   - [x] SYS_times 153
   - [x] SYS_uname 160
   - [x] SYS_sched_yield 124
