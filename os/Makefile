@@ -4,7 +4,8 @@ MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
-FS_IMG := ../testcases/sdcard-riscv.img
+FS_IMG := sdcard-riscv.img
+FS_IMG_PATH := ../testcases
 APPS := ../user/src/bin/*
 OFFLINE :=
 
@@ -41,10 +42,9 @@ endif
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
-fs-img: $(APPS)
-	@make -C ../user build
+fs-img:
 	@rm -f $(FS_IMG)
-	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/src/bin/ -c ../testcases/ -t ../user/target/riscv64gc-unknown-none-elf/release/
+	@cp $(FS_IMG_PATH)/$(FS_IMG) .
 
 kernel:
 	@echo Platform: $(BOARD)
@@ -61,7 +61,7 @@ disasm-vim: kernel
 	@vim $(DISASM_TMP)
 	@rm $(DISASM_TMP)
 
-run: build run-inner
+run: build fs-img run-inner
 
 run-inner:
 	@qemu-system-riscv64 \
