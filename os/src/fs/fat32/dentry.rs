@@ -66,7 +66,26 @@ impl Fat32Dentry {
     }
 
     pub fn file_size(&self) -> u32 {
-        self.read_dentry().file_size
+        let mut sector_id = self.sector_id;
+        let mut offset = self.sector_offset;
+        if self.is_long() {
+            loop {
+                let layout = get_block_cache(sector_id, self.bdev.clone())
+                    .lock()
+                    .read(offset, |layout: &Fat32LDentryLayout| {
+                        *layout
+                    });
+                (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
+                if layout.is_end() {
+                    break;
+                }
+            }
+        }
+        get_block_cache(sector_id, self.bdev.clone())
+            .lock()
+            .read(offset, |layout: &Fat32DentryLayout| {
+                layout.file_size() as u32
+            }) 
     }
 
     fn read_dentry(&self) -> Fat32DentryLayout {
