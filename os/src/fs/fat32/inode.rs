@@ -69,7 +69,7 @@ impl Inode for Fat32Inode {
         None
     }
     
-    fn create(&self, name: &str) -> Option<Arc<dyn Inode>> {
+    fn create(&self, name: &str, stat: StatMode) -> Option<Arc<dyn Inode>> {
         if self.find(name).is_some() {
             return None;
         }
@@ -78,23 +78,30 @@ impl Inode for Fat32Inode {
         let mut next_offset = 0;
         let mut sector_id = next_sector_id;
         let mut offset = next_offset;
-        while let Some(dentry) = fs.get_dentry(&mut next_sector_id, &mut next_offset) {
-            if dentry.is_deleted() {
-                break;
-            }
+        while let Some(_) = fs.get_dentry(&mut next_sector_id, &mut next_offset) {
             sector_id = next_sector_id;
             offset = next_offset;
         }
+        let attr = match stat {
+            StatMode::FILE => FileAttributes::ARCHIVE,
+            StatMode::DIR => FileAttributes::DIRECTORY,
+            _ => FileAttributes::ARCHIVE,
+        };
         let start_cluster = fs.fat.alloc_new_cluster(&self.bdev).unwrap();
         let dentry = Fat32Dentry::new(
             name.to_string(),
-            FileAttributes::ARCHIVE,
+            attr,
             0,
             start_cluster,
         );
         fs.insert_dentry(sector_id, offset, dentry);
+        let type_ = if stat == StatMode::FILE {
+            Fat32InodeType::File
+        } else {
+            Fat32InodeType::Dir
+        };
         Some(Arc::new(Fat32Inode {
-            type_: Fat32InodeType::File,
+            type_,
             start_cluster,
             fize_size: 0,
             fs: Arc::clone(&self.fs),

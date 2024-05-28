@@ -1,7 +1,9 @@
+use core::cmp::min;
+
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::{block_cache::get_block_cache, BLOCK_SZ}, fs::efs::BlockDevice};
+use crate::{block::{block_cache::{block_cache_sync_all, get_block_cache}, BLOCK_SZ}, fs::efs::{layout, BlockDevice}};
 
 use super::{dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
 
@@ -161,13 +163,31 @@ impl Fat32FS {
         }
     }
     
-    pub fn insert_dentry(&self, sector_id: u32, offset: usize, dentry: Fat32Dentry) {
-        if sector_id >= 512 || offset % 32 != 0 {
+    pub fn insert_dentry(&self, mut sector_id: u32, mut offset: usize, dentry: Fat32Dentry) {
+        if offset % 32 != 0 {
             return;
         }
-        get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+        let mut pos = 0;
+        let mut order = 1;
+        let len = dentry.name().len();
+        while pos < len {
+            let copy_len = min(13, len - pos);
+            get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+                .lock()
+                .modify(offset, |layout: &mut Fat32LDentryLayout| {
+                    *layout = Fat32LDentryLayout::new(
+                        order,
+                        &dentry.name()[pos..pos + copy_len],
+                        pos + copy_len == len,
+                    );
+                });
+            order += 1;
+            pos += copy_len;
+            (sector_id, offset) = self.next_dentry_id(sector_id, offset).unwrap();
+        }
+        get_block_cache(sector_id as usize, self.bdev.clone())
             .lock()
-            .modify(offset, |layout: &mut Fat32DentryLayout| {
+            .modify(offset, | layout: &mut Fat32DentryLayout | {
                 *layout = Fat32DentryLayout::from_dentry(&dentry);
             });
     }

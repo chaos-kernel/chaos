@@ -456,13 +456,11 @@ impl ProcessControlBlock {
                 .unwrap()
                 .ustack_top
         };
-        debug!("setting child's stack top");
         let new_task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
             thread_stack_top,
             true,
         ));
-        debug!("setting child's stack top success");
         let new_task_inner = new_task.inner_exclusive_access();
         let new_task_res = new_task_inner.res.as_ref().unwrap();
         let new_task_tid = new_task_res.tid;

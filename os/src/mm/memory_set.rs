@@ -67,7 +67,6 @@ impl MemorySet {
         end_va: VirtAddr,
         permission: MapPermission,
     ) {
-        //debug!("kernel: insert_framed_area MapArea::new {:x?} {:x?}",start_va, end_va);
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
             None,
@@ -238,9 +237,7 @@ impl MemorySet {
                 if ph_flags.is_execute() {
                     map_perm |= MapPermission::X;
                 }
-                //debug!("kernel: MapArea::new {:x?} {:x?}",start_va, end_va);
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
-                //debug!("kernel: MapArea::new success");
                 max_end_vpn = map_area.vpn_range.get_end();
                 memory_set.push(
                     map_area,

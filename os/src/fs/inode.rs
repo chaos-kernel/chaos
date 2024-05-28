@@ -60,9 +60,9 @@ impl OSInode {
         }
     }
     /// create a inode in memory with 'name'
-    pub fn create(&self, name: &str) -> Option<Arc<OSInode>> {
+    pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
-        if let Some(inode) = inner.inode.create(name) {
+        if let Some(inode) = inner.inode.create(name, stat) {
             Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
         } else {
             None
@@ -116,7 +116,7 @@ pub trait Inode: Send + Sync {
     /// find the disk inode of the file with 'name'
     fn find(&self, name: &str) -> Option<Arc<dyn Inode>>;
     /// create a file with 'name' in the root directory
-    fn create(&self, name: &str) -> Option<Arc<dyn Inode>>;
+    fn create(&self, name: &str, stat: StatMode) -> Option<Arc<dyn Inode>>;
     /// create a link with a disk inode under current inode
     fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>>;
     /// Remove a link under current inode

@@ -21,7 +21,6 @@ pub trait File: {
     /// is directory
     fn is_dir(&self) -> bool {
         let stat = self.fstat().unwrap();
-        debug!("stat: {:?}", stat);
         stat.is_dir()
     }
 }

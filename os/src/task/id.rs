@@ -84,7 +84,6 @@ pub struct KernelStack(pub usize);
 
 /// Allocate a kernel stack for a task
 pub fn kstack_alloc() -> KernelStack {
-    //debug!("kernel: alloc kernel stack");
     let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();
     let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
     KERNEL_SPACE.exclusive_access().insert_framed_area(
@@ -175,7 +174,6 @@ impl TaskUserRes {
         // alloc user stack
         let ustack_top = ustack_top_from_id(self.ustack_top, self.tid);
         let ustack_bottom = ustack_top - USER_STACK_SIZE;
-        //debug!("kernel: alloc user stack  bottom  top");
         process_inner.memory_set.insert_framed_area(
             ustack_bottom.into(),
             ustack_top.into(),
@@ -184,7 +182,6 @@ impl TaskUserRes {
         // alloc trap_cx
         let trap_cx_bottom = trap_cx_bottom_from_tid(self.tid);
         let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
-        //debug!("kernel: alloc trap_cx_bottom  trap_cx_top");
         process_inner.memory_set.insert_framed_area(
             trap_cx_bottom.into(),
             trap_cx_top.into(),

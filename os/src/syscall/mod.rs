@@ -18,6 +18,8 @@ pub const SYSCALL_GETCWD: usize = 17;
 pub const SYSCALL_DUP: usize = 23;
 /// dup3 syscall
 pub const SYSCALL_DUP3: usize = 24;
+/// mkdirat syscall
+pub const SYSCALL_MKDIRAT: usize = 34;
 /// unlinkat syscall
 pub const SYSCALL_UNLINKAT: usize = 35;
 /// linkat syscall
@@ -177,6 +179,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
         SYSCALL_KILL => sys_kill(args[0], args[1] as u32),
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
+        SYSCALL_MKDIRAT => sys_mkdirat64(args[0] as i32, args[1] as *const u8, args[2] as u32),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

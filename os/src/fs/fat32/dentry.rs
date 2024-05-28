@@ -120,6 +120,7 @@ impl Fat32Dentry {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct Fat32DentryLayout {
     pub name: [u8; 8],
@@ -207,6 +208,35 @@ pub struct Fat32LDentryLayout {
 }
 
 impl Fat32LDentryLayout {
+    pub fn new(mut order: u8, name: &str, is_end: bool) -> Self {
+        let mut name1 = [0u16; 5];
+        let mut name2 = [0u16; 6];
+        let mut name3 = [0u16; 2];
+        let mut i = 0;
+        for c in name.chars() {
+            if i < 5 {
+                name1[i] = c as u16;
+            } else if i < 11 {
+                name2[i - 5] = c as u16;
+            } else {
+                name3[i - 11] = c as u16;
+            }
+            i += 1;
+        }
+        if is_end {
+            order |= 0x40;
+        }
+        Self {
+            order,
+            name1,
+            attr: 0x0F,
+            reserved: 0,
+            checksum: 0,
+            name2,
+            start_cluster: 0,
+            name3,
+        }
+    }
     pub fn from_short_layout(layout: &Fat32DentryLayout) -> Option<Self> {
         if layout.attr & 0x0F != 0x0F {
             return None;

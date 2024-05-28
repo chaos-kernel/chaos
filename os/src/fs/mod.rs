@@ -42,7 +42,6 @@ bitflags! {
 
 /// Open a file
 pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
-    debug!("kernel: open_file: name = {}, flags = {:?}", name, flags);
     // TODO: read_write
     // let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
@@ -52,7 +51,12 @@ pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OS
             Some(inode)
         } else {
             // create file
-            inode.create(name)
+            let stat = if flags.contains(OpenFlags::DIRECTORY) {
+                StatMode::DIR
+            } else {
+                StatMode::FILE
+            };
+            inode.create(name, stat)
         }
     } else {
         inode.find(name).map(|inode| {
@@ -85,6 +89,6 @@ pub fn list_apps() {
 
 
 use alloc::sync::Arc;
-use inode::{Inode, OSInode, ROOT_INODE};
+use inode::{Inode, OSInode, Stat, StatMode, ROOT_INODE};
 pub use pipe::{make_pipe, Pipe};
 pub use stdio::{Stdin, Stdout};
