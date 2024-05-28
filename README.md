@@ -43,12 +43,12 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
   - [x] SYS_write 64
   - [ ] SYS_linkat 37
   - [ ] SYS_unlinkat 35
-  - [ ] SYS_mkdirat 34
+  - [x] SYS_mkdirat 34
   - [ ] SYS_umount2 39
   - [ ] SYS_mount 40
-  - [ ] SYS_fstat 80
-  - [ ] SYS_clone 220
-  - [ ] SYS_execve 221
+  - [x] SYS_fstat 80
+  - [x] SYS_clone 220
+  - [x] SYS_execve 221
   - [x] SYS_wait4 260
   - [x] SYS_exit 93
   - [x] SYS_getppid 173
