@@ -189,7 +189,7 @@ impl Inode for Fat32Inode {
     }
     
     fn write_at(self: Arc<Self>, offset: usize, buf: &[u8]) -> usize {
-        // self.increase_size(offset + buf.len());
+        self.increase_size(offset + buf.len());
         let fs = self.fs.lock();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);

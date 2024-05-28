@@ -33,6 +33,7 @@ impl OSInode {
     pub fn read_all(&self) -> Vec<u8> {
         trace!("kernel: OSInode::read_all");
         let mut inner = self.inner.exclusive_access();
+        inner.pos = 0;
         let mut buffer = [0u8; 512];
         let mut v: Vec<u8> = Vec::new();
         loop {
