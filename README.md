@@ -64,4 +64,5 @@ qemu-system-riscv64 -machine virt -kernel kernel-qemu -m 128M -nographic -smp 2 
 - [ ] Bugs
   - [ ] sys_getdents64 中 vec 导致内核 LoadPageFault
   - [ ] 初始进程
+  - [ ] 中途 read_all 会卡一段时间
 
