@@ -3,15 +3,15 @@ use core::cmp::min;
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::{block::block_dev::BlockDevice, fs::{fat32::CLUSTER_SIZE, inode::{Inode, OSInode, Stat, StatMode, ROOT_INODE}}};
+use crate::{block::block_dev::BlockDevice, fs::{fat32::CLUSTER_SIZE, inode::{Inode, Stat, StatMode}}};
 
 use super::{dentry::{self, Fat32Dentry, FileAttributes}, file_system::Fat32FS};
 
 #[derive(Clone)]
 pub struct Fat32Inode {
     pub type_: Fat32InodeType,
-    pub start_cluster: u32,
-    pub fize_size: u32,
+    pub dentry: Arc<Mutex<Fat32Dentry>>,
+    pub start_cluster: usize,
     pub fs: Arc<Mutex<Fat32FS>>,
     pub bdev: Arc<dyn BlockDevice>,
 }
@@ -55,10 +55,10 @@ impl Inode for Fat32Inode {
             if dentry.name() == name {
                 let inode = Arc::new(Fat32Inode {
                     type_,
-                    start_cluster: dentry.start_cluster(),
-                    fize_size: dentry.file_size(),
+                    start_cluster: dentry.start_cluster_id(),
                     fs: Arc::clone(&self.fs),
                     bdev: Arc::clone(&self.bdev),
+                    dentry: Arc::new(Mutex::new(dentry)),
                 });
                 if next.is_some() {
                     return Arc::clone(&inode).find(split.next().unwrap());
@@ -75,27 +75,13 @@ impl Inode for Fat32Inode {
             return None;
         }
         let fs = self.fs.lock();
-        let mut next_sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
-        let mut next_offset = 0;
-        let mut sector_id = next_sector_id;
-        let mut offset = next_offset;
-        while let Some(_) = fs.get_dentry(&mut next_sector_id, &mut next_offset) {
-            sector_id = next_sector_id;
-            offset = next_offset;
-        }
         let attr = match stat {
             StatMode::FILE => FileAttributes::ARCHIVE,
             StatMode::DIR => FileAttributes::DIRECTORY,
             _ => FileAttributes::ARCHIVE,
         };
         let start_cluster = fs.fat.alloc_new_cluster(&self.bdev).unwrap();
-        let dentry = Fat32Dentry::new(
-            name.to_string(),
-            attr,
-            0,
-            start_cluster,
-        );
-        fs.insert_dentry(sector_id, offset, dentry);
+        let dentry = fs.insert_dentry(self.start_cluster, name.to_string(), attr, 0, start_cluster).unwrap();
         let type_ = if stat == StatMode::FILE {
             Fat32InodeType::File
         } else {
@@ -104,9 +90,9 @@ impl Inode for Fat32Inode {
         Some(Arc::new(Fat32Inode {
                 type_,
                 start_cluster,
-                fize_size: 0,
                 fs: Arc::clone(&self.fs),
                 bdev: Arc::clone(&self.bdev),
+                dentry: Arc::new(Mutex::new(dentry)),
             })
         )
     }
@@ -140,14 +126,14 @@ impl Inode for Fat32Inode {
                         } else {
                             Fat32InodeType::VolumeId
                         },
-                        start_cluster: dentry.start_cluster(),
-                        fize_size: dentry.file_size(),
+                        start_cluster: dentry.start_cluster_id(),
                         fs: Arc::clone(&self.fs),
                         bdev: Arc::clone(&self.bdev),
+                        dentry: Arc::new(Mutex::new(dentry)),
                     });
                     return inode.unlink(next.unwrap());
                 } else {
-                    fs.remove_dentry(sector_id, offset);
+                    fs.remove_dentry(&dentry);
                     return true;
                 }
             }
@@ -181,12 +167,13 @@ impl Inode for Fat32Inode {
                     continue;
                 }
             }
+            let dentry = self.dentry.lock();
             fs.read_cluster(cluster_id, &mut cluster_buf);
-            let copy_size = min(self.fize_size as usize - pos, buf.len() - read_size);
+            let copy_size = min(dentry.file_size() as usize - pos, buf.len() - read_size);
             buf[read_size..read_size + copy_size].copy_from_slice(&cluster_buf[pos % CLUSTER_SIZE..pos % CLUSTER_SIZE + copy_size]);
             read_size += copy_size;
             pos += copy_size;
-            if read_size >= buf.len() || pos >= self.fize_size as usize {
+            if read_size >= buf.len() || pos >= dentry.file_size() as usize {
                 break;
             }
         }
@@ -244,7 +231,6 @@ impl Inode for Fat32Inode {
 }
 
 impl Fat32Inode {
-    
     pub fn is_dir(&self) -> bool {
         self.type_ == Fat32InodeType::Dir
     }
@@ -252,7 +238,6 @@ impl Fat32Inode {
     pub fn is_file(&self) -> bool {
         self.type_ == Fat32InodeType::File
     }
-
 }
 
 #[derive(PartialEq, Clone, Copy)]

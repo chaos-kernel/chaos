@@ -1,11 +1,16 @@
-use alloc::string::String;
+use alloc::{sync::Weak, string::String, sync::Arc};
+
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice};
+
+use super::{fat::FAT, file_system::Fat32FS};
+
 
 pub struct Fat32Dentry {
-    name: String,
-    attr: FileAttributes,
-    file_size: u32,
-    start_cluster: u32,
-    deleted: bool,
+    pub sector_id: usize,
+    pub sector_offset: usize,
+    pub deleted: bool,
+    pub bdev: Arc<dyn BlockDevice>,
+    pub fat: Arc<FAT>,
 }
 
 bitflags! {
@@ -20,95 +25,36 @@ bitflags! {
 }
 
 impl Fat32Dentry {
-    pub fn new(name: String, attr: FileAttributes, file_size: u32, start_cluster: u32) -> Self {
+    pub fn new(sector_id: usize, sector_offset: usize, bdev: &Arc<dyn BlockDevice>, fat: &Arc<FAT>) -> Self {
         Self {
-            name,
-            attr,
-            file_size,
-            start_cluster,
+            sector_id,
+            sector_offset,
             deleted: false,
+            bdev: Arc::clone(bdev),
+            fat: fat.clone(),
         }
     }
 
-    pub fn from_layout(layout: &Fat32DentryLayout) -> Option<Self> {
-        // not a valid entry
-        if layout.is_empty() {
-            return None;
+    pub fn new_deleted(bdev: &Arc<dyn BlockDevice>, fat: &Arc<FAT>) -> Self {
+        Self {
+            sector_id: 0,
+            sector_offset: 0,
+            deleted: true,
+            bdev: Arc::clone(bdev),
+            fat: fat.clone(),
         }
-        if layout.is_deleted() {
-            return Some(Self {
-                name: String::new(),
-                attr: FileAttributes::empty(),
-                file_size: 0,
-                start_cluster: 0,
-                deleted: true,
-            });
-        }
-        let name_capital = layout.reserved & 0x08 != 0;
-        let ext_capital = layout.reserved & 0x10 != 0;
-        let mut name = String::new();
-        for i in 0..8 {
-            if layout.name[i] == 0x20 {
-                break;
-            }
-            let c = if name_capital {
-                layout.name[i].to_ascii_uppercase()
-            } else {
-                layout.name[i].to_ascii_lowercase()
-            };
-            name.push(c as char);
-        }
-        let mut ext = String::new();
-        for i in 0..3 {
-            if layout.ext[i] == 0x20 {
-                break;
-            }
-            let c = if ext_capital {
-                layout.ext[i].to_ascii_uppercase()
-            } else {
-                layout.ext[i].to_ascii_lowercase()
-            };
-            ext.push(c as char);
-        }
-        if !ext.is_empty() {
-            name.push('.');
-            name.push_str(&ext);
-        }
-        Some(Self {
-            name,
-            attr: FileAttributes::from_bits_truncate(layout.attr),
-            file_size: layout.file_size,
-            start_cluster: (layout.start_cluster_high as u32) << 16 | layout.start_cluster_low as u32,
-            deleted: layout.is_deleted(),
-        })
-    }
-
-    pub fn name(&self) -> String {
-        self.name.clone()
-    }
-
-    pub fn set_name(&mut self, name: String) {
-        self.name = name;
-    }
-
-    pub fn start_cluster(&self) -> u32 {
-        self.start_cluster
-    }
-    
-    pub fn file_size(&self) -> u32 {
-        self.file_size
     }
 
     pub fn is_system(&self) -> bool {
-        self.attr.contains(FileAttributes::SYSTEM)
+        self.read_dentry().attr() == FileAttributes::SYSTEM
     }
 
     pub fn is_dir(&self) -> bool {
-        self.attr.contains(FileAttributes::DIRECTORY)
+        self.read_dentry().attr() == FileAttributes::DIRECTORY
     }
 
     pub fn is_volume_id(&self) -> bool {
-        self.attr.contains(FileAttributes::VOLUME_ID)
+        self.read_dentry().attr() == FileAttributes::VOLUME_ID
     }
 
     pub fn is_file(&self) -> bool {
@@ -118,34 +64,108 @@ impl Fat32Dentry {
     pub fn is_deleted(&self) -> bool {
         self.deleted
     }
+
+    pub fn file_size(&self) -> u32 {
+        self.read_dentry().file_size
+    }
+
+    fn read_dentry(&self) -> Fat32DentryLayout {
+        get_block_cache(self.sector_id, self.bdev.clone())
+            .lock()
+            .read(self.sector_offset, |layout: &Fat32DentryLayout| {
+                *layout
+            })
+    }
+
+    fn write_dentry(&self, layout: &Fat32DentryLayout) {
+        get_block_cache(self.sector_id, self.bdev.clone())
+            .lock()
+            .modify(self.sector_offset, |l: &mut Fat32DentryLayout| {
+                *l = *layout;
+            });
+    }
+
+    pub fn is_long(&self) -> bool {
+        self.read_dentry().is_long()
+    }
+
+    pub fn name(&self) -> String {
+        if self.is_long() {
+            let mut name = String::new();
+            let mut sector_id = self.sector_id;
+            let mut offset = self.sector_offset;
+            loop {
+                let layout = get_block_cache(sector_id, self.bdev.clone())
+                    .lock()
+                    .read(offset, |layout: &Fat32LDentryLayout| {
+                        *layout
+                    });
+                name.insert_str(0, &layout.name());
+                if layout.is_end() {
+                    break;
+                }
+                (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
+            }
+            name
+        } else {
+            get_block_cache(self.sector_id, self.bdev.clone())
+                .lock()
+                .read(self.sector_offset, |layout: &Fat32DentryLayout| {
+                    layout.name()
+                })
+        }
+    }
+
+    pub fn start_cluster_id(&self) -> usize {
+        let mut sector_id = self.sector_id;
+        let mut offset = self.sector_offset;
+        if self.is_long() {
+            loop {
+                let layout = get_block_cache(sector_id, self.bdev.clone())
+                    .lock()
+                    .read(offset, |layout: &Fat32LDentryLayout| {
+                        *layout
+                    });
+                (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
+                if layout.is_end() {
+                    break;
+                }
+            }
+        }
+        get_block_cache(sector_id, self.bdev.clone())
+            .lock()
+            .read(offset, |layout: &Fat32DentryLayout| {
+                layout.start_cluster_id() as usize
+            }) 
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Fat32DentryLayout {
-    pub name: [u8; 8],
-    pub ext: [u8; 3],
-    pub attr: u8,
-    pub reserved: u8,
-    pub create_time_ms: u8,
-    pub create_time: u16,
-    pub create_date: u16,
-    pub last_access_date: u16,
-    pub start_cluster_high: u16,
-    pub last_modify_time: u16,
-    pub last_modify_date: u16,
-    pub start_cluster_low: u16,
-    pub file_size: u32,
+    name: [u8; 8],
+    ext: [u8; 3],
+    attr: u8,
+    reserved: u8,
+    create_time_ms: u8,
+    create_time: u16,
+    create_date: u16,
+    last_access_date: u16,
+    start_cluster_high: u16,
+    last_modify_time: u16,
+    last_modify_date: u16,
+    start_cluster_low: u16,
+    file_size: u32,
 }
 
 impl Fat32DentryLayout {
-    pub fn from_dentry(dentry: &Fat32Dentry) -> Self {
+    pub fn new(file_name: &str, attr: FileAttributes, start_cluster: usize, file_size: u32) -> Self {
         let mut name = [0u8; 8];
         let mut ext = [0u8; 3];
         let mut name_capital = false;
         let mut ext_capital = false;
         let mut i = 0;
-        for c in dentry.name.chars() {
+        for c in file_name.chars() {
             if c == '.' {
                 i = 8;
                 continue;
@@ -168,17 +188,17 @@ impl Fat32DentryLayout {
         Self {
             name,
             ext,
-            attr: dentry.attr.bits(),
+            attr: attr.bits(),
             reserved: if name_capital { 0x08 } else { 0x00 } | if ext_capital { 0x10 } else { 0x00 },
             create_time_ms: 0,
             create_time: 0,
             create_date: 0,
             last_access_date: 0,
-            start_cluster_high: (dentry.start_cluster >> 16) as u16,
+            start_cluster_high: (start_cluster >> 16) as u16,
             last_modify_time: 0,
             last_modify_date: 0,
-            start_cluster_low: dentry.start_cluster as u16,
-            file_size: dentry.file_size,
+            start_cluster_low: start_cluster as u16,
+            file_size,
         }
     }
 
@@ -193,9 +213,44 @@ impl Fat32DentryLayout {
     pub fn is_empty(&self) -> bool {
         self.name[0] == 0x00
     }
+
+    pub fn attr(&self) -> FileAttributes {
+        FileAttributes::from_bits_truncate(self.attr)
+    }
+
+    pub fn file_size(&self) -> u32 {
+        self.file_size
+    }
+
+    pub fn start_cluster_id(&self) -> u32 {
+        (self.start_cluster_high as u32) << 16 | self.start_cluster_low as u32
+    }
+
+    pub fn set_deleted(&mut self) {
+        self.name[0] = 0xE5;
+    }
+
+    pub fn name(&self) -> String {
+        let mut name = String::new();
+        for i in self.name.iter() {
+            if *i == 0x20 {
+                break;
+            }
+            name.push(char::from_u32(*i as u32).unwrap());
+        }
+        name.push('.');
+        for i in self.ext.iter() {
+            if *i == 0x20 {
+                break;
+            }
+            name.push(char::from_u32(*i as u32).unwrap());
+        }
+        name
+    }
 }
 
 
+#[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 /// the layout of a fat32 long dentry
 pub struct Fat32LDentryLayout {
