@@ -27,6 +27,8 @@
 
 use core::arch::global_asm;
 
+use board::QEMUExit;
+
 
 #[macro_use]
 extern crate log;
@@ -138,5 +140,7 @@ pub fn rust_main() -> ! {
         task::add_file(file);
         task::run_tasks();
     }
-    panic!("Unreachable in rust_main!");
+    println!("All tasks finished successfully!");
+    println!("ChaOS is shutting down...");
+    crate::board::QEMU_EXIT_HANDLE.exit_success();
 }
