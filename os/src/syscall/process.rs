@@ -1,6 +1,6 @@
-use core::{borrow::BorrowMut, mem::size_of, ptr};
+use core::{borrow::BorrowMut, mem::{self, size_of}, ptr};
 use crate::{
-    config::*, fs::{inode::ROOT_INODE, open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
+    config::*, fs::{file::File, inode::{OSInode, ROOT_INODE}, open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL
     }, timer::{get_time_ms, get_time_us}
 };
@@ -9,6 +9,7 @@ use crate::{
 use super::errno::{EINVAL, EPERM, SUCCESS};
 
 use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::vec;
 
 
 #[repr(C)]
@@ -76,6 +77,7 @@ bitflags! {
         const WNOWAIT    = 0x1000000;
     }
 }
+
 
 /// exit syscall
 ///
@@ -337,33 +339,18 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 /// mmap syscall
 ///
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_mmap",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        "kernel:pid[{}] sys_mmap start:{:#x} len:{} prot:{} flags:{} fd:{} off:{}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(), start, len, prot, flags, fd, off
     );
-    if port & !0x7 != 0 {
-        return -1;
+    if start as isize == -1 || len == 0 {
+        debug!("mmap: invalid arguments");
+        return EPERM;
     }
-    if port & 0x7 == 0 {
-        return -1;
-    }
-    let start_va: VirtAddr = start.into();
-    if !start_va.aligned() {
-        return -1;
-    }
-    let end_va: VirtAddr = (start + len).into();
-    let port = (port << 1 | 0x10) as u8;
-    let permission = MapPermission::from_bits(port).unwrap();
-    let task = current_task().unwrap();
-    let process = task.process.upgrade().unwrap();
+    let process = current_process();
     let mut inner = process.inner_exclusive_access();
-    if inner.memory_set.is_conflict_with_va(start_va, end_va) {
-        -1
-    } else {
-        inner.memory_set.insert_framed_area(start_va, end_va, permission);
-        0
-    }
+    inner.mmap(start, len, prot, flags, fd, off)
 }
 
 /// munmap syscall

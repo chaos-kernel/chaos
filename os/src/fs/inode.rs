@@ -2,8 +2,8 @@
 
 use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
 use lazy_static::*;
-use crate::{drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell};
-use super::file::{File};
+use crate::{block::BLOCK_SZ, drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell, timer::TimeSpec};
+use super::file::File;
 
 /// inode in memory
 pub struct OSInode {
@@ -138,33 +138,85 @@ pub trait Inode: Send + Sync {
 #[derive(Debug)]
 pub struct Stat {
     /// ID of device containing file
-    pub dev: u64,
-    /// file type and mode
-    pub mode: StatMode,
-    /// number of hard links
-    pub nlink: u32,
-    /// unused pad
-    pad: [u64; 7],
+    st_dev: u64,
+    /// Inode number
+    st_ino: u64,
+    /// File type and mode   
+    st_mode: u32,
+    /// Number of hard links
+    st_nlink: u32,
+    /// User ID of the file's owner.
+    st_uid: u32,
+    /// Group ID of the file's group.
+    st_gid: u32,
+    /// Device ID (if special file)
+    st_rdev: u64,
+    __pad: u64,
+    /// Size of file, in bytes.
+    pub st_size: i64,
+    /// Optimal block size for I/O.
+    st_blksize: u32,
+    __pad2: i32,
+    /// Number 512-byte blocks allocated.
+    st_blocks: u64,
+    /// Backward compatibility. Used for time of last access.
+    st_atime: TimeSpec,
+    /// Time of last modification.
+    st_mtime: TimeSpec,
+    /// Time of last status change.
+    st_ctime: TimeSpec,
+    __unused: u64,
 }
 
 impl Stat {
     /// create a new stat
-    pub fn new(mode: StatMode, nlink: u32) -> Self {
+    pub fn new(        
+        st_dev: u64,
+        st_ino: u64,
+        st_mode: u32,
+        st_nlink: u32,
+        st_rdev: u64,
+        st_size: i64,
+        st_atime_sec: i64,
+        st_mtime_sec: i64,
+        st_ctime_sec: i64,
+    ) -> Self {
         Self {
-            dev: 0,
-            mode,
-            nlink,
-            pad: [0; 7],
+            st_dev,
+            st_ino,
+            st_mode,
+            st_nlink,
+            st_uid: 0,
+            st_gid: 0,
+            st_rdev,
+            __pad: 0,
+            st_size,
+            st_blksize: BLOCK_SZ as u32,
+            __pad2: 0,
+            st_blocks: (st_size as u64 + BLOCK_SZ as u64 - 1) / BLOCK_SZ as u64,
+            st_atime: TimeSpec {
+                tv_sec: st_atime_sec as usize,
+                tv_nsec: 0,
+            },
+            st_mtime: TimeSpec {
+                tv_sec: st_mtime_sec as usize,
+                tv_nsec: 0,
+            },
+            st_ctime: TimeSpec {
+                tv_sec: st_ctime_sec as usize,
+                tv_nsec: 0,
+            },
+            __unused: 0,
         }
     }
     /// check whether the inode is a directory
     pub fn is_dir(&self) -> bool {
-        self.mode.contains(StatMode::DIR)
+        StatMode::from_bits(self.st_mode).unwrap().contains(StatMode::DIR)
     }
 
     /// check whether the inode is a file
     pub fn is_file(&self) -> bool {
-        self.mode.contains(StatMode::FILE)
+        StatMode::from_bits(self.st_mode).unwrap().contains(StatMode::FILE)
     }
 }
 
@@ -218,6 +270,22 @@ impl File for OSInode {
             total_read_size += read_size;
         }
         total_read_size
+    }
+    /// read all data from file
+    fn read_all(&self) -> Vec<u8> {
+        trace!("kernel: file::read_all");
+        let mut inner = self.inner.exclusive_access();
+        let mut buffer = [0u8; 512];
+        let mut v: Vec<u8> = Vec::new();
+        loop {
+            let len = inner.inode.clone().read_at(inner.pos, &mut buffer);
+            if len == 0 {
+                break;
+            }
+            inner.pos += len;
+            v.extend_from_slice(&buffer[..len]);
+        }
+        v
     }
     /// write buffer data into file
     fn write(&self, buf: UserBuffer) -> usize {

@@ -6,10 +6,11 @@ use super::{current_task, TaskControlBlock};
 use super::{add_task, SignalFlags};
 use super::{pid_alloc, PidHandle};
 use crate::fs::file::File;
-use crate::fs::inode::{Inode, OSInode, ROOT_INODE};
+use crate::fs::inode::{OSInode, ROOT_INODE};
 use crate::fs::{Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
+use crate::mm::{translated_refmut, MemorySet, UserBuffer, VirtAddr, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
+use crate::syscall::errno::EPERM;
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
@@ -72,6 +73,27 @@ bitflags! {
         const CLONE_NEWNET		    = 0x40000000;
         ///Clone io context
         const CLONE_IO		        = 0x80000000;
+    }
+}
+
+bitflags! {
+    pub struct Flags: u32 {
+        const MAP_SHARED = 0x01;
+        const MAP_PRIVATE = 0x02;
+        const MAP_FIXED = 0x10;
+        const MAP_ANONYMOUS = 0x20;
+        const MAP_GROWSDOWN = 0x0100;
+        const MAP_DENYWRITE = 0x0800;
+        const MAP_EXECUTABLE = 0x1000;
+        const MAP_LOCKED = 0x2000;
+        const MAP_NORESERVE = 0x4000;
+        const MAP_POPULATE = 0x8000;
+        const MAP_NONBLOCK = 0x10000;
+        const MAP_STACK = 0x20000;
+        const MAP_HUGETLB = 0x40000;
+        const MAP_SYNC = 0x80000;
+        const MAP_FIXED_NOREPLACE = 0x100000;
+        const MAP_UNINITIALIZED = 0x4000000;
     }
 }
 
@@ -196,8 +218,43 @@ impl ProcessControlBlockInner {
         for c in &self.children {
             children_kernel_clock += c.inner_exclusive_access().kernel_clock;
             children_user_clock += c.inner_exclusive_access().user_clock; 
+
+
         }
         (children_kernel_clock as i64, children_user_clock as i64)
+    }
+
+    
+    /// mmap
+    pub fn mmap(
+        &mut self,
+        start_addr: usize,
+        len: usize,
+        _prot: usize,
+        flags: usize,
+        fd: usize,
+        offset: usize,
+    ) -> isize {
+        let flags = Flags::from_bits(flags as u32).unwrap();
+        let file = self.fd_table[fd].clone().unwrap();
+        let file = unsafe { &*(file.as_ref() as *const dyn File as *const OSInode) };
+        let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
+            (Vec::new(), len)
+        } else {
+            debug!("mmap: file name: {}", file.name().unwrap());
+            let context = file.read_all();
+            
+            let file_len = context.len();
+            let length = len.min(file_len - offset);
+            if file_len <= offset {
+                debug!("mmap ERROR: offset exceeds file length context.len(): {}, offset: {}", file_len, offset);
+                return EPERM;
+            };
+            (context, length)
+        };
+
+        self.memory_set
+            .mmap(start_addr, length, offset, context, flags)
     }
 }
 

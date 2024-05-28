@@ -24,6 +24,14 @@ const MSEC_PER_SEC: usize = 1000;
 #[allow(dead_code)]
 const MICRO_PER_SEC: usize = 1_000_000;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TimeSpec {
+    /// The tv_sec member represents the elapsed time, in whole seconds.
+    pub tv_sec: usize,
+    /// The tv_usec member captures rest of the elapsed time, represented as the number of microseconds.
+    pub tv_nsec: usize,
+}
+
 /// Get the current time in ticks
 pub fn get_time() -> usize {
     time::read()

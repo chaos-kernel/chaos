@@ -162,7 +162,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_EXECVE => sys_execve(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize,args[1] as *mut i32, args[2] as u32, args[3],) ,
         SYSCALL_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1]),
-        SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2]),
+        SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5]),
         SYSCALL_MUNMAP => sys_munmap(args[0], args[1]),
         SYSCALL_SET_PRIORITY => sys_set_priority(args[0] as isize),
         SYSCALL_TASK_INFO => sys_task_info(args[0] as *mut TaskInfo),

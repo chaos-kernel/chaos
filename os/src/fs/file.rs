@@ -1,8 +1,9 @@
-use alloc::sync::Arc;
+
+use alloc::vec::Vec;
 
 use crate::mm::UserBuffer;
 
-use super::inode::{Inode, OSInode, Stat};
+use super::inode:: Stat;
 
 
 
@@ -14,7 +15,9 @@ pub trait File: {
     fn writable(&self) -> bool;
     /// read from the file to buf, return the number of bytes read
     fn read(&self, buf: UserBuffer) -> usize;
-    /// write to the file from buf, return the number of bytes written
+    /// read all data from the file
+    fn read_all(&self) -> Vec<u8>;
+    /// write to the file from buf, return the number of bytes writte
     fn write(&self, buf: UserBuffer) -> usize;
     /// get file status
     fn fstat(&self) -> Option<Stat>;

@@ -36,6 +36,9 @@ impl File for Stdin {
         }
         1
     }
+    fn read_all(&self) -> alloc::vec::Vec<u8> {
+        panic!("Stdin::read_all not implemented");
+    }
     fn write(&self, _user_buf: UserBuffer) -> usize {
         panic!("Cannot write to stdin!");
     }
@@ -53,6 +56,9 @@ impl File for Stdout {
     }
     fn read(&self, _user_buf: UserBuffer) -> usize {
         panic!("Cannot read from stdout!");
+    }
+    fn read_all(&self) -> alloc::vec::Vec<u8> {
+        panic!("Stdout::read_all not allowed");
     }
     fn write(&self, user_buf: UserBuffer) -> usize {
         for buffer in user_buf.buffers.iter() {

@@ -17,15 +17,23 @@ pub struct Fat32Inode {
 }
 
 impl Inode for Fat32Inode {
-    fn fstat(self: Arc<Self>) -> Stat {
-        let mode = match self.type_ {
-            Fat32InodeType::File => StatMode::FILE,
-            Fat32InodeType::Dir => StatMode::DIR,
-            _ => StatMode::NULL,
+    fn fstat(self: Arc<Fat32Inode>) -> Stat {
+        let st_mode = match self.type_ {
+            Fat32InodeType::File => StatMode::FILE.bits(),
+            Fat32InodeType::Dir => StatMode::DIR.bits(),
+            _ => StatMode::NULL.bits(),
             
         };
+        debug!("fstat: st_mode: {:#x} size: {:?}", st_mode,self.dentry.lock().file_size());
         Stat::new(
-            mode,
+            0,
+            0,
+            st_mode,
+            1,
+            0,
+            self.dentry.lock().file_size() as i64 ,
+            0,
+            0,
             0,
         )
     }

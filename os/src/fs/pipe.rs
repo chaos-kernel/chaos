@@ -4,7 +4,7 @@ use alloc::sync::{Arc, Weak};
 
 use crate::task::suspend_current_and_run_next;
 
-use super::{file::{File}, inode::Stat};
+use super::{file::File, inode::Stat};
 
 /// IPC pipe
 pub struct Pipe {
@@ -148,6 +148,9 @@ impl File for Pipe {
                 }
             }
         }
+    }
+    fn read_all(&self) -> alloc::vec::Vec<u8> {
+        panic!("Pipe::read_all not implemented");
     }
     fn write(&self, buf: UserBuffer) -> usize {
         trace!("kernel: Pipe::write");

@@ -27,7 +27,6 @@
 
 use core::arch::global_asm;
 
-use fs::inode::ROOT_INODE;
 
 #[macro_use]
 extern crate log;
@@ -88,7 +87,6 @@ const ALL_TASKS: [&str; 32] = [
     "read",
     "clone",
     "write",
-    "chdir",
     "dup2",
     "times",
     "uname",
@@ -107,16 +105,17 @@ const ALL_TASKS: [&str; 32] = [
     "open",
     "openat",
     "getcwd",
-    "mkdir_",
     "execve",
-    
+    "mkdir_",
+    "chdir",
+    "fstat",
+    "mmap",
+    "munmap",
+
     "pipe",
     "mount",
     "umount",
-    "fstat",
     "getdents",
-    "munmap",
-    "mmap",
     "unlink",
 ];
 

@@ -50,6 +50,7 @@ pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OS
             Some(inode)
         } else {
             // create file
+            debug!("create file: {}", name);
             let stat = if flags.contains(OpenFlags::DIRECTORY) {
                 StatMode::DIR
             } else {

@@ -2,7 +2,6 @@
 
 use bitflags::*;
 
-#[allow(missing_docs)]
 bitflags! {
     /// Signal flags
     pub struct SignalFlags: usize {

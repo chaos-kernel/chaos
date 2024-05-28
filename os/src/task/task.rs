@@ -3,7 +3,7 @@
 use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
 use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
-use crate::fs::inode::{Inode, OSInode};
+use crate::fs::inode::OSInode;
 use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};

@@ -34,3 +34,5 @@ pub const SYS_RELEASE: &str = "0.0.1";
 pub const SYS_VERSION: &str = "#1-Chaos RISC-V 64bit Version 0.0.1";
 ///
 pub const STACK_TOP: usize = 0x1_0000_0000;
+///
+pub const MMAP_BASE: usize = 0x2000_0000;

@@ -4,13 +4,13 @@ use core::mem::size_of;
 use core::ptr;
 
 use crate::fs::file::File;
-use crate::fs::inode::{Inode, OSInode, Stat, ROOT_INODE};
+use crate::fs::inode::{OSInode, Stat, ROOT_INODE};
 use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
-use crate::syscall::{process, Dirent};
+use crate::syscall::Dirent;
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
-use alloc::{slice, vec};
+use alloc::vec;
 
 pub const AT_FDCWD: i32 = -100;
 

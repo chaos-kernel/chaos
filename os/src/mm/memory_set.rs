@@ -4,8 +4,9 @@ use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE};
+use crate::config::{MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE};
 use crate::sync::UPSafeCell;
+use crate::task::process::Flags;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -45,6 +46,15 @@ pub struct MemorySet {
     pub areas: Vec<MapArea>,
     /// heap
     heap_area: BTreeMap<VirtPageNum, FrameTracker>,
+    // The memory area formed by mmap does not need to be modified
+    // we can use MapArea in Vec to hold FramTracker
+    // we set a fixed address as the start address for mmap_area
+    // the virtual memorySet is big enough to use it that doesnt concern address conflicts
+    pub mmap_area: BTreeMap<VirtPageNum, FrameTracker>,
+    // mmap_base will never change
+    pub mmap_base: VirtAddr,
+    // always aligh to PAGE_SIZE
+    pub mmap_end: VirtAddr,
 }
 
 impl MemorySet {
@@ -54,6 +64,9 @@ impl MemorySet {
             page_table: PageTable::new(),
             areas: Vec::new(),
             heap_area: BTreeMap::new(),
+            mmap_area: BTreeMap::new(),
+            mmap_base: MMAP_BASE.into(),
+            mmap_end: MMAP_BASE.into(),
         }
     }
     /// Get he page table token
@@ -70,6 +83,20 @@ impl MemorySet {
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
             None,
+        );
+    }
+
+    pub fn insert_framed_area_with_data(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+        data: &[u8],
+    ) {
+        debug!("kernel: insert_framed_area_with_data MapArea::new {:x?} {:x?}",start_va, end_va);
+        self.push(
+            MapArea::new(start_va, end_va, MapType::Framed, permission),
+            Some(data),
         );
     }
     /// check if exist areas conflict with given virtial address
@@ -261,6 +288,8 @@ impl MemorySet {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
+        // copy mmap
+        memory_set.mmap_end = user_space.mmap_end;
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
@@ -282,6 +311,21 @@ impl MemorySet {
                 .page_table
                 .map(*vpn, dst_ppn, PTEFlags::U | PTEFlags::R | PTEFlags::W);
             memory_set.heap_area.insert(*vpn, dst_frame);
+
+            let src_ppn = src_frame.ppn;
+            // copy data
+            dst_ppn
+                .get_bytes_array()
+                .copy_from_slice(src_ppn.get_bytes_array());
+        }
+        // copy mmap_area
+        for (vpn, src_frame) in user_space.mmap_area.iter() {
+            let dst_frame = frame_alloc().unwrap();
+            let dst_ppn = dst_frame.ppn;
+            memory_set
+                .page_table
+                .map(*vpn, dst_ppn, PTEFlags::U | PTEFlags::R | PTEFlags::W);
+            memory_set.mmap_area.insert(*vpn, dst_frame);
 
             let src_ppn = src_frame.ppn;
             // copy data
@@ -358,6 +402,100 @@ impl MemorySet {
             current_addr = VirtAddr::from(current_addr.0 + PAGE_SIZE);
         }
         0
+    }
+
+    ///
+    pub fn mmap(
+        &mut self,
+        start_addr: usize,
+        len: usize,
+        offset: usize,
+        context: Vec<u8>,
+        flags: Flags,
+    ) -> isize {
+        let start_addr_align: usize;
+        let end_addr_align: usize;
+        if flags.contains(Flags::MAP_FIXED) && start_addr != 0 {
+            // MAP_FIXED
+            // alloc page one by one
+            start_addr_align = ((start_addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+            end_addr_align = ((start_addr + len) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        } else {
+            start_addr_align = ((self.mmap_end.0) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+            end_addr_align = ((self.mmap_end.0 + len) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        }
+        self.mmap_end = (end_addr_align + PAGE_SIZE).into();
+        let vpn_range = VPNRange::new(
+            VirtAddr::from(start_addr_align).floor(),
+            VirtAddr::from(end_addr_align).floor(),
+        );
+        if flags.contains(Flags::MAP_FIXED) && start_addr != 0 {
+            // alloc memory
+            for vpn in vpn_range {
+                // let frame = frame_alloc().unwrap();
+                match self.mmap_area.get(&vpn) {
+                    Some(_) => {
+                        debug!(
+                            "[mmap] vpn = {:#x} has been mapped, skip",
+                            vpn.0);
+                    }
+                    None => {
+                        let frame = frame_alloc().unwrap();
+                        let ppn = frame.ppn;
+                        self.mmap_area.insert(vpn, frame);
+                        self.page_table.map(
+                            vpn,
+                            ppn,
+                            PTEFlags::R | PTEFlags::W | PTEFlags::U | PTEFlags::X,
+                        );
+                    }
+                }
+            }
+        } else {
+            // alloc memory
+            for vpn in vpn_range {
+                let frame = frame_alloc().unwrap();
+                let ppn = frame.ppn;
+                self.mmap_area.insert(vpn, frame);
+                self.page_table.map(
+                    vpn,
+                    ppn,
+                    PTEFlags::R | PTEFlags::W | PTEFlags::U | PTEFlags::X,
+                );
+            }
+        }
+        debug!(
+            "[mmap] context.len() = {}, offset = {}, len = {}",
+            context.len(),
+            offset,
+            len
+        );
+
+        // MAP_ANONYMOUS标志代表不与文件关联的匿名映射
+        if !flags.contains(Flags::MAP_ANONYMOUS) {
+            let mut start: usize = offset;
+            let mut current_vpn = vpn_range.get_start();
+            loop {
+                let src = &context[start..len.min(start + PAGE_SIZE)];
+                let dst = &mut self
+                    .page_table
+                    .translate(current_vpn)
+                    .unwrap()
+                    .ppn()
+                    .get_bytes_array()[..src.len()];
+                dst.copy_from_slice(src);
+                start += PAGE_SIZE;
+                if start >= len {
+                    break;
+                }
+                current_vpn.step();
+            }
+        }
+        debug!(
+            "[mmap] start_addr_align = {:#x}, end_addr_align = {:#x}",
+            start_addr_align, end_addr_align
+        );
+        start_addr_align as isize
     }
 }
 
