@@ -101,9 +101,10 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
         return -1;
     }
     let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
-    if !dir.is_dir() {
-        return -1;
-    }
+    // TODO: 好像无法判断是否是目录
+    // if !dir.is_dir() {
+    //     return -1;
+    // }
     let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
