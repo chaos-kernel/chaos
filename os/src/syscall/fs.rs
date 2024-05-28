@@ -17,8 +17,9 @@ pub const AT_FDCWD: i32 = -100;
 /// write syscall
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_write",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        "kernel:pid[{}] sys_write fd:{}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        fd,
     );
     let token = current_user_token();
     let process = current_process();
@@ -41,8 +42,9 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
 /// read syscall
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_read",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        "kernel:pid[{}] sys_read fd:{}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        fd,
     );
     let token = current_user_token();
     let process = current_process();
@@ -116,8 +118,9 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
 /// close syscall
 pub fn sys_close(fd: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_close",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        "kernel:pid[{}] sys_close fd:{}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        fd,
     );
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
@@ -131,7 +134,7 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 /// pipe syscall
-pub fn sys_pipe(pipe: *mut usize) -> isize {
+pub fn sys_pipe(pipe: *mut u32) -> isize {
     trace!(
         "kernel:pid[{}] sys_pipe",
         current_task().unwrap().process.upgrade().unwrap().getpid()
@@ -144,8 +147,8 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     inner.fd_table[read_fd] = Some(pipe_read);
     let write_fd = inner.alloc_fd();
     inner.fd_table[write_fd] = Some(pipe_write);
-    *translated_refmut(token, pipe) = read_fd;
-    *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
+    *translated_refmut(token, pipe) = read_fd as u32;
+    *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd as u32;
     0
 }
 /// dup syscall

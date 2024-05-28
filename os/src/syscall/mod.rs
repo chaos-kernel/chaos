@@ -145,7 +145,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_UNLINKAT => sys_unlinkat(args[1] as *const u8),
         SYSCALL_OPENAT => sys_openat(args[0] as i32, args[1] as *const u8, args[2] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
-        SYSCALL_PIPE => sys_pipe(args[0] as *mut usize),
+        SYSCALL_PIPE => sys_pipe(args[0] as *mut u32),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),

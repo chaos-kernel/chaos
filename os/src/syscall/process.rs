@@ -93,7 +93,7 @@ pub fn sys_exit(exit_code: i32) -> ! {
 }
 /// yield syscall
 pub fn sys_yield() -> isize {
-    //trace!("kernel: sys_yield");
+    trace!("kernel: sys_yield");
     suspend_current_and_run_next();
     0
 }
@@ -345,7 +345,6 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, 
         current_task().unwrap().process.upgrade().unwrap().getpid(), start, len, prot, flags, fd, off
     );
     if start as isize == -1 || len == 0 {
-        debug!("mmap: invalid arguments");
         return EPERM;
     }
     let process = current_process();

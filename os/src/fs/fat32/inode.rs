@@ -24,7 +24,6 @@ impl Inode for Fat32Inode {
             _ => StatMode::NULL.bits(),
             
         };
-        debug!("fstat: st_mode: {:#x} size: {:?}", st_mode,self.dentry.lock().file_size());
         Stat::new(
             0,
             0,

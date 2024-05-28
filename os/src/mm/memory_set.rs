@@ -93,7 +93,6 @@ impl MemorySet {
         permission: MapPermission,
         data: &[u8],
     ) {
-        debug!("kernel: insert_framed_area_with_data MapArea::new {:x?} {:x?}",start_va, end_va);
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
             Some(data),
