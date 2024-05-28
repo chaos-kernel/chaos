@@ -93,7 +93,7 @@ pub fn sys_exit(exit_code: i32) -> ! {
 }
 /// yield syscall
 pub fn sys_yield() -> isize {
-    trace!("kernel: sys_yield");
+
     suspend_current_and_run_next();
     0
 }
@@ -345,6 +345,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, 
         current_task().unwrap().process.upgrade().unwrap().getpid(), start, len, prot, flags, fd, off
     );
     if start as isize == -1 || len == 0 {
+        debug!("mmap: invalid arguments");
         return EPERM;
     }
     let process = current_process();
@@ -353,27 +354,14 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, 
 }
 
 /// munmap syscall
-///
-/// YOUR JOB: Implement munmap.
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_munmap",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    let start_va: VirtAddr = start.into();
-    if !start_va.aligned() {
-        return -1;
-    }
-    let end_va: VirtAddr = (start + len).into();
-    let task = current_task().unwrap();
-    let process = task.process.upgrade().unwrap();
-    let mut inner = process.inner_exclusive_access();
-
-    if inner.memory_set.remove_area_with_va(start_va, end_va) {
-        0
-    } else {
-        -1
-    }
+    current_process()
+        .inner_exclusive_access()
+        .munmap(start, len)
 }
 
 /// change data segment size

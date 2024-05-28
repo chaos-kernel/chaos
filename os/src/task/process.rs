@@ -241,11 +241,13 @@ impl ProcessControlBlockInner {
         let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
             (Vec::new(), len)
         } else {
+            debug!("mmap: file name: {}", file.name().unwrap());
             let context = file.read_all();
             
             let file_len = context.len();
             let length = len.min(file_len - offset);
             if file_len <= offset {
+                debug!("mmap ERROR: offset exceeds file length context.len(): {}, offset: {}", file_len, offset);
                 return EPERM;
             };
             (context, length)
@@ -253,6 +255,11 @@ impl ProcessControlBlockInner {
 
         self.memory_set
             .mmap(start_addr, length, offset, context, flags)
+    }
+
+    ///munmap
+    pub fn munmap(&mut self, start_addr: usize, len: usize) -> isize {
+        self.memory_set.munmap(start_addr, len)
     }
 }
 

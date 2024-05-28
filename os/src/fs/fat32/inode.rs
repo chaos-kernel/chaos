@@ -217,7 +217,8 @@ impl Inode for Fat32Inode {
     }
     
     fn clear(self: Arc<Self>) {
-        todo!()
+        trace!("kernel: Fat32Inode::clear");
+        self.set_file_size(0);
     } 
 
     /// Get the current directory name

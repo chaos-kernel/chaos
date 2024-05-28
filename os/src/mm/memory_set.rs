@@ -6,6 +6,7 @@ use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
 use crate::config::{MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE};
 use crate::sync::UPSafeCell;
+use crate::syscall::errno::SUCCESS;
 use crate::task::process::Flags;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -403,7 +404,7 @@ impl MemorySet {
         0
     }
 
-    ///
+    /// mmap
     pub fn mmap(
         &mut self,
         start_addr: usize,
@@ -495,6 +496,20 @@ impl MemorySet {
             start_addr_align, end_addr_align
         );
         start_addr_align as isize
+    }
+
+    ///munmap
+    pub fn munmap(&mut self, start_addr: usize, len: usize) -> isize {
+        let start_addr_align = ((start_addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        let end_addr_align = ((start_addr + len) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        let vpn_range = VPNRange::new(
+            VirtAddr::from(start_addr_align).floor(),
+            VirtAddr::from(end_addr_align).floor(),
+        );
+        for vpn in vpn_range {
+            self.mmap_area.remove(&vpn);
+        }
+        SUCCESS
     }
 }
 
