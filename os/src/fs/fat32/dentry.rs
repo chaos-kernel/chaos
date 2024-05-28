@@ -155,11 +155,13 @@ impl Fat32DentryLayout {
                 if c.is_ascii_uppercase() {
                     name_capital = true;
                 }
-            } else {
+            } else if i < 11 {
                 ext[i - 8] = c as u8;
                 if c.is_ascii_uppercase() {
                     ext_capital = true;
                 }
+            } else {
+                break;
             }
             i += 1;
         }

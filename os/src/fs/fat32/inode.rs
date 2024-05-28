@@ -113,8 +113,44 @@ impl Inode for Fat32Inode {
         todo!()
     }
     
-    fn unlink(&self, name: &str) -> bool {
-        todo!()
+    fn unlink(&self, path: &str) -> bool {
+        let mut split = path.splitn(2, '/');
+        let name = split.next().unwrap();
+        let next = split.next();
+        if name == "." {
+            if next.is_some() {
+                return self.unlink(next.unwrap());
+            } else {
+                return false;
+            }
+        }
+        let fs = self.fs.lock();
+        let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
+        let mut offset = 0;
+        while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
+            if dentry.name() == name {
+                if next.is_some() {
+                    let inode = Fat32Inode {
+                        type_: if dentry.is_file() {
+                            Fat32InodeType::File
+                        } else if dentry.is_dir() {
+                            Fat32InodeType::Dir
+                        } else {
+                            Fat32InodeType::VolumeId
+                        },
+                        start_cluster: dentry.start_cluster(),
+                        fize_size: dentry.file_size(),
+                        fs: Arc::clone(&self.fs),
+                        bdev: Arc::clone(&self.bdev),
+                    };
+                    return inode.unlink(next.unwrap());
+                } else {
+                    fs.remove_dentry(sector_id, offset);
+                    return true;
+                }
+            }
+        }
+        true
     }
     
     fn ls(&self) -> Vec<String> {

@@ -191,4 +191,42 @@ impl Fat32FS {
                 *layout = Fat32DentryLayout::from_dentry(&dentry);
             });
     }
+
+    pub fn remove_dentry(&self, mut sector_id: u32, mut offset: usize) {
+        if offset % 32 != 0 {
+            return;
+        }
+        let mut is_long_entry = false;
+        get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+            .lock()
+            .read(offset, |layout: &Fat32DentryLayout| {
+                if layout.is_long() {
+                    is_long_entry = true;
+                    return None;
+                }
+                Fat32Dentry::from_layout(layout)
+            });
+        if is_long_entry {
+            let mut is_end = false;
+            loop {
+                get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+                    .lock()
+                    .modify(offset, |layout: &mut Fat32LDentryLayout| {
+                        layout.order = 0xE5;
+                        if layout.is_end() {
+                            is_end = true;
+                        }
+                    });
+                (sector_id, offset) = self.next_dentry_id(sector_id, offset).unwrap();
+                if is_end {
+                    break;
+                }
+            }
+        }
+        get_block_cache(sector_id as usize, self.bdev.clone())
+            .lock()
+            .modify(offset, |layout: &mut Fat32DentryLayout| {
+                layout.name[0] = 0xE5;
+            });
+    }
 }
