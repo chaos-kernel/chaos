@@ -12,7 +12,7 @@
 
 ## 提示
 
-gitlab仓库与[ github 同名仓库](https://github.com/bosswnx/chaos/)保持同步。
+gitlab仓库与 [github 同名仓库](https://github.com/bosswnx/chaos/)保持同步。
 
 ### 队伍信息
 
@@ -20,9 +20,9 @@ gitlab仓库与[ github 同名仓库](https://github.com/bosswnx/chaos/)保持�
 参赛学校：北京科技大学
 队伍成员：
 
-- 王诺贤：[bosswnx@outlook.com](bosswnx@outlook.com)
-- 陈宽宽：[ck_look@outlook.com](ck_look@outlook.com)
-- 乐一然：[ryan.yiran.le@gmail.com](ryan.yiran.le@gmail.com)
+- 王诺贤：[bosswnx@outlook.com](mailto:bosswnx@outlook.com)
+- 陈宽宽：[ck_look@outlook.com](mailto:ck_look@outlook.com)
+- 乐一然：[ryan.yiran.le@gmail.com](mailto:ryan.yiran.le@gmail.com)
 
 ### 使用说明
 
