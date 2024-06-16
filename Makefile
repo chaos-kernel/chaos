@@ -1,5 +1,5 @@
 DOCKER_NAME ?= rcore-tutorial-v3
-.PHONY: docker build_docker all
+.PHONY: docker build_docker all clean
 	
 docker:
 	docker run --rm -it -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
@@ -12,11 +12,14 @@ fmt:
 
 all:
 	@cd os && make build
-	@cd ..
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu
 
-run:
+sdcard-riscv.img:
+	@echo "Extracting sdcard-riscv.img.gz..."
+	@gzip -dk sdcard-riscv.img.gz
+
+run: all sdcard-riscv.img
 	@qemu-system-riscv64 \
 		-machine virt \
 		-kernel kernel-qemu \
@@ -24,9 +27,14 @@ run:
 		-nographic \
 		-smp 2 \
 		-bios sbi-qemu \
-		-drive file=sdcard.img,if=none,format=raw,id=x0  \
+		-drive file=sdcard-riscv.img,if=none,format=raw,id=x0  \
 		-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
 		-device virtio-net-device,netdev=net \
 		-netdev user,id=net
 
+clean: 
+	@echo "Cleaning..."
+	@cd os && make clean
+	@rm -f sbi-qemu kernel-qemu
+	@rm -f sdcard-riscv.img
 

@@ -23,4 +23,3 @@ sdcard-riscv.img
 testcases-backup
 kernel-qemu
 sbi-qemu
-sdcard.img
