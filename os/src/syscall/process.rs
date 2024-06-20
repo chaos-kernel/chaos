@@ -315,10 +315,6 @@ pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 /// task_info syscall
-///
-/// YOUR JOB: Finish sys_task_info to pass testcases
-/// HINT: You might reimplement it with virtual memory management.
-/// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!(
         "kernel:pid[{}] sys_task_info",

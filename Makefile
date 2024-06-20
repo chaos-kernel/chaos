@@ -11,6 +11,7 @@ fmt:
 	cd easy-fs; cargo fmt; cd ../easy-fs-fuse cargo fmt; cd ../os ; cargo fmt; cd ../user; cargo fmt; cd ..
 
 all:
+	@cd user && make elf
 	@cd os && make build
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu
