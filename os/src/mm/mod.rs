@@ -25,7 +25,9 @@ pub use page_table::{
 
 /// initiate heap allocator, frame allocator and kernel space
 pub fn init() {
+    trace!("heap allocator initialize");
     heap_allocator::init_heap();
+    trace!("frame allocator initialize");
     frame_allocator::init_frame_allocator();
     KERNEL_SPACE.exclusive_access().activate();
 }

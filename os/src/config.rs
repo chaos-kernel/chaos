@@ -3,11 +3,11 @@
 #[allow(unused)]
 
 /// user app's stack size
-pub const USER_STACK_SIZE: usize = 4096 * 8;
+pub const USER_STACK_SIZE: usize = 4096 * 20;
 /// kernel stack size
 pub const KERNEL_STACK_SIZE: usize = 4096 * 8;
 /// kernel heap size
-pub const KERNEL_HEAP_SIZE: usize = 0x200_0000;
+pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x500;
 /// physical memory end address
 pub const MEMORY_END: usize = 0x88000000;
 /// page size : 4KB

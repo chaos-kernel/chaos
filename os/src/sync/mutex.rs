@@ -5,6 +5,7 @@ use crate::task::TaskControlBlock;
 use crate::task::{block_current_and_run_next, suspend_current_and_run_next};
 use crate::task::{current_task, wakeup_task};
 use alloc::{collections::VecDeque, sync::Arc};
+use riscv::register::sstatus;
 
 /// Mutex trait
 pub trait Mutex: Sync + Send {
@@ -100,6 +101,51 @@ impl Mutex for MutexBlocking {
             wakeup_task(waking_task);
         } else {
             mutex_inner.locked = false;
+        }
+    }
+}
+
+/// Low-level support for mutex(spinlock, sleeplock, etc)
+pub trait MutexSupport {
+    /// Guard data
+    type GuardData;
+    /// Called before lock() & try_lock()
+    fn before_lock() -> Self::GuardData;
+    /// Called when MutexGuard dropping
+    fn after_unlock(_: &mut Self::GuardData);
+}
+
+/// Spin MutexSupport
+pub struct Spin;
+
+impl MutexSupport for Spin {
+    type GuardData = ();
+    #[inline(always)]
+    fn before_lock() -> Self::GuardData {}
+    #[inline(always)]
+    fn after_unlock(_: &mut Self::GuardData) {}
+}
+
+/// Sie Guard
+pub struct SieGuard(bool);
+
+impl SieGuard {
+    /// Construct a SieGuard 关中断
+    pub fn new() -> Self {
+        Self(unsafe {
+            let sie_before = sstatus::read().sie();
+            sstatus::clear_sie();
+            sie_before
+        })
+    }
+}
+impl Drop for SieGuard {
+    /// 开中断
+    fn drop(&mut self) {
+        if self.0 {
+            unsafe {
+                sstatus::set_sie();
+            }
         }
     }
 }

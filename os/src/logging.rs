@@ -42,4 +42,5 @@ pub fn init() {
         Some("TRACE") => LevelFilter::Trace,
         _ => LevelFilter::Off,
     });
+    trace!("Logger initialized");
 }

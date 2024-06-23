@@ -23,7 +23,7 @@
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 #![feature(ascii_char)]
-
+#![feature(negative_impls)]
 
 use core::arch::global_asm;
 
@@ -56,6 +56,7 @@ pub mod task;
 pub mod timer;
 pub mod trap;
 pub mod block;
+pub mod utils;
 
 global_asm!(include_str!("entry.asm"));
 
