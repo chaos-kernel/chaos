@@ -1,39 +1,54 @@
-use core::{borrow::BorrowMut, mem::{self, size_of}, ptr};
 use crate::{
-    config::*, fs::{file::File, inode::{OSInode, ROOT_INODE}, open_file, OpenFlags}, mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission, VirtAddr}, task::{
-        current_process, current_task, current_user_token, exit_current_and_run_next, pid2process, suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL
-    }, timer::{get_time_ms, get_time_us}
+    config::*,
+    fs::{
+        file::File,
+        inode::{OSInode, ROOT_INODE},
+        open_file, OpenFlags,
+    },
+    mm::{
+        translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission,
+        VirtAddr,
+    },
+    task::{
+        current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
+        suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
+    },
+    timer::{get_time_ms, get_time_us},
+};
+use core::{
+    borrow::BorrowMut,
+    mem::{self, size_of},
+    ptr,
 };
 
 #[allow(unused)]
 use super::errno::{EINVAL, EPERM, SUCCESS};
 
-use alloc::{string::String, sync::Arc, vec::Vec};
 use alloc::vec;
-
+use alloc::{string::String, sync::Arc, vec::Vec};
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct TimeVal {
-    pub sec:  usize,
+    pub sec: usize,
     pub usec: usize,
 }
 
 #[repr(C)]
 pub struct Tms {
-    tms_utime:  i64,
-    tms_stime:  i64,
+    tms_utime: i64,
+    tms_stime: i64,
     tms_cutime: i64,
     tms_cstime: i64,
 }
 
 #[allow(dead_code)]
 pub struct Utsname {
-    sysname:    [u8; 65],
-    nodename:   [u8; 65],
-    release:    [u8; 65],
-    version:    [u8; 65],
-    machine:    [u8; 65],
+    sysname: [u8; 65],
+    nodename: [u8; 65],
+    release: [u8; 65],
+    version: [u8; 65],
+    machine: [u8; 65],
     domainname: [u8; 65],
 }
 /// Task information
@@ -83,7 +98,6 @@ bitflags! {
     }
 }
 
-
 /// exit syscall
 ///
 /// exit the current task and run the next task in task list
@@ -98,7 +112,6 @@ pub fn sys_exit(exit_code: i32) -> ! {
 }
 /// yield syscall
 pub fn sys_yield() -> isize {
-
     suspend_current_and_run_next();
     0
 }
@@ -109,7 +122,7 @@ pub fn sys_getpid() -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     //todo 仅用于初赛, 后面把加一去掉，主要因为目前还没有初始进程
-    
+
     (current_task().unwrap().process.upgrade().unwrap().getpid() + 1) as isize
 }
 /// getppid syscall
@@ -118,13 +131,16 @@ pub fn sys_getppid() -> isize {
         "kernel: sys_getppid pid:{}",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    if let Some(parent) = &current_task().unwrap()
-    .process
-    .upgrade().unwrap()
-    .inner_exclusive_access().parent {
-        parent.upgrade().unwrap().getpid()  as isize
-    }
-    else {
+    if let Some(parent) = &current_task()
+        .unwrap()
+        .process
+        .upgrade()
+        .unwrap()
+        .inner_exclusive_access()
+        .parent
+    {
+        parent.upgrade().unwrap().getpid() as isize
+    } else {
         warn!("kwenel: getppid NOT IMPLEMENTED YET!!");
         1
     }
@@ -137,12 +153,19 @@ pub fn sys_clone(
     tls: usize,
     ctid: *mut usize,
 ) -> isize {
-    trace!("[sys_clone] flags {:?} stack_ptr {:x?} ptid {:x?} tls {:x?} ctid {:x?}", flags , stack_ptr, ptid, tls, ctid);
+    trace!(
+        "[sys_clone] flags {:?} stack_ptr {:x?} ptid {:x?} tls {:x?} ctid {:x?}",
+        flags,
+        stack_ptr,
+        ptid,
+        tls,
+        ctid
+    );
     let current_process = current_process();
 
     let exit_signal = SignalFlags::from_bits(1 << ((flags & CSIGNAL) - 1)).unwrap();
     let clone_signals = CloneFlags::from_bits((flags & !CSIGNAL) as u32).unwrap();
-    
+
     trace!(
         "[sys_clone] exit_signal = {:?}, clone_signals = {:?}, stack_ptr = {:#x}, ptid = {:#x}, tls = {:#x}, ctid = {:#x}",
          exit_signal, clone_signals, stack_ptr, ptid as usize, tls, ctid as usize
@@ -185,7 +208,6 @@ pub fn sys_clone(
 
         return new_thread_ttid as isize;
     }
-    
 }
 /// exec syscall
 pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
@@ -265,7 +287,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             }
         }
     }
-    
+
     // ---- release current PCB automatically
 }
 
@@ -320,7 +342,8 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
         "kernel:pid[{}] sys_task_info",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    let mut v = translated_byte_buffer(current_user_token(), ti as *const u8, size_of::<TaskInfo>());
+    let mut v =
+        translated_byte_buffer(current_user_token(), ti as *const u8, size_of::<TaskInfo>());
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access();
     let mut ti = TaskInfo {
@@ -342,10 +365,23 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 /// mmap syscall
 ///
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> isize {
+pub fn sys_mmap(
+    start: usize,
+    len: usize,
+    prot: usize,
+    flags: usize,
+    fd: usize,
+    off: usize,
+) -> isize {
     trace!(
         "kernel:pid[{}] sys_mmap start:{:#x} len:{} prot:{} flags:{} fd:{} off:{}",
-        current_task().unwrap().process.upgrade().unwrap().getpid(), start, len, prot, flags, fd, off
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        start,
+        len,
+        prot,
+        flags,
+        fd,
+        off
     );
     if start as isize == -1 || len == 0 {
         debug!("mmap: invalid arguments");
@@ -446,13 +482,14 @@ pub fn sys_times(tms: *mut Tms) -> isize {
         "kernel:pid[{}] sys_get_time",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    let mut tms_k = translated_byte_buffer(current_user_token(), tms as *const u8, size_of::<Tms>());
+    let mut tms_k =
+        translated_byte_buffer(current_user_token(), tms as *const u8, size_of::<Tms>());
     let (tms_stime, tms_utime) = current_process()
-    .inner_exclusive_access()
-    .get_process_clock_time();
+        .inner_exclusive_access()
+        .get_process_clock_time();
     let (tms_cstime, tms_cutime) = current_process()
-    .inner_exclusive_access()
-    .get_children_process_clock_time();
+        .inner_exclusive_access()
+        .get_children_process_clock_time();
     let mut sys_tms = Tms {
         tms_utime,
         tms_stime,
@@ -472,7 +509,8 @@ pub fn sys_times(tms: *mut Tms) -> isize {
 
 ///get OS informations
 pub fn sys_uname(uts: *mut Utsname) -> isize {
-    let mut uts_k = translated_byte_buffer(current_user_token(), uts as *const u8, size_of::<Utsname>());
+    let mut uts_k =
+        translated_byte_buffer(current_user_token(), uts as *const u8, size_of::<Utsname>());
     let mut sys_uts = Utsname {
         sysname: [0; 65],
         nodename: [0; 65],

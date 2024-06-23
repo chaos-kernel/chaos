@@ -3,9 +3,18 @@ use core::cmp::min;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 
-use crate::block::{block_cache::{block_cache_sync_all, get_block_cache}, block_dev::BlockDevice, BLOCK_SZ};
+use crate::block::{
+    block_cache::{block_cache_sync_all, get_block_cache},
+    block_dev::BlockDevice,
+    BLOCK_SZ,
+};
 
-use super::{dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes}, fat::FAT, inode::{Fat32Inode, Fat32InodeType}, super_block::{Fat32SB, Fat32SBLayout}};
+use super::{
+    dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes},
+    fat::FAT,
+    inode::{Fat32Inode, Fat32InodeType},
+    super_block::{Fat32SB, Fat32SBLayout},
+};
 
 pub struct Fat32FS {
     pub sb: Fat32SB,
@@ -22,7 +31,10 @@ impl Fat32FS {
                 assert!(sb_layout.is_valid(), "Error loading FAT32!");
                 let fat32fs = Self {
                     sb: Fat32SB::from_layout(sb_layout),
-                    fat: Arc::new(FAT::from_sb(Arc::new(Fat32SB::from_layout(sb_layout)), &bdev)),
+                    fat: Arc::new(FAT::from_sb(
+                        Arc::new(Fat32SB::from_layout(sb_layout)),
+                        &bdev,
+                    )),
                     bdev,
                 };
                 Arc::new(Mutex::new(fat32fs))
@@ -60,7 +72,8 @@ impl Fat32FS {
 
     /// read a cluster
     pub fn read_cluster(&self, cluster: usize, buf: &mut [u8; 4096]) {
-        let cluster_offset = self.sb.root_sector() + (cluster - 2) * self.sb.sectors_per_cluster as usize;
+        let cluster_offset =
+            self.sb.root_sector() + (cluster - 2) * self.sb.sectors_per_cluster as usize;
         let cluster_size = self.sb.bytes_per_sector as usize * self.sb.sectors_per_cluster as usize;
         let mut read_size = 0;
         for i in 0..self.sb.sectors_per_cluster {
@@ -76,7 +89,8 @@ impl Fat32FS {
 
     /// write a cluster
     pub fn write_cluster(&self, cluster: usize, buf: &[u8; 4096]) {
-        let cluster_offset = self.sb.root_sector() + (cluster - 2) * self.sb.sectors_per_cluster as usize;
+        let cluster_offset =
+            self.sb.root_sector() + (cluster - 2) * self.sb.sectors_per_cluster as usize;
         let cluster_size = self.sb.bytes_per_sector as usize * self.sb.sectors_per_cluster as usize;
         let mut write_size = 0;
         for i in 0..self.sb.sectors_per_cluster {
@@ -151,16 +165,21 @@ impl Fat32FS {
         (*sector_id, *offset) = self.next_dentry_id(*sector_id, *offset).unwrap();
         dentry
     }
-    
-    pub fn insert_dentry(&self, cluster_id: usize, name: String, attr: FileAttributes, file_size: u32, start_cluster: usize) -> Option<Fat32Dentry> {
+
+    pub fn insert_dentry(
+        &self,
+        cluster_id: usize,
+        name: String,
+        attr: FileAttributes,
+        file_size: u32,
+        start_cluster: usize,
+    ) -> Option<Fat32Dentry> {
         let mut sector_id = self.fat.cluster_id_to_sector_id(cluster_id).unwrap();
         let mut offset = 0;
         loop {
             let found = get_block_cache(sector_id, self.bdev.clone())
                 .lock()
-                .read(offset, |layout: &Fat32DentryLayout| {
-                    layout.is_empty()
-                });
+                .read(offset, |layout: &Fat32DentryLayout| layout.is_empty());
             if found {
                 break;
             }
@@ -185,13 +204,8 @@ impl Fat32FS {
         }
         get_block_cache(sector_id as usize, self.bdev.clone())
             .lock()
-            .modify(offset, | layout: &mut Fat32DentryLayout | {
-                *layout = Fat32DentryLayout::new(
-                    name.as_str(),
-                    attr,
-                    start_cluster,
-                    file_size,
-                );
+            .modify(offset, |layout: &mut Fat32DentryLayout| {
+                *layout = Fat32DentryLayout::new(name.as_str(), attr, start_cluster, file_size);
             });
         Some(Fat32Dentry::new(sector_id, offset, &self.bdev, &self.fat))
     }
@@ -199,7 +213,7 @@ impl Fat32FS {
     pub fn remove_dentry(&self, dentry: &Fat32Dentry) {
         let mut sector_id = dentry.sector_id;
         let mut offset = dentry.sector_offset;
-        if dentry.is_long()   {
+        if dentry.is_long() {
             let mut is_end = false;
             loop {
                 get_block_cache(sector_id, Arc::clone(&self.bdev))
@@ -216,10 +230,11 @@ impl Fat32FS {
                 }
             }
         }
-        get_block_cache(sector_id, self.bdev.clone())
-            .lock()
-            .modify(offset, |layout: &mut Fat32DentryLayout| {
+        get_block_cache(sector_id, self.bdev.clone()).lock().modify(
+            offset,
+            |layout: &mut Fat32DentryLayout| {
                 layout.set_deleted();
-            });
+            },
+        );
     }
 }

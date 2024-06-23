@@ -74,7 +74,11 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let process = current_process();
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+    if let Some(inode) = open_file(
+        ROOT_INODE.as_ref(),
+        path.as_str(),
+        OpenFlags::from_bits(flags).unwrap(),
+    ) {
         let mut inner = process.inner_exclusive_access();
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(inode);
@@ -217,7 +221,8 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
             return -1;
         }
         let stat = stat.unwrap();
-        let mut v = translated_byte_buffer(inner.get_user_token(), st as *const u8, size_of::<Stat>());
+        let mut v =
+            translated_byte_buffer(inner.get_user_token(), st as *const u8, size_of::<Stat>());
         unsafe {
             let mut p = stat.borrow() as *const Stat as *const u8;
             for slice in v.iter_mut() {
@@ -267,7 +272,13 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let token = current_user_token();
-    if let Some(path) = current_task().unwrap().inner_exclusive_access().work_dir.clone().name() {
+    if let Some(path) = current_task()
+        .unwrap()
+        .inner_exclusive_access()
+        .work_dir
+        .clone()
+        .name()
+    {
         let len = core::cmp::min(len, path.len());
         let mut v = translated_byte_buffer(token, buf, len);
         unsafe {
@@ -377,14 +388,21 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
         let mut mbuf = [0u8; 35];
         let mut p = mbuf.as_mut() as *mut [u8] as *mut u8;
         let dirent = p as *mut Dirent;
-        unsafe { 
-            *dirent = Dirent::new(read_size + dirent_len, dirent_len as u16, &name); 
+        unsafe {
+            *dirent = Dirent::new(read_size + dirent_len, dirent_len as u16, &name);
         }
         let mut copy_len = 0;
         while copy_len < dirent_len {
-            let copy_size = min(dirent_len - copy_len, v[slice_index].len() - offset_in_slice);
+            let copy_size = min(
+                dirent_len - copy_len,
+                v[slice_index].len() - offset_in_slice,
+            );
             unsafe {
-                ptr::copy_nonoverlapping(p, v[slice_index][offset_in_slice..].as_mut_ptr(), copy_size);
+                ptr::copy_nonoverlapping(
+                    p,
+                    v[slice_index][offset_in_slice..].as_mut_ptr(),
+                    copy_size,
+                );
                 p = p.add(copy_size);
             }
             read_size += copy_size;
@@ -399,7 +417,11 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
             }
         }
     }
-    if is_end { 0 } else { read_size as isize }
+    if is_end {
+        0
+    } else {
+        read_size as isize
+    }
 }
 
 pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
@@ -410,7 +432,13 @@ pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
     0
 }
 
-pub fn sys_mount(source: *const u8, target: *const u8, fs: *const u8, flags: u32, data: *const u8) -> isize {
+pub fn sys_mount(
+    source: *const u8,
+    target: *const u8,
+    fs: *const u8,
+    flags: u32,
+    data: *const u8,
+) -> isize {
     trace!(
         "kernel:pid[{}] sys_mount",
         current_task().unwrap().process.upgrade().unwrap().getpid()

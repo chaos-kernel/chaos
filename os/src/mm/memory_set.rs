@@ -113,18 +113,17 @@ impl MemorySet {
     }
     /// remove an area with start and end virtual address
     pub fn remove_area_with_va(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
-        if let Some(idx) = self
-            .areas
-            .iter_mut()
-            .position(|area| area.vpn_range.get_start() == start_va.floor() && area.vpn_range.get_end() == end_va.ceil())
-        {
+        if let Some(idx) = self.areas.iter_mut().position(|area| {
+            area.vpn_range.get_start() == start_va.floor()
+                && area.vpn_range.get_end() == end_va.ceil()
+        }) {
             self.areas[idx].unmap(&mut self.page_table);
             self.areas.remove(idx);
             true
         } else {
             false
         }
-    }    
+    }
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
@@ -435,9 +434,7 @@ impl MemorySet {
                 // let frame = frame_alloc().unwrap();
                 match self.mmap_area.get(&vpn) {
                     Some(_) => {
-                        debug!(
-                            "[mmap] vpn = {:#x} has been mapped, skip",
-                            vpn.0);
+                        debug!("[mmap] vpn = {:#x} has been mapped, skip", vpn.0);
                     }
                     None => {
                         let frame = frame_alloc().unwrap();

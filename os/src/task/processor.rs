@@ -64,9 +64,13 @@ pub fn run_tasks() {
             if task_inner.first_time == None {
                 task_inner.first_time = Some(get_time_ms());
             }
-            
+
             //被调度，开始计算进程时钟时间
-            task.process.upgrade().unwrap().inner_exclusive_access().clock_time_refresh();
+            task.process
+                .upgrade()
+                .unwrap()
+                .inner_exclusive_access()
+                .clock_time_refresh();
 
             // release coming task_inner manually
             drop(task_inner);

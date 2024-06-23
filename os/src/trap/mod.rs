@@ -17,7 +17,9 @@ mod context;
 use crate::config::TRAMPOLINE;
 use crate::syscall::syscall;
 use crate::task::{
-    check_signals_of_current, current_add_signal, current_process, current_trap_cx, current_trap_cx_user_va, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, SignalFlags
+    check_signals_of_current, current_add_signal, current_process, current_trap_cx,
+    current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
+    suspend_current_and_run_next, SignalFlags,
 };
 use crate::timer::{check_timer, set_next_trigger};
 use core::arch::{asm, global_asm};
@@ -65,15 +67,19 @@ pub fn trap_handler() -> ! {
     // trace!("into {:?}", scause.cause());
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
-
             //进入内核态之前，计算用户态已运行的时间
-            current_process().inner_exclusive_access().user_clock_time_end();
+            current_process()
+                .inner_exclusive_access()
+                .user_clock_time_end();
 
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
             // get system call return value
-            let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]]);
+            let result = syscall(
+                cx.x[17],
+                [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]],
+            );
             // cx is changed during sys_exec, so we have to call it again
             cx = current_trap_cx();
             cx.x[10] = result as usize;
@@ -123,7 +129,9 @@ pub fn trap_return() -> ! {
     set_user_trap_entry();
 
     //从内核态返回后，计算内核态运行时间
-    current_process().inner_exclusive_access().user_clock_time_start();
+    current_process()
+        .inner_exclusive_access()
+        .user_clock_time_start();
 
     let trap_cx_user_va = current_trap_cx_user_va();
     let user_satp = current_user_token();

@@ -133,7 +133,6 @@ use thread::*;
 
 use crate::{fs::inode::Stat, task::current_task};
 
-
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     let task = current_task().unwrap();
@@ -161,10 +160,21 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_GETTID => sys_gettid(),
-        SYSCALL_CLONE => sys_clone(args[0], args[1], args[2] as *mut usize, args[3], args[4] as *mut usize),
+        SYSCALL_CLONE => sys_clone(
+            args[0],
+            args[1],
+            args[2] as *mut usize,
+            args[3],
+            args[4] as *mut usize,
+        ),
         SYSCALL_BRK => sys_brk(args[0] as usize),
         SYSCALL_EXECVE => sys_execve(args[0] as *const u8, args[1] as *const usize),
-        SYSCALL_WAIT4 => sys_wait4(args[0] as isize,args[1] as *mut i32, args[2] as u32, args[3],) ,
+        SYSCALL_WAIT4 => sys_wait4(
+            args[0] as isize,
+            args[1] as *mut i32,
+            args[2] as u32,
+            args[3],
+        ),
         SYSCALL_GETTIMEOFDAY => sys_gettimeofday(args[0] as *mut TimeVal, args[1]),
         SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4], args[5]),
         SYSCALL_MUNMAP => sys_munmap(args[0], args[1]),
@@ -188,7 +198,13 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_MKDIRAT => sys_mkdirat64(args[0] as i32, args[1] as *const u8, args[2] as u32),
         SYSCALL_GETDENTS64 => sys_getdents64(args[0] as i32, args[1] as *mut u8, args[2] as usize),
         SYSCALL_UMOUNT2 => sys_umount2(args[0] as *const u8, args[1] as i32),
-        SYSCALL_MOUNT => sys_mount(args[0] as *const u8, args[1] as *const u8, args[2] as *const u8, args[3] as u32, args[4] as *const u8),
+        SYSCALL_MOUNT => sys_mount(
+            args[0] as *const u8,
+            args[1] as *const u8,
+            args[2] as *const u8,
+            args[3] as u32,
+            args[4] as *const u8,
+        ),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

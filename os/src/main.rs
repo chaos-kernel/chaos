@@ -24,11 +24,9 @@
 #![feature(alloc_error_handler)]
 #![feature(ascii_char)]
 
-
 use core::arch::global_asm;
 
 use board::QEMUExit;
-
 
 #[macro_use]
 extern crate log;
@@ -43,6 +41,7 @@ mod board;
 
 #[macro_use]
 mod console;
+pub mod block;
 pub mod config;
 pub mod drivers;
 pub mod fs;
@@ -55,7 +54,6 @@ pub mod syscall;
 pub mod task;
 pub mod timer;
 pub mod trap;
-pub mod block;
 
 global_asm!(include_str!("entry.asm"));
 
@@ -113,7 +111,6 @@ const ALL_TASKS: [&str; 32] = [
     "fstat",
     "mmap",
     "munmap",
-
     "pipe",
     "mount",
     "umount",

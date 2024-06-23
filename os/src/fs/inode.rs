@@ -1,9 +1,16 @@
 //! inode
 
-use alloc::{string::{String, ToString}, sync::Arc, vec::Vec};
-use lazy_static::*;
-use crate::{block::BLOCK_SZ, drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer, sync::UPSafeCell, timer::TimeSpec};
 use super::file::File;
+use crate::{
+    block::BLOCK_SZ, drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer,
+    sync::UPSafeCell, timer::TimeSpec,
+};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use lazy_static::*;
 
 /// inode in memory
 pub struct OSInode {
@@ -26,7 +33,13 @@ impl OSInode {
         Self {
             readable,
             writable,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, name, inode }) },
+            inner: unsafe {
+                UPSafeCell::new(OSInodeInner {
+                    pos: 0,
+                    name,
+                    inode,
+                })
+            },
         }
     }
     /// read all data from the inode in memory
@@ -73,7 +86,12 @@ impl OSInode {
     pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.clone().link(old_name, new_name) {
-            Some(Arc::new(OSInode::new(true, true, new_name.to_string(), inode)))
+            Some(Arc::new(OSInode::new(
+                true,
+                true,
+                new_name.to_string(),
+                inode,
+            )))
         } else {
             None
         }
@@ -171,7 +189,7 @@ pub struct Stat {
 
 impl Stat {
     /// create a new stat
-    pub fn new(        
+    pub fn new(
         st_dev: u64,
         st_ino: u64,
         st_mode: u32,
@@ -212,12 +230,16 @@ impl Stat {
     }
     /// check whether the inode is a directory
     pub fn is_dir(&self) -> bool {
-        StatMode::from_bits(self.st_mode).unwrap().contains(StatMode::DIR)
+        StatMode::from_bits(self.st_mode)
+            .unwrap()
+            .contains(StatMode::DIR)
     }
 
     /// check whether the inode is a file
     pub fn is_file(&self) -> bool {
-        StatMode::from_bits(self.st_mode).unwrap().contains(StatMode::FILE)
+        StatMode::from_bits(self.st_mode)
+            .unwrap()
+            .contains(StatMode::FILE)
     }
 }
 
@@ -240,8 +262,8 @@ lazy_static! {
         let fs = Fat32FS::load(BLOCK_DEVICE.clone());
         let root_inode = Fat32FS::root_inode(&fs);
         let inode: Arc<dyn Inode> = Arc::new(root_inode);
-        Arc::new(OSInode { 
-            readable: true, 
+        Arc::new(OSInode {
+            readable: true,
             writable: true,
             inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, name: "/".to_string(), inode }) }
         })

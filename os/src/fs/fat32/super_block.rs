@@ -14,7 +14,8 @@ pub struct Fat32SB {
 impl Fat32SB {
     pub fn from_layout(layout: &Fat32SBLayout) -> Self {
         Self {
-            bytes_per_sector: layout.bytes_per_sector[0] as u16 | (layout.bytes_per_sector[1] as u16) << 8,
+            bytes_per_sector: layout.bytes_per_sector[0] as u16
+                | (layout.bytes_per_sector[1] as u16) << 8,
             sectors_per_cluster: layout.sectors_per_cluster,
             reserved_sectors_cnt: layout.reserved_sectors_cnt,
             fat_cnt: layout.fat_cnt,
@@ -27,7 +28,8 @@ impl Fat32SB {
 
 impl Fat32SB {
     pub fn root_sector(&self) -> usize {
-        let res = self.reserved_sectors_cnt as usize + self.fat_cnt as usize * self.fat_size_32 as usize;
+        let res =
+            self.reserved_sectors_cnt as usize + self.fat_cnt as usize * self.fat_size_32 as usize;
         res
     }
 }
@@ -35,7 +37,8 @@ impl Fat32SB {
 impl From<Fat32SBLayout> for Fat32SB {
     fn from(sb_layout: Fat32SBLayout) -> Self {
         Self {
-            bytes_per_sector: sb_layout.bytes_per_sector[0] as u16 | (sb_layout.bytes_per_sector[1] as u16) << 8,
+            bytes_per_sector: sb_layout.bytes_per_sector[0] as u16
+                | (sb_layout.bytes_per_sector[1] as u16) << 8,
             sectors_per_cluster: sb_layout.sectors_per_cluster,
             reserved_sectors_cnt: sb_layout.reserved_sectors_cnt,
             fat_cnt: sb_layout.fat_cnt,

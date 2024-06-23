@@ -21,14 +21,17 @@ mod task;
 
 use self::id::TaskUserRes;
 use self::manager::add_block_task;
-use crate::{fs::{inode::ROOT_INODE, open_file, OpenFlags}, timer::remove_timer};
+use crate::{
+    fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    timer::remove_timer,
+};
 use alloc::{sync::Arc, vec::Vec};
 use lazy_static::*;
 use manager::{add_stopping_task, fetch_task};
-use process::ProcessControlBlock;
-use switch::__switch;
 pub use process::CloneFlags;
+use process::ProcessControlBlock;
 pub use process::CSIGNAL;
+use switch::__switch;
 
 pub use context::TaskContext;
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
@@ -90,10 +93,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let process = task.process.upgrade().unwrap();
     let mut process_inner = process.inner_exclusive_access();
     let tid = task_inner.res.as_ref().unwrap().tid;
-    let additions: Vec<_> = process_inner.allocation[tid]
-        .iter()
-        .cloned()
-        .collect();
+    let additions: Vec<_> = process_inner.allocation[tid].iter().cloned().collect();
     for (i, num) in additions.iter().enumerate() {
         process_inner.available[i] += num;
     }
