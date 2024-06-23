@@ -8,8 +8,8 @@ use super::{pid_alloc, PidHandle};
 use crate::fs::file::File;
 use crate::fs::inode::{OSInode, ROOT_INODE};
 use crate::fs::{Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, UserBuffer, VirtAddr, KERNEL_SPACE};
-use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
+use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
+use crate::sync::UPSafeCell;
 use crate::syscall::errno::EPERM;
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
@@ -126,11 +126,11 @@ pub struct ProcessControlBlockInner {
     /// task resource allocator
     pub task_res_allocator: RecycleAllocator,
     /// mutex list
-    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>,
+    // pub mutex_list: Vec<Option<Arc<dyn MutexSupport>>>,
     /// semaphore list
-    pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
-    /// condvar list
-    pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    // pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
+    // /// condvar list
+    // pub condvar_list: Vec<Option<Arc<Condvar>>>,
     /// enable deadlock detect
     pub deadlock_detect: bool,
     /// available list
@@ -295,9 +295,9 @@ impl ProcessControlBlock {
                     signals: SignalFlags::empty(),
                     tasks: Vec::new(),
                     task_res_allocator: RecycleAllocator::new(),
-                    mutex_list: Vec::new(),
-                    semaphore_list: Vec::new(),
-                    condvar_list: Vec::new(),
+                    // mutex_list: Vec::new(),
+                    // semaphore_list: Vec::new(),
+                    // condvar_list: Vec::new(),
                     deadlock_detect: false,
                     available: Vec::new(),
                     allocation: Vec::new(),
@@ -440,9 +440,9 @@ impl ProcessControlBlock {
                     signals: SignalFlags::empty(),
                     tasks: Vec::new(),
                     task_res_allocator: RecycleAllocator::new(),
-                    mutex_list: Vec::new(),
-                    semaphore_list: Vec::new(),
-                    condvar_list: Vec::new(),
+                    // mutex_list: Vec::new(),
+                    // semaphore_list: Vec::new(),
+                    // condvar_list: Vec::new(),
                     deadlock_detect: false,
                     available: Vec::new(),
                     allocation: Vec::new(),
@@ -589,9 +589,9 @@ impl ProcessControlBlock {
                     signals: SignalFlags::empty(),
                     tasks: Vec::new(),
                     task_res_allocator: RecycleAllocator::new(),
-                    mutex_list: Vec::new(),
-                    semaphore_list: Vec::new(),
-                    condvar_list: Vec::new(),
+                    // mutex_list: Vec::new(),
+                    // semaphore_list: Vec::new(),
+                    // condvar_list: Vec::new(),
                     deadlock_detect: false,
                     available: Vec::new(),
                     allocation: Vec::new(),
