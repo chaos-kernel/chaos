@@ -5,7 +5,7 @@ KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := sdcard-riscv.img
-FS_IMG_PATH := ../testcases
+FS_IMG_PATH := ..
 APPS := ../user/src/bin/*
 OFFLINE :=
 
@@ -73,7 +73,7 @@ run-inner:
 		-machine virt \
 		-nographic \
 		-bios $(BOOTLOADER) \
-		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-kernel $(KERNEL_BIN) \
 		-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
@@ -85,7 +85,7 @@ debug: build
 
 
 gdbserver: build
-	@qemu-system-riscv64 -M 128m -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+	@qemu-system-riscv64 -smp 2 -M 128m -machine virt -nographic  -kernel $(KERNEL_BIN) \
 	-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
 	-s -S
