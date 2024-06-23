@@ -1,11 +1,10 @@
 //! File trait & inode(dir, file, pipe, stdin, stdout)
 
+mod fat32;
+pub(crate) mod file;
 pub mod inode;
 mod pipe;
 mod stdio;
-mod fat32;
-pub(crate) mod file;
-
 
 impl OpenFlags {
     /// Do not check validity for simplicity
@@ -85,7 +84,6 @@ pub fn list_apps() {
     }
     println!("**************/");
 }
-
 
 use alloc::sync::Arc;
 use inode::{Inode, OSInode, Stat, StatMode, ROOT_INODE};

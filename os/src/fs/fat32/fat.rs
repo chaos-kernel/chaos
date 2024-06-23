@@ -1,6 +1,9 @@
 use alloc::sync::Arc;
 
-use crate::{block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ}, config::PAGE_SIZE};
+use crate::{
+    block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ},
+    config::PAGE_SIZE,
+};
 
 use super::super_block::Fat32SB;
 
@@ -42,7 +45,7 @@ impl FAT {
         let sector_offset = offset % BLOCK_SZ;
         get_block_cache(sector_id, Arc::clone(&self.bdev))
             .lock()
-            .modify(sector_offset, | num: &mut u32| {
+            .modify(sector_offset, |num: &mut u32| {
                 *num = 0x0FFFFFFFu32;
             });
         Some(cluster_id as usize)
@@ -60,7 +63,7 @@ impl FAT {
             });
         Some(new_cluster_id)
     }
-    
+
     /// get next cluster number
     pub fn next_cluster_id(&self, cluster: usize) -> Option<usize> {
         let fat_offset = self.start_sector as usize * BLOCK_SZ + cluster * 4;
@@ -79,7 +82,7 @@ impl FAT {
         }
     }
 
-     /// get next dentry sector id and offset
+    /// get next dentry sector id and offset
     pub fn next_dentry_id(&self, sector_id: usize, offset: usize) -> Option<(usize, usize)> {
         if offset >= 512 || offset % 32 != 0 {
             return None;
@@ -121,4 +124,3 @@ impl FAT {
         Some(res)
     }
 }
-

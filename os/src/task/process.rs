@@ -2,8 +2,8 @@
 
 use super::id::RecycleAllocator;
 use super::manager::insert_into_pid2process;
-use super::{current_task, TaskControlBlock};
 use super::{add_task, SignalFlags};
+use super::{current_task, TaskControlBlock};
 use super::{pid_alloc, PidHandle};
 use crate::fs::file::File;
 use crate::fs::inode::{OSInode, ROOT_INODE};
@@ -189,7 +189,7 @@ impl ProcessControlBlockInner {
     /// count clock time
     pub fn clock_time_refresh(&mut self) {
         self.clock_stop_watch = get_time();
-    } 
+    }
     /// count user clock time and start to count kernel clock time
     pub fn user_clock_time_end(&mut self) -> usize {
         let last_stop = self.clock_stop_watch;
@@ -217,14 +217,11 @@ impl ProcessControlBlockInner {
         let mut children_user_clock: usize = 0;
         for c in &self.children {
             children_kernel_clock += c.inner_exclusive_access().kernel_clock;
-            children_user_clock += c.inner_exclusive_access().user_clock; 
-
-
+            children_user_clock += c.inner_exclusive_access().user_clock;
         }
         (children_kernel_clock as i64, children_user_clock as i64)
     }
 
-    
     /// mmap
     pub fn mmap(
         &mut self,
@@ -243,11 +240,14 @@ impl ProcessControlBlockInner {
         } else {
             debug!("mmap: file name: {}", file.name().unwrap());
             let context = file.read_all();
-            
+
             let file_len = context.len();
             let length = len.min(file_len - offset);
             if file_len <= offset {
-                debug!("mmap ERROR: offset exceeds file length context.len(): {}, offset: {}", file_len, offset);
+                debug!(
+                    "mmap ERROR: offset exceeds file length context.len(): {}, offset: {}",
+                    file_len, offset
+                );
                 return EPERM;
             };
             (context, length)
@@ -409,7 +409,7 @@ impl ProcessControlBlock {
     }
 
     /// Only support processes with a single thread.
-    pub fn fork(self: &Arc<Self>) ->usize {
+    pub fn fork(self: &Arc<Self>) -> usize {
         trace!("kernel: sys_fork");
         let mut parent = self.inner_exclusive_access();
         assert_eq!(parent.thread_count(), 1);
@@ -453,7 +453,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: parent.heap_base,
                     heap_end: parent.heap_base,
-                    work_dir: parent.work_dir.clone()
+                    work_dir: parent.work_dir.clone(),
                 })
             },
         });
@@ -558,7 +558,7 @@ impl ProcessControlBlock {
         self.pid.0
     }
 
-    pub fn fork2(self: &Arc<Self>, stack_ptr: usize) ->usize {
+    pub fn fork2(self: &Arc<Self>, stack_ptr: usize) -> usize {
         trace!("kernel: sys_fork2");
         let mut parent = self.inner_exclusive_access();
         assert_eq!(parent.thread_count(), 1);
@@ -602,7 +602,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: parent.heap_base,
                     heap_end: parent.heap_base,
-                    work_dir: parent.work_dir.clone()
+                    work_dir: parent.work_dir.clone(),
                 })
             },
         });

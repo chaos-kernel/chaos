@@ -1,5 +1,8 @@
 DOCKER_NAME ?= rcore-tutorial-v3
+MAKEFLAGS += --no-print-directory
+
 .PHONY: docker build_docker all clean
+
 	
 docker:
 	docker run --rm -it -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
@@ -8,9 +11,10 @@ build_docker:
 	docker build -t ${DOCKER_NAME} .
 
 fmt:
-	cd easy-fs; cargo fmt; cd ../easy-fs-fuse cargo fmt; cd ../os ; cargo fmt; cd ../user; cargo fmt; cd ..
+	@echo "Formatting..."
+	@cd os; cargo fmt;
 
-all:
+all: fmt
 	@cd user && make elf
 	@cd os && make build
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu

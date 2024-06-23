@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use num_enum::{TryFromPrimitive};
+use num_enum::TryFromPrimitive;
 
 /// Success
 pub const SUCCESS: isize = 0;

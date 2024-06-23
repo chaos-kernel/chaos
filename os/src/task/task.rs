@@ -75,11 +75,7 @@ impl TaskControlBlockInner {
 
 impl TaskControlBlock {
     /// Create a new task
-    pub fn new(
-        process: Arc<ProcessControlBlock>,
-        ustack_top: usize,
-        alloc_user_res: bool,
-    ) -> Self {
+    pub fn new(process: Arc<ProcessControlBlock>, ustack_top: usize, alloc_user_res: bool) -> Self {
         let res = TaskUserRes::new(Arc::clone(&process), ustack_top, alloc_user_res);
         let trap_cx_ppn = res.trap_cx_ppn();
         let kstack = kstack_alloc();

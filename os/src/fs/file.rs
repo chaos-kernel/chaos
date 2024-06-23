@@ -1,14 +1,11 @@
-
 use alloc::vec::Vec;
 
 use crate::mm::UserBuffer;
 
-use super::inode:: Stat;
-
-
+use super::inode::Stat;
 
 /// trait File for all file types
-pub trait File: {
+pub trait File {
     /// the file readable?
     fn readable(&self) -> bool;
     /// the file writable?

@@ -1,9 +1,8 @@
-use alloc::{sync::Weak, string::String, sync::Arc};
+use alloc::{string::String, sync::Arc, sync::Weak};
 
 use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice};
 
 use super::{fat::FAT, file_system::Fat32FS};
-
 
 pub struct Fat32Dentry {
     pub sector_id: usize,
@@ -25,7 +24,12 @@ bitflags! {
 }
 
 impl Fat32Dentry {
-    pub fn new(sector_id: usize, sector_offset: usize, bdev: &Arc<dyn BlockDevice>, fat: &Arc<FAT>) -> Self {
+    pub fn new(
+        sector_id: usize,
+        sector_offset: usize,
+        bdev: &Arc<dyn BlockDevice>,
+        fat: &Arc<FAT>,
+    ) -> Self {
         Self {
             sector_id,
             sector_offset,
@@ -71,18 +75,18 @@ impl Fat32Dentry {
             .lock()
             .read(offset, |layout: &Fat32DentryLayout| {
                 layout.file_size() as usize
-            }) 
+            })
     }
 
     pub fn set_file_size(&self, size: usize) {
         let (sector_id, offset) = self.to_end();
-        get_block_cache(sector_id, self.bdev.clone())
-            .lock()
-            .modify(offset, |layout: &mut Fat32DentryLayout| {
+        get_block_cache(sector_id, self.bdev.clone()).lock().modify(
+            offset,
+            |layout: &mut Fat32DentryLayout| {
                 layout.file_size = size as u32;
-            });
+            },
+        );
     }
-
 
     pub fn is_long(&self) -> bool {
         self.read_dentry().is_long()
@@ -96,9 +100,7 @@ impl Fat32Dentry {
             loop {
                 let layout = get_block_cache(sector_id, self.bdev.clone())
                     .lock()
-                    .read(offset, |layout: &Fat32LDentryLayout| {
-                        *layout
-                    });
+                    .read(offset, |layout: &Fat32LDentryLayout| *layout);
                 name.insert_str(0, &layout.name());
                 if layout.is_end() {
                     break;
@@ -121,7 +123,7 @@ impl Fat32Dentry {
             .lock()
             .read(offset, |layout: &Fat32DentryLayout| {
                 layout.start_cluster_id() as usize
-            }) 
+            })
     }
 
     fn to_end(&self) -> (usize, usize) {
@@ -133,9 +135,7 @@ impl Fat32Dentry {
         loop {
             let layout = get_block_cache(sector_id, self.bdev.clone())
                 .lock()
-                .read(offset, |layout: &Fat32LDentryLayout| {
-                    *layout
-                });
+                .read(offset, |layout: &Fat32LDentryLayout| *layout);
             (sector_id, offset) = self.fat.next_dentry_id(sector_id, offset).unwrap();
             if layout.is_end() {
                 break;
@@ -147,9 +147,7 @@ impl Fat32Dentry {
     fn read_dentry(&self) -> Fat32DentryLayout {
         get_block_cache(self.sector_id, self.bdev.clone())
             .lock()
-            .read(self.sector_offset, |layout: &Fat32DentryLayout| {
-                *layout
-            })
+            .read(self.sector_offset, |layout: &Fat32DentryLayout| *layout)
     }
 
     fn write_dentry(&self, layout: &Fat32DentryLayout) {
@@ -180,7 +178,12 @@ pub struct Fat32DentryLayout {
 }
 
 impl Fat32DentryLayout {
-    pub fn new(file_name: &str, attr: FileAttributes, start_cluster: usize, file_size: u32) -> Self {
+    pub fn new(
+        file_name: &str,
+        attr: FileAttributes,
+        start_cluster: usize,
+        file_size: u32,
+    ) -> Self {
         let mut name = [0u8; 8];
         let mut ext = [0u8; 3];
         let mut name_capital = false;
@@ -210,7 +213,8 @@ impl Fat32DentryLayout {
             name,
             ext,
             attr: attr.bits(),
-            reserved: if name_capital { 0x08 } else { 0x00 } | if ext_capital { 0x10 } else { 0x00 },
+            reserved: if name_capital { 0x08 } else { 0x00 }
+                | if ext_capital { 0x10 } else { 0x00 },
             create_time_ms: 0,
             create_time: 0,
             create_date: 0,
@@ -269,7 +273,6 @@ impl Fat32DentryLayout {
         name
     }
 }
-
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
@@ -340,10 +343,7 @@ impl Fat32LDentryLayout {
                 layout.last_modify_date,
             ],
             start_cluster: layout.start_cluster_low,
-            name3: [
-                layout.file_size as u16,
-                (layout.file_size >> 16) as u16,
-            ],
+            name3: [layout.file_size as u16, (layout.file_size >> 16) as u16],
         })
     }
 

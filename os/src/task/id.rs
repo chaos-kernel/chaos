@@ -151,11 +151,7 @@ fn ustack_top_from_id(ustack_top: usize, id: usize) -> usize {
 
 impl TaskUserRes {
     /// Create a new TaskUserRes (Task User Resource)
-    pub fn new(
-        process: Arc<ProcessControlBlock>,
-        ustack_top: usize,
-        alloc_user_res: bool,
-    ) -> Self {
+    pub fn new(process: Arc<ProcessControlBlock>, ustack_top: usize, alloc_user_res: bool) -> Self {
         let tid = process.inner_exclusive_access().alloc_tid();
         let task_user_res = Self {
             tid,
