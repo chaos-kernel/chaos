@@ -6,6 +6,15 @@ use crate::task::{block_current_and_run_next, suspend_current_and_run_next};
 use crate::task::{current_task, wakeup_task};
 use alloc::{collections::VecDeque, sync::Arc};
 use riscv::register::sstatus;
+use spin_mutex::SpinMutex;
+
+/// SpinMutex
+pub mod spin_mutex;
+
+/// SpinLock
+pub type SpinLock<T> = SpinMutex<T, Spin>;
+/// SpinNoIrqLock(Cannot be interrupted)
+pub type SpinNoIrqLock<T> = SpinMutex<T, SpinNoIrq>;
 
 /// Mutex trait
 pub trait Mutex: Sync + Send {
@@ -149,3 +158,18 @@ impl Drop for SieGuard {
         }
     }
 }
+
+/// SpinNoIrq MutexSupport
+pub struct SpinNoIrq;
+
+impl MutexSupport for SpinNoIrq {
+    type GuardData = SieGuard;
+    #[inline(always)]
+    fn before_lock() -> Self::GuardData {
+        SieGuard::new()
+    }
+    #[inline(always)]
+    fn after_unlock(_: &mut Self::GuardData) {}
+}
+
+
