@@ -31,6 +31,7 @@ __alltraps:
     # read user stack from sscratch and save it in TrapContext
     csrr t2, sscratch
     sd t2, 2*8(sp)
+    
     # load kernel_satp into t0
     ld t0, 34*8(sp)
     # load trap_handler into t1

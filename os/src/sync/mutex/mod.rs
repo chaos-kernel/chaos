@@ -1,6 +1,6 @@
 //! Mutex (spin-like and blocking(sleep))
 
-use super::UPSafeCell;
+use crate::sync::UPSafeCell;
 use crate::task::TaskControlBlock;
 use crate::task::{block_current_and_run_next, suspend_current_and_run_next};
 use crate::task::{current_task, wakeup_task};

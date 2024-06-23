@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 
-use crate::sync::mutex::MutexSupport;
+use crate::sync::mutex::mutex::MutexSupport;
 
 use crate::utils::async_utils::SendWrapper;
 
