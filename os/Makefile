@@ -8,6 +8,7 @@ FS_IMG := sdcard-riscv.img
 FS_IMG_PATH := ../testcases
 APPS := ../user/src/bin/*
 OFFLINE :=
+MAKEFLAGS += --no-print-directory
 
 # BOARD
 BOARD := qemu
