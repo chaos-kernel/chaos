@@ -78,5 +78,3 @@ impl MutexSupport for SpinNoIrq {
     #[inline(always)]
     fn after_unlock(_: &mut Self::GuardData) {}
 }
-
-

@@ -96,7 +96,10 @@ pub fn init_frame_allocator() {
     extern "C" {
         fn ekernel();
     }
-    debug!("init_frame_allocator: ekernel={:#x} memory_end={:#x}", ekernel as usize, MEMORY_END);
+    debug!(
+        "init_frame_allocator: ekernel={:#x} memory_end={:#x}",
+        ekernel as usize, MEMORY_END
+    );
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(ekernel as usize).ceil(),
         PhysAddr::from(MEMORY_END).floor(),

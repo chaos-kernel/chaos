@@ -1,7 +1,7 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-use core::marker::PhantomData;
 use core::cell::UnsafeCell;
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::sync::mutex::MutexSupport;
 

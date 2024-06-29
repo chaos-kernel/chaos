@@ -125,13 +125,20 @@ const ALL_TASKS: [&str; 32] = [
 pub fn rust_main() -> ! {
     show_logo();
     clear_bss();
+    debug!("clear bss section done");
     println!("[kernel] Hello, world!");
     logging::init();
+    debug!("logging init done");
     mm::init();
+    debug!("mm init done");
     mm::remap_test();
+    debug!("mm remap test done");
     trap::init();
+    debug!("trap init done");
     trap::enable_timer_interrupt();
+    debug!("timer interrupt enabled");
     timer::set_next_trigger();
+    debug!("timer set next trigger done");
     // for file in ROOT_INODE.ls() {
     //     println!("{}", file);
     // }
