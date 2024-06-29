@@ -1,7 +1,7 @@
 //! PhysAddr, VirtAddr, PhysPageNum, VirtPageNum, raw address
 
 use super::PageTableEntry;
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS, PAGE_TABLE_LEVEL};
 use core::fmt::{self, Debug, Formatter};
 
 const PA_WIDTH_SV39: usize = 56;
@@ -165,10 +165,10 @@ impl From<PhysPageNum> for PhysAddr {
 
 impl VirtPageNum {
     /// Get the indexes of the page table entry
-    pub fn indexes(&self) -> [usize; 3] {
+    pub fn indexes(&self) -> [usize; PAGE_TABLE_LEVEL] {
         let mut vpn = self.0;
-        let mut idx = [0usize; 3];
-        for i in (0..3).rev() {
+        let mut idx = [0usize; PAGE_TABLE_LEVEL];
+        for i in (0..PAGE_TABLE_LEVEL).rev() {
             idx[i] = vpn & 511;
             vpn >>= 9;
         }

@@ -4,7 +4,9 @@ use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE};
+use crate::config::{
+    KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE,
+};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::SUCCESS;
 use crate::task::process::Flags;
@@ -161,7 +163,7 @@ impl MemorySet {
     pub fn new_kernel() -> Self {
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         // map kernel sections
         info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
         info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
@@ -541,11 +543,11 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
-                ppn = PhysPageNum(vpn.0);
+                ppn = PhysPageNum(vpn.0 - KERNEL_SPACE_OFFSET);
             }
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
@@ -555,6 +557,7 @@ impl MapArea {
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
         page_table.map(vpn, ppn, pte_flags);
+        ppn
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         if self.map_type == MapType::Framed {
@@ -582,7 +585,7 @@ impl MapArea {
     #[allow(unused)]
     pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
-            self.map_one(page_table, vpn)
+            self.map_one(page_table, vpn);
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
@@ -619,7 +622,9 @@ impl MapArea {
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MapType {
+    ///vpn - offset = ppn ;only for kernel space
     Identical,
+    ///
     Framed,
 }
 
