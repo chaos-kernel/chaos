@@ -14,7 +14,7 @@ _start:
     or t0, t0, t1
     csrw satp, t0
     sfence.vma
-    call rust_main
+    call fake_main
 
     .section .bss.stack
     .globl boot_stack_lower_bound
@@ -32,6 +32,8 @@ boot_pagetable:
     .quad 0
     .quad 0
     .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
-    .zero 8 * 255
+    .quad (0xc0000 << 10) | 0xcf # VRWXAD 1G大页
+    .zero 8 * 254
     .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
-    .zero 8 * 253
+    .quad (0xc0000 << 10) | 0xcf # VRWXAD 1G大页
+    .zero 8 * 252

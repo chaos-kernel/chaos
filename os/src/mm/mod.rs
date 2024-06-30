@@ -29,5 +29,6 @@ pub fn init() {
     heap_allocator::init_heap();
     debug!("frame allocator initialize");
     frame_allocator::init_frame_allocator();
+    debug!("kernel space initialize");
     KERNEL_SPACE.exclusive_access().activate();
 }

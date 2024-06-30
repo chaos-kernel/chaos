@@ -17,10 +17,12 @@ impl FrameTracker {
     /// Create a new FrameTracker
     pub fn new(ppn: PhysPageNum) -> Self {
         // page cleaning
+        debug!("set FrameTracker::new: ppn={:?}", ppn);
         let bytes_array = ppn.get_bytes_array();
         for i in bytes_array {
             *i = 0;
         }
+        debug!("new FrameTracker::new: ppn={:?}", ppn);
         Self { ppn }
     }
 }
@@ -65,6 +67,7 @@ impl FrameAllocator for StackFrameAllocator {
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
+        info!("alloc: current={:#x} end={:#x}", self.current, self.end);
         if let Some(ppn) = self.recycled.pop() {
             Some(ppn.into())
         } else if self.current == self.end {
@@ -99,6 +102,14 @@ pub fn init_frame_allocator() {
     debug!(
         "init_frame_allocator: ekernel={:#x} memory_end={:#x}",
         ekernel as usize, MEMORY_END
+    );
+    debug!(
+        "PhysAddr::from(ekernel as usize)={:?}",
+        PhysAddr::from(ekernel as usize)
+    );
+    debug!(
+        "PhysAddr::from(MEMORY_END)={:?}",
+        PhysAddr::from(MEMORY_END)
     );
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(ekernel as usize).ceil(),

@@ -18,6 +18,9 @@ use lazy_static::*;
 use riscv::register::satp;
 
 extern "C" {
+    fn rust_main();
+    fn _start();
+    fn skernel();
     fn stext();
     fn etext();
     fn srodata();
@@ -27,7 +30,6 @@ extern "C" {
     fn sbss_with_stack();
     fn ebss();
     fn ekernel();
-    fn strampoline();
 }
 
 lazy_static! {
@@ -152,19 +154,38 @@ impl MemorySet {
         self.areas.push(map_area);
     }
     /// Mention that trampoline is not collected by areas.
-    fn map_trampoline(&mut self) {
-        self.page_table.map(
-            VirtAddr::from(TRAMPOLINE).into(),
-            PhysAddr::from(strampoline as usize).into(),
-            PTEFlags::R | PTEFlags::X,
-        );
-    }
+    // fn map_trampoline(&mut self) {
+    //     self.page_table.map(
+    //         VirtAddr::from(TRAMPOLINE).into(),
+    //         PhysAddr::from(strampoline as usize).into(),
+    //         PTEFlags::R | PTEFlags::X,
+    //     );
+    // }
     /// Without kernel stacks.
+    #[no_mangle]
     pub fn new_kernel() -> Self {
         let mut memory_set = Self::new_bare();
         // map trampoline
         // memory_set.map_trampoline();
         // map kernel sections
+        // let pc: usize;
+        // unsafe {
+        //     asm!(
+        //         "auipc {}, 0",
+        //         out(reg) pc,
+        //     );
+        // }
+        // let satp = satp::read();
+        // info!("Current satp: {:#x}", satp.bits());
+        // info!("Current PC: {:#x}", pc);
+        // let instruction: u32;
+        // unsafe {
+        //     instruction = core::ptr::read(pc as *const u32);
+        // }
+        // info!("Instruction at PC: {:#x}", instruction);
+        info!("kernel entry: {:#x}", skernel as u64);
+        info!("_start [{:#x}]", _start as usize);
+        info!("rust_main [{:#x}]", rust_main as usize);
         info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
         info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
         info!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
@@ -241,7 +262,7 @@ impl MemorySet {
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -288,7 +309,7 @@ impl MemorySet {
     pub fn from_existed_user(user_space: &Self) -> Self {
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         // copy mmap
         memory_set.mmap_end = user_space.mmap_end;
         // copy data sections/trap_context/user_stack

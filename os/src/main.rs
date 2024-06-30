@@ -25,7 +25,7 @@
 #![feature(ascii_char)]
 #![feature(negative_impls)]
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 
 use board::QEMUExit;
 
@@ -57,7 +57,9 @@ pub mod timer;
 pub mod trap;
 pub mod utils;
 
-global_asm!(include_str!("entry.asm"));
+use config::KERNEL_SPACE_OFFSET;
+
+global_asm!(include_str!("entry.S"));
 
 fn clear_bss() {
     extern "C" {
@@ -70,6 +72,7 @@ fn clear_bss() {
     }
 }
 
+#[no_mangle]
 fn show_logo() {
     println!(
         r#"
@@ -119,6 +122,16 @@ const ALL_TASKS: [&str; 32] = [
     "getdents",
     "unlink",
 ];
+
+#[no_mangle]
+pub fn fake_main() {
+    unsafe {
+        asm!("add sp, sp, {}", in(reg) KERNEL_SPACE_OFFSET << 12);
+        asm!("la t0, rust_main");
+        asm!("add t0, t0, {}", in(reg) KERNEL_SPACE_OFFSET << 12);
+        asm!("jalr zero, 0(t0)");
+    }
+}
 
 #[no_mangle]
 /// the rust entry-point of os

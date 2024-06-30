@@ -9,7 +9,7 @@ pub const KERNEL_STACK_SIZE: usize = 4096 * 8;
 /// kernel heap size
 pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x500;
 /// physical memory end address
-pub const MEMORY_END: usize = 0x88000000;
+pub const MEMORY_END: usize = 0xffff_ffc0_88000000;
 /// page size : 4KB
 pub const PAGE_SIZE: usize = 0x1000;
 /// page size bits: 12
@@ -39,4 +39,4 @@ pub const MMAP_BASE: usize = 0x2000_0000;
 /// SV39
 pub const PAGE_TABLE_LEVEL: usize = 3;
 /// kernel space offset
-pub const KERNEL_SPACE_OFFSET: usize = 0xffff_ffc0_0000_0000;
+pub const KERNEL_SPACE_OFFSET: usize = 0xffff_ffc0_0000_0;

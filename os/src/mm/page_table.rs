@@ -74,7 +74,9 @@ pub struct PageTable {
 impl PageTable {
     /// Create a new page table
     pub fn new() -> Self {
+        info!("create a new page table");
         let frame = frame_alloc().unwrap();
+        info!("create a new page table success");
         PageTable {
             root_ppn: frame.ppn,
             frames: vec![frame],

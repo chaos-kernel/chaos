@@ -58,7 +58,28 @@ impl Debug for PhysPageNum {
 
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        // SV39标准，高位与地址有效位最高位必须一致
+        // PA_WIDTH_SV39 是物理地址宽度，通常为 39
+        const PA_WIDTH_SV39: usize = 39;
+
+        // 提取有效的物理地址部分
+        let masked_value = v & ((1 << PA_WIDTH_SV39) - 1);
+
+        // 获取最高有效位
+        let sign_bit = (v >> (PA_WIDTH_SV39 - 1)) & 1;
+
+        // 构造高位扩展部分
+        let high_bits = if sign_bit == 1 {
+            (1 << (64 - PA_WIDTH_SV39)) - 1
+        } else {
+            0
+        };
+
+        // 将高位扩展部分左移到正确的位置
+        let extended_value = high_bits << PA_WIDTH_SV39;
+
+        // 组合有效地址和扩展部分
+        Self(masked_value | extended_value)
     }
 }
 impl From<usize> for PhysPageNum {
@@ -68,7 +89,28 @@ impl From<usize> for PhysPageNum {
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        // SV39标准，高位与地址有效位最高位必须一致
+        // VA_WIDTH_SV39 是虚拟地址宽度，通常为 39
+        const VA_WIDTH_SV39: usize = 39;
+
+        // 提取有效的虚拟地址部分
+        let masked_value = v & ((1 << VA_WIDTH_SV39) - 1);
+
+        // 获取最高有效位
+        let sign_bit = (v >> (VA_WIDTH_SV39 - 1)) & 1;
+
+        // 构造高位扩展部分
+        let high_bits = if sign_bit == 1 {
+            (1 << (64 - VA_WIDTH_SV39)) - 1
+        } else {
+            0
+        };
+
+        // 将高位扩展部分左移到正确的位置
+        let extended_value = high_bits << VA_WIDTH_SV39;
+
+        // 组合有效地址和扩展部分
+        Self(masked_value | extended_value)
     }
 }
 impl From<usize> for VirtPageNum {
