@@ -17,12 +17,12 @@ impl FrameTracker {
     /// Create a new FrameTracker
     pub fn new(ppn: PhysPageNum) -> Self {
         // page cleaning
-        debug!("set FrameTracker::new: ppn={:?}", ppn);
+        // debug!("set FrameTracker::new: ppn={:?}", ppn);
         let bytes_array = ppn.get_bytes_array();
         for i in bytes_array {
             *i = 0;
         }
-        debug!("new FrameTracker::new: ppn={:?}", ppn);
+        // debug!("new FrameTracker::new: ppn={:?}", ppn);
         Self { ppn }
     }
 }
@@ -67,12 +67,15 @@ impl FrameAllocator for StackFrameAllocator {
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
-        info!("alloc: current={:#x} end={:#x}", self.current, self.end);
+        //debug!("alloc a new page: current={:#x} end={:#x}", self.current, self.end);
         if let Some(ppn) = self.recycled.pop() {
+            debug!(" alloc a new page: recycled ppn={:#x}", ppn);
             Some(ppn.into())
         } else if self.current == self.end {
+            error!("FrameAllocator out of memory!");
             None
         } else {
+            debug!("alloc a new page: new ppn={:#x}", self.current);
             self.current += 1;
             Some((self.current - 1).into())
         }

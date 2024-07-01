@@ -157,7 +157,7 @@ pub fn trap_return() -> ! {
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
     use riscv::register::sepc;
-    trace!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
+    error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
     panic!("a trap {:?} from kernel!", scause::read().cause());
 }
 
