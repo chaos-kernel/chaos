@@ -259,8 +259,12 @@ bitflags! {
 lazy_static! {
     /// The root inode
     pub static ref ROOT_INODE: Arc<OSInode> = {
+        info!("kernel: lazy load root inode");
+        debug!("kernel: load BLOCK_DEVICE fs");
         let fs = Fat32FS::load(BLOCK_DEVICE.clone());
+        debug!("kernel: get root inode");
         let root_inode = Fat32FS::root_inode(&fs);
+        debug!("kernel: create OSInode");
         let inode: Arc<dyn Inode> = Arc::new(root_inode);
         Arc::new(OSInode {
             readable: true,

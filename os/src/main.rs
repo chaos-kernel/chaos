@@ -58,6 +58,7 @@ pub mod trap;
 pub mod utils;
 
 use config::KERNEL_SPACE_OFFSET;
+use riscv::register::satp;
 
 global_asm!(include_str!("entry.S"));
 
@@ -138,10 +139,11 @@ pub fn fake_main() {
 pub fn rust_main() -> ! {
     show_logo();
     clear_bss();
-    debug!("clear bss section done");
     println!("[kernel] Hello, world!");
     logging::init();
     debug!("logging init done");
+    let satp = satp::read();
+    debug!(" satp: {:#x}", satp.bits());
     mm::init();
     debug!("mm init done");
     mm::remap_test();
@@ -155,9 +157,13 @@ pub fn rust_main() -> ! {
     // for file in ROOT_INODE.ls() {
     //     println!("{}", file);
     // }
+    let satp = satp::read();
+    debug!(" satp: {:#x}", satp.bits());
     for file in ALL_TASKS.iter() {
         task::add_file(file);
+        info!("task {} added", file);
         task::run_tasks();
+        info!("task {} finished", file);
     }
     println!("All tasks finished successfully!");
     println!("ChaOS is shutting down...");

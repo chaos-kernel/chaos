@@ -57,6 +57,7 @@ pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OS
             inode.create(name, stat)
         }
     } else {
+        debug!("finding a existed file in fat32: {}", name);
         inode.find(name).map(|inode| {
             if flags.contains(OpenFlags::TRUNC) {
                 inode.clear();

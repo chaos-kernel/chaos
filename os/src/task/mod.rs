@@ -204,8 +204,11 @@ pub fn add_initproc() {
 
 /// Run all files in the root directory
 pub fn add_file(file: &str) {
+    debug!("kernel: open file Inode: {}", file);
     let inode = open_file(ROOT_INODE.as_ref(), &file, OpenFlags::RDONLY).unwrap();
+    debug!("kernel: read from Inode: {}", file);
     let v = inode.read_all();
+    debug!("kernel: create PCB: {}", file);
     let _pcb = ProcessControlBlock::new(v.as_slice());
 }
 
