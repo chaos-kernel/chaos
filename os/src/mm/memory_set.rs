@@ -360,10 +360,13 @@ impl MemorySet {
     /// Change page table by writing satp CSR Register.
     pub fn activate(&self) {
         let satp = self.page_table.token();
+        warn!("activate satp: {:#x}", satp);
         unsafe {
             satp::write(satp);
             asm!("sfence.vma");
         }
+        let satp = satp::read();
+        warn!("satp has been reset!! : {:#x}", satp.bits());
     }
     /// Translate a virtual page number to a page table entry
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
@@ -587,6 +590,11 @@ impl MapArea {
         page_table.unmap(vpn);
     }
     pub fn map(&mut self, page_table: &mut PageTable) {
+        debug!(
+            "map area: {:#x} - {:#x}",
+            self.vpn_range.get_start().0,
+            self.vpn_range.get_end().0
+        );
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);
         }
@@ -667,9 +675,14 @@ bitflags! {
 #[allow(unused)]
 pub fn remap_test() {
     let mut kernel_space = KERNEL_SPACE.exclusive_access();
-    let mid_text: VirtAddr = ((stext as usize + etext as usize) / 2).into();
-    let mid_rodata: VirtAddr = ((srodata as usize + erodata as usize) / 2).into();
-    let mid_data: VirtAddr = ((sdata as usize + edata as usize) / 2).into();
+    let mid_text: VirtAddr = (stext as usize + (etext as usize - stext as usize) / 2).into();
+    let mid_rodata: VirtAddr =
+        (srodata as usize + (erodata as usize - srodata as usize) / 2).into();
+    let mid_data: VirtAddr = (sdata as usize + (edata as usize - sdata as usize) / 2).into();
+    debug!(
+        "mid text {:#x}, mid rodata {:#x}, mid data {:#x}",
+        mid_text.0, mid_rodata.0, mid_data.0
+    );
     assert!(!kernel_space
         .page_table
         .translate(mid_text.floor())
@@ -685,5 +698,5 @@ pub fn remap_test() {
         .translate(mid_data.floor())
         .unwrap()
         .executable(),);
-    println!("remap_test passed!");
+    info!("remap_test passed!");
 }

@@ -32,8 +32,6 @@ boot_pagetable:
     .quad 0
     .quad 0
     .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
-    .quad (0xc0000 << 10) | 0xcf # VRWXAD 1G大页
-    .zero 8 * 254
+    .zero 8 * 255
     .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
-    .quad (0xc0000 << 10) | 0xcf # VRWXAD 1G大页
-    .zero 8 * 252
+    .zero 8 * 253

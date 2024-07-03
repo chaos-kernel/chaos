@@ -1,7 +1,7 @@
 //! PhysAddr, VirtAddr, PhysPageNum, VirtPageNum, raw address
 
 use super::PageTableEntry;
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS, PAGE_TABLE_LEVEL};
+use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, PAGE_SIZE_BITS, PAGE_TABLE_LEVEL};
 use core::fmt::{self, Debug, Formatter};
 
 const PA_WIDTH_SV39: usize = 56;
@@ -28,6 +28,11 @@ pub struct PhysPageNum(pub usize);
 #[repr(C)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtPageNum(pub usize);
+
+/// kernel address
+#[repr(C)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct KernelAddr(pub usize);
 
 /// Debugging
 
@@ -56,110 +61,70 @@ impl Debug for PhysPageNum {
 /// T -> usize: T.0
 /// usize -> T: usize.into()
 
+impl From<usize> for KernelAddr {
+    fn from(v: usize) -> Self {
+        Self(v)
+    }
+}
+impl From<PhysAddr> for KernelAddr {
+    fn from(pa: PhysAddr) -> Self {
+        Self(pa.0 + (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS))
+    }
+}
+
+impl From<KernelAddr> for PhysAddr {
+    fn from(ka: KernelAddr) -> Self {
+        Self(ka.0 - (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS))
+    }
+}
+
+impl From<KernelAddr> for VirtAddr {
+    fn from(ka: KernelAddr) -> Self {
+        Self(ka.0)
+    }
+}
+
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        // SV39标准，高位与地址有效位最高位必须一致
-        // PA_WIDTH_SV39 是物理地址宽度，通常为 39
-        const PA_WIDTH_SV39: usize = 39;
-
-        // 提取有效的物理地址部分
-        let masked_value = v & ((1 << PA_WIDTH_SV39) - 1);
-
-        // 获取最高有效位
-        let sign_bit = (v >> (PA_WIDTH_SV39 - 1)) & 1;
-
-        // 构造高位扩展部分
-        let high_bits = if sign_bit == 1 {
-            (1 << (64 - PA_WIDTH_SV39)) - 1
-        } else {
-            0
-        };
-
-        // 将高位扩展部分左移到正确的位置
-        let extended_value = high_bits << PA_WIDTH_SV39;
-
-        // 组合有效地址和扩展部分
-        Self(masked_value | extended_value)
+        // Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> PA_WIDTH_SV39) as isize;
+        assert!(tmp == 0 || tmp == -1);
+        Self(v)
     }
 }
 impl From<usize> for PhysPageNum {
     fn from(v: usize) -> Self {
-        // SV39标准，高位与地址有效位最高位必须一致
-        // PA_WIDTH_SV39 是物理地址宽度，通常为 39
-        const PPN_WIDTH_SV39: usize = 39;
-
-        // 提取有效的物理地址部分
-        let masked_value = v & ((1 << PPN_WIDTH_SV39) - 1);
-
-        // 获取最高有效位
-        let sign_bit = (v >> (PPN_WIDTH_SV39 - 1)) & 1;
-
-        // 构造高位扩展部分
-        let high_bits = if sign_bit == 1 {
-            (1 << (64 - PPN_WIDTH_SV39)) - 1
-        } else {
-            0
-        };
-
-        // 将高位扩展部分左移到正确的位置
-        let extended_value = high_bits << PPN_WIDTH_SV39;
-
-        // 组合有效地址和扩展部分
-        Self(masked_value | extended_value)
+        // Self(v & ((1 << PPN_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> PPN_WIDTH_SV39) as isize;
+        assert!(tmp == 0 || tmp == -1);
+        Self(v)
+    }
+}
+impl From<KernelAddr> for PhysPageNum {
+    fn from(ka: KernelAddr) -> Self {
+        let pa = PhysAddr::from(ka);
+        pa.floor()
     }
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        // SV39标准，高位与地址有效位最高位必须一致
-        // VA_WIDTH_SV39 是虚拟地址宽度，通常为 39
-        const VA_WIDTH_SV39: usize = 39;
-
-        // 提取有效的虚拟地址部分
-        let masked_value = v & ((1 << VA_WIDTH_SV39) - 1);
-
-        // 获取最高有效位
-        let sign_bit = (v >> (VA_WIDTH_SV39 - 1)) & 1;
-
-        // 构造高位扩展部分
-        let high_bits = if sign_bit == 1 {
-            (1 << (64 - VA_WIDTH_SV39)) - 1
-        } else {
-            0
-        };
-
-        // 将高位扩展部分左移到正确的位置
-        let extended_value = high_bits << VA_WIDTH_SV39;
-
-        // 组合有效地址和扩展部分
-        Self(masked_value | extended_value)
+        // Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> VA_WIDTH_SV39) as isize;
+        // 检查传入地址是否合法（SV39标准
+        assert!(tmp == 0 || tmp == -1, "invalid va: {:#x}", v);
+        Self(v)
     }
 }
 impl From<usize> for VirtPageNum {
     fn from(v: usize) -> Self {
-        // SV39标准，高位与地址有效位最高位必须一致
-        // PA_WIDTH_SV39 是物理地址宽度，通常为 39
-        const VPN_WIDTH_SV39: usize = 39;
-
-        // 提取有效的物理地址部分
-        let masked_value = v & ((1 << VPN_WIDTH_SV39) - 1);
-
-        // 获取最高有效位
-        let sign_bit = (v >> (VPN_WIDTH_SV39 - 1)) & 1;
-
-        // 构造高位扩展部分
-        let high_bits = if sign_bit == 1 {
-            (1 << (64 - VPN_WIDTH_SV39)) - 1
-        } else {
-            0
-        };
-
-        // 将高位扩展部分左移到正确的位置
-        let extended_value = high_bits << VPN_WIDTH_SV39;
-
-        // 组合有效地址和扩展部分
-        Self(masked_value | extended_value)
+        // Self(v & ((1 << VPN_WIDTH_SV39) - 1))
+        let tmp = v >> (VPN_WIDTH_SV39 - 1);
+        // 检查传入页号是否合法（SV39标准
+        assert!(tmp == 0 || tmp == (1 << (52 - VPN_WIDTH_SV39 + 1)) - 1);
+        Self(v)
     }
 }
+
 impl From<PhysAddr> for usize {
     fn from(v: PhysAddr) -> Self {
         v.0
@@ -274,13 +239,16 @@ impl PhysPageNum {
     /// Get the reference of page table(array of ptes)
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         let pa: PhysAddr = (*self).into();
-        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 512) }
+        // debug!("get_pte_array: pa={:?}", pa);
+        let kernel_pa = KernelAddr::from(pa).0;
+        unsafe { core::slice::from_raw_parts_mut(kernel_pa as *mut PageTableEntry, 512) }
     }
     /// Get the reference of page(array of bytes)
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
         let pa: PhysAddr = (*self).into();
         //debug!("get_bytes_array: pa={:?}", pa);
-        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut u8, 4096) }
+        let kernel_pa = KernelAddr::from(pa).0;
+        unsafe { core::slice::from_raw_parts_mut(kernel_pa as *mut u8, 4096) }
     }
     /// Get the mutable reference of physical address
     pub fn get_mut<T>(&self) -> &'static mut T {

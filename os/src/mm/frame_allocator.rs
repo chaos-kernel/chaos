@@ -1,8 +1,8 @@
 //! Physical page frame allocator
 
 use super::{PhysAddr, PhysPageNum};
-use crate::config::MEMORY_END;
 use crate::sync::UPSafeCell;
+use crate::{config::MEMORY_END, mm::address::KernelAddr};
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use lazy_static::*;
@@ -70,13 +70,13 @@ impl FrameAllocator for StackFrameAllocator {
     fn alloc(&mut self) -> Option<PhysPageNum> {
         //debug!("alloc a new page: current={:#x} end={:#x}", self.current, self.end);
         if let Some(ppn) = self.recycled.pop() {
-            debug!(" alloc a new page: recycled ppn={:#x}", ppn);
+            // debug!(" alloc a new page: recycled ppn={:#x}", ppn);
             Some(ppn.into())
         } else if self.current == self.end {
             error!("FrameAllocator out of memory!");
             None
         } else {
-            debug!("alloc a new page: new ppn={:#x}", self.current);
+            // debug!("alloc a new page: new ppn={:#x}", self.current);
             self.current += 1;
             Some((self.current - 1).into())
         }
@@ -88,7 +88,7 @@ impl FrameAllocator for StackFrameAllocator {
                 error!("FrameAllocator out of memory!");
                 return None;
             } else {
-                debug!("alloc a new page contiguous: new ppn={:#x}", self.current);
+                // debug!("alloc a new page contiguous: new ppn={:#x}", self.current);
                 self.current += 1;
                 ret.push((self.current - 1).into());
             }
@@ -130,8 +130,8 @@ pub fn init_frame_allocator() {
         PhysAddr::from(MEMORY_END)
     );
     FRAME_ALLOCATOR.exclusive_access().init(
-        PhysAddr::from(ekernel as usize).ceil(),
-        PhysAddr::from(MEMORY_END).floor(),
+        PhysAddr::from(KernelAddr::from(ekernel as usize)).ceil(),
+        PhysAddr::from(KernelAddr::from(MEMORY_END)).floor(),
     );
 }
 
