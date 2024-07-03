@@ -42,7 +42,7 @@ impl Drop for FrameTracker {
 trait FrameAllocator {
     fn new() -> Self;
     fn alloc(&mut self) -> Option<PhysPageNum>;
-    fn alloc_contiguous(&mut self, num: usize) -> Vec<PhysPageNum>;
+    fn alloc_contiguous(&mut self, num: usize) -> Option<Vec<PhysPageNum>>;
     fn dealloc(&mut self, ppn: PhysPageNum);
 }
 
@@ -81,19 +81,19 @@ impl FrameAllocator for StackFrameAllocator {
             Some((self.current - 1).into())
         }
     }
-    fn alloc_contiguous(&mut self, num: usize) -> Vec<PhysPageNum> {
+    fn alloc_contiguous(&mut self, num: usize) -> Option<Vec<PhysPageNum>> {
         let mut ret = Vec::with_capacity(num);
         for _ in 0..num {
             if self.current == self.end {
                 error!("FrameAllocator out of memory!");
-                None
+                return None;
             } else {
                 debug!("alloc a new page contiguous: new ppn={:#x}", self.current);
                 self.current += 1;
                 ret.push((self.current - 1).into());
             }
         }
-        ret
+        Some(ret)
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
@@ -145,11 +145,9 @@ pub fn frame_alloc() -> Option<FrameTracker> {
 
 /// Allocate n contiguous physical page frames in FrameTracker style
 pub fn frame_alloc_contiguous(num: usize) -> Option<Vec<FrameTracker>> {
-    FRAME_ALLOCATOR
-        .alloc_contig(num)
-        .iter()
-        .map(|p| FrameTracker::new(*p))
-        .collect()
+    let frames = FRAME_ALLOCATOR.exclusive_access().alloc_contiguous(num)?;
+    let frame_trackers: Vec<FrameTracker> = frames.iter().map(|&p| FrameTracker::new(p)).collect();
+    Some(frame_trackers)
 }
 
 /// Deallocate a physical page frame with a given ppn
