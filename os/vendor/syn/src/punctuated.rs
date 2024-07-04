@@ -20,26 +20,26 @@
 //!                 ~~~~^ ~~~~^ ~~~~
 //! ```
 
+use crate::drops::{NoDrop, TrivialDrop};
+#[cfg(feature = "parsing")]
+use crate::error::Result;
+#[cfg(feature = "parsing")]
+use crate::parse::{Parse, ParseStream};
+#[cfg(feature = "parsing")]
+use crate::token::Token;
 #[cfg(feature = "extra-traits")]
 use std::fmt::{self, Debug};
 #[cfg(feature = "extra-traits")]
 use std::hash::{Hash, Hasher};
 #[cfg(any(feature = "full", feature = "derive"))]
 use std::iter;
-use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
 use std::option;
 use std::slice;
 use std::vec;
 
-use crate::drops::{NoDrop, TrivialDrop};
-#[cfg(feature = "parsing")]
-use crate::parse::{Parse, ParseStream, Result};
-#[cfg(feature = "parsing")]
-use crate::token::Token;
-
-/// A punctuated sequence of syntax tree nodes of type `T` separated by
-/// punctuation of type `P`.
+/// **A punctuated sequence of syntax tree nodes of type `T` separated by
+/// punctuation of type `P`.**
 ///
 /// Refer to the [module documentation] for details about punctuated sequences.
 ///
@@ -51,17 +51,7 @@ pub struct Punctuated<T, P> {
 
 impl<T, P> Punctuated<T, P> {
     /// Creates an empty punctuated sequence.
-    #[cfg(not(syn_no_const_vec_new))]
     pub const fn new() -> Self {
-        Punctuated {
-            inner: Vec::new(),
-            last: None,
-        }
-    }
-
-    /// Creates an empty punctuated sequence.
-    #[cfg(syn_no_const_vec_new)]
-    pub fn new() -> Self {
         Punctuated {
             inner: Vec::new(),
             last: None,
@@ -151,7 +141,7 @@ impl<T, P> Punctuated<T, P> {
     }
 
     /// Appends a syntax tree node onto the end of this punctuated sequence. The
-    /// sequence must previously have a trailing punctuation.
+    /// sequence must already have a trailing punctuation, or be empty.
     ///
     /// Use [`push`] instead if the punctuated sequence may or may not already
     /// have trailing punctuation.
@@ -160,8 +150,8 @@ impl<T, P> Punctuated<T, P> {
     ///
     /// # Panics
     ///
-    /// Panics if the sequence does not already have a trailing punctuation when
-    /// this method is called.
+    /// Panics if the sequence is nonempty and does not already have a trailing
+    /// punctuation.
     pub fn push_value(&mut self, value: T) {
         assert!(
             self.empty_or_trailing(),
@@ -195,6 +185,18 @@ impl<T, P> Punctuated<T, P> {
             self.last.take().map(|t| Pair::End(*t))
         } else {
             self.inner.pop().map(|(t, p)| Pair::Punctuated(t, p))
+        }
+    }
+
+    /// Removes the trailing punctuation from this punctuated sequence, or
+    /// `None` if there isn't any.
+    pub fn pop_punct(&mut self) -> Option<P> {
+        if self.last.is_some() {
+            None
+        } else {
+            let (t, p) = self.inner.pop()?;
+            self.last = Some(Box::new(t));
+            Some(p)
         }
     }
 
@@ -260,11 +262,8 @@ impl<T, P> Punctuated<T, P> {
     ///
     /// Parsing continues until the end of this parse stream. The entire content
     /// of this parse stream must consist of `T` and `P`.
-    ///
-    /// *This function is available only if Syn is built with the `"parsing"`
-    /// feature.*
     #[cfg(feature = "parsing")]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     pub fn parse_terminated(input: ParseStream) -> Result<Self>
     where
         T: Parse,
@@ -281,11 +280,8 @@ impl<T, P> Punctuated<T, P> {
     /// to be parsed.
     ///
     /// [`parse_terminated`]: Punctuated::parse_terminated
-    ///
-    /// *This function is available only if Syn is built with the `"parsing"`
-    /// feature.*
     #[cfg(feature = "parsing")]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     pub fn parse_terminated_with(
         input: ParseStream,
         parser: fn(ParseStream) -> Result<T>,
@@ -318,11 +314,8 @@ impl<T, P> Punctuated<T, P> {
     /// the stream. This method returns upon parsing a `T` and observing that it
     /// is not followed by a `P`, even if there are remaining tokens in the
     /// stream.
-    ///
-    /// *This function is available only if Syn is built with the `"parsing"`
-    /// feature.*
     #[cfg(feature = "parsing")]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     pub fn parse_separated_nonempty(input: ParseStream) -> Result<Self>
     where
         T: Parse,
@@ -339,11 +332,8 @@ impl<T, P> Punctuated<T, P> {
     /// the entire content of this stream.
     ///
     /// [`parse_separated_nonempty`]: Punctuated::parse_separated_nonempty
-    ///
-    /// *This function is available only if Syn is built with the `"parsing"`
-    /// feature.*
     #[cfg(feature = "parsing")]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     pub fn parse_separated_nonempty_with(
         input: ParseStream,
         parser: fn(ParseStream) -> Result<T>,
@@ -368,7 +358,7 @@ impl<T, P> Punctuated<T, P> {
 }
 
 #[cfg(feature = "clone-impls")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "clone-impls")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "clone-impls")))]
 impl<T, P> Clone for Punctuated<T, P>
 where
     T: Clone,
@@ -380,10 +370,15 @@ where
             last: self.last.clone(),
         }
     }
+
+    fn clone_from(&mut self, other: &Self) {
+        self.inner.clone_from(&other.inner);
+        self.last.clone_from(&other.last);
+    }
 }
 
 #[cfg(feature = "extra-traits")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "extra-traits")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "extra-traits")))]
 impl<T, P> Eq for Punctuated<T, P>
 where
     T: Eq,
@@ -392,7 +387,7 @@ where
 }
 
 #[cfg(feature = "extra-traits")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "extra-traits")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "extra-traits")))]
 impl<T, P> PartialEq for Punctuated<T, P>
 where
     T: PartialEq,
@@ -405,7 +400,7 @@ where
 }
 
 #[cfg(feature = "extra-traits")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "extra-traits")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "extra-traits")))]
 impl<T, P> Hash for Punctuated<T, P>
 where
     T: Hash,
@@ -419,7 +414,7 @@ where
 }
 
 #[cfg(feature = "extra-traits")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "extra-traits")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "extra-traits")))]
 impl<T: Debug, P: Debug> Debug for Punctuated<T, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut list = f.debug_list();
@@ -459,29 +454,37 @@ where
 impl<T, P> FromIterator<Pair<T, P>> for Punctuated<T, P> {
     fn from_iter<I: IntoIterator<Item = Pair<T, P>>>(i: I) -> Self {
         let mut ret = Punctuated::new();
-        ret.extend(i);
+        do_extend(&mut ret, i.into_iter());
         ret
     }
 }
 
-impl<T, P> Extend<Pair<T, P>> for Punctuated<T, P> {
+impl<T, P> Extend<Pair<T, P>> for Punctuated<T, P>
+where
+    P: Default,
+{
     fn extend<I: IntoIterator<Item = Pair<T, P>>>(&mut self, i: I) {
-        assert!(
-            self.empty_or_trailing(),
-            "Punctuated::extend: Punctuated is not empty or does not have a trailing punctuation",
-        );
+        if !self.empty_or_trailing() {
+            self.push_punct(P::default());
+        }
+        do_extend(self, i.into_iter());
+    }
+}
 
-        let mut nomore = false;
-        for pair in i {
-            if nomore {
-                panic!("Punctuated extended with items after a Pair::End");
-            }
-            match pair {
-                Pair::Punctuated(a, b) => self.inner.push((a, b)),
-                Pair::End(a) => {
-                    self.last = Some(Box::new(a));
-                    nomore = true;
-                }
+fn do_extend<T, P, I>(punctuated: &mut Punctuated<T, P>, i: I)
+where
+    I: Iterator<Item = Pair<T, P>>,
+{
+    let mut nomore = false;
+    for pair in i {
+        if nomore {
+            panic!("punctuated extended with items after a Pair::End");
+        }
+        match pair {
+            Pair::Punctuated(a, b) => punctuated.inner.push((a, b)),
+            Pair::End(a) => {
+                punctuated.last = Some(Box::new(a));
+                nomore = true;
             }
         }
     }
@@ -719,16 +722,11 @@ where
 ///
 /// [module documentation]: self
 pub struct Iter<'a, T: 'a> {
-    // The `Item = &'a T` needs to be specified to support rustc 1.31 and older.
-    // On modern compilers we would be able to write just IterTrait<'a, T> where
-    // Item can be inferred unambiguously from the supertrait.
-    inner: Box<NoDrop<dyn IterTrait<'a, T, Item = &'a T> + 'a>>,
+    inner: Box<NoDrop<dyn IterTrait<'a, T> + 'a>>,
 }
 
-trait IterTrait<'a, T: 'a>:
-    DoubleEndedIterator<Item = &'a T> + ExactSizeIterator<Item = &'a T>
-{
-    fn clone_box(&self) -> Box<NoDrop<dyn IterTrait<'a, T, Item = &'a T> + 'a>>;
+trait IterTrait<'a, T: 'a>: Iterator<Item = &'a T> + DoubleEndedIterator + ExactSizeIterator {
+    fn clone_box(&self) -> Box<NoDrop<dyn IterTrait<'a, T> + 'a>>;
 }
 
 struct PrivateIter<'a, T: 'a, P: 'a> {
@@ -827,7 +825,7 @@ where
         + TrivialDrop
         + 'a,
 {
-    fn clone_box(&self) -> Box<NoDrop<dyn IterTrait<'a, T, Item = &'a T> + 'a>> {
+    fn clone_box(&self) -> Box<NoDrop<dyn IterTrait<'a, T> + 'a>> {
         Box::new(NoDrop::new(self.clone()))
     }
 }
@@ -1009,7 +1007,22 @@ impl<T, P> Pair<T, P> {
 }
 
 #[cfg(feature = "clone-impls")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "clone-impls")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "clone-impls")))]
+impl<T, P> Pair<&T, &P> {
+    pub fn cloned(self) -> Pair<T, P>
+    where
+        T: Clone,
+        P: Clone,
+    {
+        match self {
+            Pair::Punctuated(t, p) => Pair::Punctuated(t.clone(), p.clone()),
+            Pair::End(t) => Pair::End(t.clone()),
+        }
+    }
+}
+
+#[cfg(feature = "clone-impls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "clone-impls")))]
 impl<T, P> Clone for Pair<T, P>
 where
     T: Clone,
@@ -1021,6 +1034,15 @@ where
             Pair::End(t) => Pair::End(t.clone()),
         }
     }
+}
+
+#[cfg(feature = "clone-impls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "clone-impls")))]
+impl<T, P> Copy for Pair<T, P>
+where
+    T: Copy,
+    P: Copy,
+{
 }
 
 impl<T, P> Index<usize> for Punctuated<T, P> {
@@ -1051,13 +1073,36 @@ impl<T, P> IndexMut<usize> for Punctuated<T, P> {
     }
 }
 
+#[cfg(all(feature = "fold", any(feature = "full", feature = "derive")))]
+pub(crate) fn fold<T, P, V, F>(
+    punctuated: Punctuated<T, P>,
+    fold: &mut V,
+    mut f: F,
+) -> Punctuated<T, P>
+where
+    V: ?Sized,
+    F: FnMut(&mut V, T) -> T,
+{
+    Punctuated {
+        inner: punctuated
+            .inner
+            .into_iter()
+            .map(|(t, p)| (f(fold, t), p))
+            .collect(),
+        last: match punctuated.last {
+            Some(t) => Some(Box::new(f(fold, *t))),
+            None => None,
+        },
+    }
+}
+
 #[cfg(feature = "printing")]
 mod printing {
-    use super::*;
+    use crate::punctuated::{Pair, Punctuated};
     use proc_macro2::TokenStream;
     use quote::{ToTokens, TokenStreamExt};
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl<T, P> ToTokens for Punctuated<T, P>
     where
         T: ToTokens,
@@ -1068,7 +1113,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl<T, P> ToTokens for Pair<T, P>
     where
         T: ToTokens,
