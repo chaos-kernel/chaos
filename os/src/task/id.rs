@@ -1,7 +1,9 @@
 //! Allocator for pid, task user resource, kernel stack using a simple recycle strategy.
 
 use super::ProcessControlBlock;
-use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::config::{
+    KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE,
+};
 use crate::mm::{MapPermission, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use alloc::{
@@ -74,7 +76,7 @@ impl Drop for PidHandle {
 
 /// Return (bottom, top) of a kernel stack in kernel space.
 pub fn kernel_stack_position(kstack_id: usize) -> (usize, usize) {
-    let top = TRAMPOLINE - kstack_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    let top = MEMORY_END + kstack_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
     let bottom = top - KERNEL_STACK_SIZE;
     (bottom, top)
 }
