@@ -1,5 +1,10 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
-use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use crate::config::KERNEL_SPACE_OFFSET;
+
+use super::{
+    frame_alloc, kernel_token, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr,
+    VirtPageNum, KERNEL_SPACE,
+};
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -87,6 +92,25 @@ impl PageTable {
         Self {
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
             frames: Vec::new(),
+        }
+    }
+    /// create a new page table for a new process, keep the kernel part of the page table the same
+    pub fn new_process() -> Self {
+        let frame = frame_alloc().unwrap();
+        let kernel_root_vpn: VirtPageNum = KERNEL_SPACE_OFFSET.into();
+
+        //to keep kernel part the same, we only first level of page table
+        frame.ppn.get_pte_array()[kernel_root_vpn.indexes()[0]..].copy_from_slice(
+            &KERNEL_SPACE
+                .exclusive_access()
+                .page_table
+                .root_ppn
+                .get_pte_array()[kernel_root_vpn.indexes()[0]..],
+        );
+
+        PageTable {
+            root_ppn: frame.ppn,
+            frames: vec![frame],
         }
     }
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {

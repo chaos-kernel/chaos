@@ -74,6 +74,19 @@ impl MemorySet {
             mmap_end: MMAP_BASE.into(),
         }
     }
+    /// Create a new `MemorySet` with the same page table as the kernel.
+    pub fn new_process() -> Self {
+        let page_table = PageTable::new_process();
+        debug!("new process page table token: {:#x}", page_table.token());
+        Self {
+            page_table,
+            areas: Vec::new(),
+            heap_area: BTreeMap::new(),
+            mmap_area: BTreeMap::new(),
+            mmap_base: MMAP_BASE.into(),
+            mmap_end: MMAP_BASE.into(),
+        }
+    }
     /// Get he page table token
     pub fn token(&self) -> usize {
         self.page_table.token()
@@ -260,7 +273,7 @@ impl MemorySet {
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp_base and entry point.
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
-        let mut memory_set = Self::new_bare();
+        let mut memory_set = Self::new_process();
         // map trampoline
         // memory_set.map_trampoline();
         // map program headers of elf, with U flag
@@ -298,6 +311,7 @@ impl MemorySet {
         let max_end_va: VirtAddr = max_end_vpn.into();
         let mut user_heap_base: usize = max_end_va.into();
         user_heap_base += PAGE_SIZE;
+        debug!("elf read completed!");
         (
             memory_set,
             user_heap_base,
