@@ -1,16 +1,16 @@
 //! Allocator for pid, task user resource, kernel stack using a simple recycle strategy.
 
 use super::ProcessControlBlock;
-use crate::config::{
-    KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE,
-};
-use crate::mm::{MapPermission, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::config::{KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::mm::PTEFlags;
+use crate::mm::{MapPermission, PageTable, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
 use lazy_static::*;
+use riscv::register::satp;
 
 /// Allocator with a simple recycle strategy
 pub struct RecycleAllocator {
@@ -76,7 +76,7 @@ impl Drop for PidHandle {
 
 /// Return (bottom, top) of a kernel stack in kernel space.
 pub fn kernel_stack_position(kstack_id: usize) -> (usize, usize) {
-    let top = MEMORY_END + kstack_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    let top = MEMORY_END + (kstack_id + 1) * (KERNEL_STACK_SIZE + PAGE_SIZE);
     let bottom = top - KERNEL_STACK_SIZE;
     (bottom, top)
 }
@@ -148,6 +148,7 @@ fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
 
 #[allow(unused)]
 fn ustack_top_from_id(ustack_top: usize, id: usize) -> usize {
+    //todo 暂时弃用，意义不明
     ustack_top - id * (PAGE_SIZE + USER_STACK_SIZE)
 }
 
@@ -170,8 +171,12 @@ impl TaskUserRes {
         let process = self.process.upgrade().unwrap();
         let mut process_inner = process.inner_exclusive_access();
         // alloc user stack
-        let ustack_top = ustack_top_from_id(self.ustack_top, self.tid);
+        let ustack_top = self.ustack_top;
         let ustack_bottom = ustack_top - USER_STACK_SIZE;
+        debug!(
+            "alloc_user_res: ustack_bottom={:#x} ustack_top={:#x}",
+            ustack_bottom, ustack_top
+        );
         process_inner.memory_set.insert_framed_area(
             ustack_bottom.into(),
             ustack_top.into(),
@@ -180,11 +185,40 @@ impl TaskUserRes {
         // alloc trap_cx
         let trap_cx_bottom = trap_cx_bottom_from_tid(self.tid);
         let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
+        debug!(
+            "alloc_user_res: trap_cx_bottom={:#x} trap_cx_top={:#x}",
+            trap_cx_bottom, trap_cx_top
+        );
         process_inner.memory_set.insert_framed_area(
             trap_cx_bottom.into(),
             trap_cx_top.into(),
             MapPermission::R | MapPermission::W,
         );
+        let trap_cx_bottom_va: VirtAddr = trap_cx_bottom.into();
+        let trap_cx_bottom_ppn = process_inner
+            .memory_set
+            .translate(trap_cx_bottom_va.into())
+            .unwrap()
+            .ppn();
+        let current_pagetable = &mut KERNEL_SPACE.exclusive_access().page_table;
+        debug!(
+            "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
+            trap_cx_bottom_va.0, trap_cx_bottom_ppn.0, current_pagetable.token()
+        );
+        current_pagetable.map(
+            trap_cx_bottom_va.floor(),
+            trap_cx_bottom_ppn,
+            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        );
+        // debug!(
+        //     "trap_cx_bottom ppn = {:x}",
+        //     process_inner
+        //         .memory_set
+        //         .translate(crate::mm::VirtPageNum::from(VirtAddr::from(trap_cx_bottom)))
+        //         .unwrap()
+        //         .ppn()
+        //         .0
+        // );
     }
     /// Deallocate user resource for a task
     fn dealloc_user_res(&self) {
@@ -221,14 +255,24 @@ impl TaskUserRes {
         process_inner.dealloc_tid(self.tid);
     }
     /// The bottom usr vaddr (low addr) of the trap context for a task with tid
-    pub fn trap_cx_user_va(&self) -> usize {
-        trap_cx_bottom_from_tid(self.tid)
+    pub fn trap_cx_user_va(&self) -> VirtAddr {
+        trap_cx_bottom_from_tid(self.tid).into()
     }
     /// The physical page number(ppn) of the trap context for a task with tid
     pub fn trap_cx_ppn(&self) -> PhysPageNum {
+        //todo: 意义不明，暂时准备弃用
         let process = self.process.upgrade().unwrap();
         let process_inner = process.inner_exclusive_access();
         let trap_cx_bottom_va: VirtAddr = trap_cx_bottom_from_tid(self.tid).into();
+        debug!(
+            "trap_cx_ppn = {:#x}",
+            process_inner
+                .memory_set
+                .translate(trap_cx_bottom_va.into())
+                .unwrap()
+                .ppn()
+                .0
+        );
         process_inner
             .memory_set
             .translate(trap_cx_bottom_va.into())

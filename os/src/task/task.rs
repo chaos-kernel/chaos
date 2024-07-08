@@ -4,6 +4,7 @@ use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
 use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
 use crate::fs::inode::OSInode;
+use crate::mm::VirtPageNum;
 use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
@@ -60,7 +61,7 @@ pub struct TaskControlBlockInner {
 
 impl TaskControlBlockInner {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
-        self.trap_cx_ppn.get_mut()
+        self.res.as_ref().unwrap().trap_cx_user_va().get_mut()
     }
 
     #[allow(unused)]
@@ -77,6 +78,7 @@ impl TaskControlBlock {
     /// Create a new task
     pub fn new(process: Arc<ProcessControlBlock>, ustack_top: usize, alloc_user_res: bool) -> Self {
         let res = TaskUserRes::new(Arc::clone(&process), ustack_top, alloc_user_res);
+        debug!("TaskUserRes allocated");
         let trap_cx_ppn = res.trap_cx_ppn();
         let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();

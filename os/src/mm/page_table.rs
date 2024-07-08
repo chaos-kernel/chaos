@@ -114,6 +114,7 @@ impl PageTable {
         }
     }
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        //debug!("find_pte_create: vpn = {:?}", vpn);
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -124,8 +125,13 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
+                debug!("create a new pte of vpn: {:#x}", vpn.0);
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                // debug!(
+                //     "find_pte_create: invalid pte at level {}, pte = {:#b}, index = {:#x}",
+                //     i, pte.bits, idx
+                // );
                 self.frames.push(frame);
             }
             ppn = pte.ppn();
@@ -133,6 +139,7 @@ impl PageTable {
         result
     }
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        //debug!("find_pte: vpn = {:?}", vpn);
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -143,6 +150,10 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
+                // debug!(
+                //     "find_pte: invalid pte at level {}, pte = {:#b}, index = {:#x}",
+                //     i, pte.bits, idx
+                // );
                 return None;
             }
             ppn = pte.ppn();

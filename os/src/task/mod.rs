@@ -210,6 +210,7 @@ pub fn add_file(file: &str) {
     let v = inode.read_all();
     debug!("kernel: create PCB: {}", file);
     let _pcb = ProcessControlBlock::new(v.as_slice());
+    debug!("PCB created: {}", file);
 }
 
 /// Check if the current task has any signal to handle

@@ -312,18 +312,22 @@ impl ProcessControlBlock {
                 })
             },
         });
+        info!("create new TaskControlBlock, ustack_top ={:#x}", ustack_top);
         // create a main thread, we should allocate ustack and trap_cx here
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
             ustack_top,
             true,
         ));
+        info!("TaskControlBlock create completed");
         // prepare trap_cx of main thread
         let task_inner = task.inner_exclusive_access();
         let trap_cx = task_inner.get_trap_cx();
         let ustack_top = task_inner.res.as_ref().unwrap().ustack_top();
         let kstack_top = task.kstack.get_top();
         drop(task_inner);
+        debug!("TrapContext::app_init_context");
+        // debug!("*trap_cx = {:?}", *trap_cx);
         *trap_cx = TrapContext::app_init_context(
             entry_point,
             ustack_top - 4,
@@ -331,6 +335,7 @@ impl ProcessControlBlock {
             kstack_top,
             trap_handler as usize,
         );
+        debug!("TrapContext completed");
         // add main thread to the process
         let mut process_inner = process.inner_exclusive_access();
         process_inner.tasks.push(Some(Arc::clone(&task)));
@@ -340,6 +345,7 @@ impl ProcessControlBlock {
         process_inner.need.push(res.clone());
         process_inner.finish.push(false);
         drop(process_inner);
+        debug!("insert_into_pid2process");
         insert_into_pid2process(process.getpid(), Arc::clone(&process));
         // add main thread to scheduler
         add_task(task);

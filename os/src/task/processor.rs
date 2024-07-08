@@ -7,6 +7,7 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{ProcessControlBlock, TaskContext, TaskControlBlock};
+use crate::mm::VirtAddr;
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
@@ -117,7 +118,7 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 }
 
 /// get the user virtual address of trap context
-pub fn current_trap_cx_user_va() -> usize {
+pub fn current_trap_cx_user_va() -> VirtAddr {
     current_task()
         .unwrap()
         .inner_exclusive_access()

@@ -120,7 +120,11 @@ impl From<usize> for VirtPageNum {
         // Self(v & ((1 << VPN_WIDTH_SV39) - 1))
         let tmp = v >> (VPN_WIDTH_SV39 - 1);
         // 检查传入页号是否合法（SV39标准
-        assert!(tmp == 0 || tmp == (1 << (52 - VPN_WIDTH_SV39 + 1)) - 1);
+        assert!(
+            tmp == 0 || tmp == (1 << (52 - VPN_WIDTH_SV39 + 1)) - 1,
+            "Assertion failed: tmp = {:#x}",
+            tmp
+        );
         Self(v)
     }
 }
@@ -211,6 +215,12 @@ impl From<PhysPageNum> for PhysAddr {
         Self(v.0 << PAGE_SIZE_BITS)
     }
 }
+impl VirtAddr {
+    /// Get the mutable reference of virtual address
+    pub fn get_mut<T>(&self) -> &'static mut T {
+        unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    }
+}
 
 impl VirtPageNum {
     /// Get the indexes of the page table entry
@@ -222,6 +232,11 @@ impl VirtPageNum {
             vpn >>= 9;
         }
         idx
+    }
+    /// Get the mutable reference of virtual address
+    pub fn get_mut<T>(&self) -> &'static mut T {
+        let va: VirtAddr = (*self).into();
+        va.get_mut()
     }
 }
 
