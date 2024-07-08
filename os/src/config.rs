@@ -16,10 +16,14 @@ pub const PAGE_SIZE: usize = 0x1000;
 pub const PAGE_SIZE_BITS: usize = 0xc;
 /// the max number of syscall
 pub const MAX_SYSCALL_NUM: usize = 500;
-/// the virtual addr of trapoline
-pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
+// /// the virtual addr of trapoline
+// pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
+/// user space end
+pub const USER_SPACE_END: usize = 0x0000_003F_FFFF_FFFF;
+/// kernel space end
+pub const KERNEL_SPACE_END: usize = 0xFFFF_FFFF_FFFF_FFFF;
 /// the virtual addr of trap context
-pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
+pub const TRAP_CONTEXT_BASE: usize = KERNEL_SPACE_END - PAGE_SIZE * 2 + 1;
 /// qemu board info
 pub use crate::board::{CLOCK_FREQ, MMIO};
 /// Big stride (lcm of 2..20)

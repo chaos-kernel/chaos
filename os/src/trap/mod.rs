@@ -14,7 +14,6 @@
 
 mod context;
 
-use crate::config::TRAMPOLINE;
 use crate::syscall::syscall;
 use crate::task::{
     check_signals_of_current, current_add_signal, current_process, current_trap_cx,
@@ -46,8 +45,11 @@ fn set_kernel_trap_entry() {
 }
 /// set trap entry for traps happen in user mode
 fn set_user_trap_entry() {
+    extern "C" {
+        fn __alltraps();
+    }
     unsafe {
-        stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
+        stvec::write(__alltraps as usize, TrapMode::Direct);
     }
 }
 
@@ -133,13 +135,13 @@ pub fn trap_return() -> ! {
         .inner_exclusive_access()
         .user_clock_time_start();
 
-    let trap_cx_user_va = current_trap_cx_user_va();
+    let trap_cx_user_va: usize = current_trap_cx_user_va().into();
     let user_satp = current_user_token();
     extern "C" {
         fn __alltraps();
         fn __restore();
     }
-    let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    let restore_va = __restore as usize;
     // trace!("[kernel] trap_return: ..before return");
     unsafe {
         asm!(

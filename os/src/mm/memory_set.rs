@@ -4,9 +4,7 @@ use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{
-    KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE,
-};
+use crate::config::{KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, USER_STACK_SIZE};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::SUCCESS;
 use crate::task::process::Flags;
@@ -309,13 +307,16 @@ impl MemorySet {
         }
         // map user stack with U flags
         let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_heap_base: usize = max_end_va.into();
-        user_heap_base += PAGE_SIZE;
+        let mut user_stack_bottom: usize = max_end_va.into();
+        user_stack_bottom += PAGE_SIZE;
+        let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
+        debug!("user_stack_bottom: {:#x}", user_stack_bottom);
+        let user_heap_base: usize = user_stack_top + PAGE_SIZE;
         debug!("elf read completed!");
         (
             memory_set,
             user_heap_base,
-            STACK_TOP,
+            user_stack_top,
             elf.header.pt2.entry_point() as usize,
         )
     }
@@ -582,6 +583,7 @@ impl MapArea {
         }
     }
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> PhysPageNum {
+        // debug!("map_one vpn: {:#x}", vpn.0);
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
@@ -605,9 +607,11 @@ impl MapArea {
     }
     pub fn map(&mut self, page_table: &mut PageTable) {
         debug!(
-            "map area: {:#x} - {:#x}",
+            "map area, vpn: {:#x} - {:#x}, perm: {:?}, page_table: {:#x}",
             self.vpn_range.get_start().0,
-            self.vpn_range.get_end().0
+            self.vpn_range.get_end().0,
+            self.map_perm,
+            page_table.token()
         );
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);
