@@ -9,6 +9,17 @@ use crate::timer::{get_time, NSEC_PER_SEC};
 use alloc::sync::Arc;
 /// sleep syscall
 pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_sleep",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        current_task()
+            .unwrap()
+            .inner_exclusive_access()
+            .res
+            .as_ref()
+            .unwrap()
+            .tid
+    );
     #[inline]
     fn is_end(end_time: usize) -> bool {
         let current_time = get_time();

@@ -112,6 +112,10 @@ pub fn sys_exit(exit_code: i32) -> ! {
 }
 /// yield syscall
 pub fn sys_yield() -> isize {
+    trace!(
+        "kernel:pid[{}] sys_yield",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
     suspend_current_and_run_next();
     0
 }
@@ -123,7 +127,7 @@ pub fn sys_getpid() -> isize {
     );
     //todo 仅用于初赛, 后面把加一去掉，主要因为目前还没有初始进程
 
-    (current_task().unwrap().process.upgrade().unwrap().getpid() + 1) as isize
+    (current_task().unwrap().process.upgrade().unwrap().getpid()) as isize
 }
 /// getppid syscall
 pub fn sys_getppid() -> isize {
