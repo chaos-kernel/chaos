@@ -15,7 +15,7 @@ fmt:
 	@cd os; cargo fmt;
 
 all: fmt
-	@cd user && make elf
+	@cd user && make build
 	@cd os && make build
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu

@@ -32,7 +32,6 @@ const ALL_TASKS: [&str; 32] = [
     "fstat",
     "mmap",
     "munmap",
-
     "pipe",
     "mount",
     "umount",
@@ -42,28 +41,26 @@ const ALL_TASKS: [&str; 32] = [
 
 #[no_mangle]
 fn main() -> i32 {
-    // 定义要执行的应用程序列表
-    let apps = [
-        "app1\0",
-        "app2\0",
-        "app3\0",
-    ];
+
+    let mut app_num = 0;
 
     for app in ALL_TASKS {
         if fork() == 0 {
+            app_num += 1;
             // 在子进程中执行应用程序
             exec(app, &[core::ptr::null::<u8>()]);
         }
     }
 
     // 父进程等待所有子进程结束
-    loop {
+    while app_num > 0 {
         let mut exit_code: i32 = 0;
         let pid = wait(&mut exit_code);
         if pid == -1 {
             yield_();
             continue;
         }
+        app_num -= 1;
         /*
         println!(
             "[initproc] Released a zombie process, pid={}, exit_code={}",

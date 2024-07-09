@@ -56,6 +56,7 @@ pub mod timer;
 pub mod trap;
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_initproc.S"));
 
 fn clear_bss() {
     extern "C" {
@@ -133,11 +134,15 @@ pub fn rust_main() -> ! {
     // for file in ROOT_INODE.ls() {
     //     println!("{}", file);
     // }
-    for file in ALL_TASKS.iter() {
-        task::add_file(file);
-        task::run_tasks();
-    }
-    println!("All tasks finished successfully!");
-    println!("ChaOS is shutting down...");
+    // for file in ALL_TASKS.iter() {
+    //     task::add_file(file);
+    //     task::run_tasks();
+    // }
+    info!("adding initproc");
+    task::add_initproc();
+    info!("running tasks");
+    task::run_tasks();
+    println!("[kernel] All tasks finished successfully!");
+    println!("[kernel] ChaOS is shutting down...");
     crate::board::QEMU_EXIT_HANDLE.exit_success();
 }

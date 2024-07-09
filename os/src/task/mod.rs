@@ -191,9 +191,16 @@ lazy_static! {
     /// the name "initproc" may be changed to any other app name like "usertests",
     /// but we have user_shell, so we don't need to change it.
     pub static ref INITPROC: Arc<ProcessControlBlock> = {
-        let inode = open_file(ROOT_INODE.as_ref(), "", OpenFlags::RDONLY).unwrap();
-        let v = inode.read_all();
-        ProcessControlBlock::new(v.as_slice())
+        unsafe {
+            extern "C" {
+                fn initproc_start();
+                fn initproc_end();
+            }
+            let start = initproc_start as usize as *const usize as *const u8;
+            let len = initproc_end as usize - initproc_start as usize;
+            let data = core::slice::from_raw_parts(start, len);
+            ProcessControlBlock::new(data)
+        }
     };
 }
 
