@@ -13,6 +13,7 @@ use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
+use riscv::register::satp;
 
 /// Processor management structure
 pub struct Processor {
@@ -85,6 +86,7 @@ pub fn run_tasks() {
         } else {
             return;
         }
+        warn!("satp: {:x}", satp::read().bits());
     }
 }
 

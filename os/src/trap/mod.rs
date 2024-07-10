@@ -14,11 +14,12 @@
 
 mod context;
 
+use crate::config::TRAP_CONTEXT_BASE;
 use crate::syscall::syscall;
 use crate::task::{
     check_signals_of_current, current_add_signal, current_process, current_trap_cx,
     current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
-    suspend_current_and_run_next, SignalFlags,
+    suspend_current_and_run_next, SignalFlags, INITPROC,
 };
 use crate::timer::{check_timer, set_next_trigger};
 use core::arch::{asm, global_asm};
@@ -29,6 +30,7 @@ use riscv::register::{
 };
 
 global_asm!(include_str!("trap.S"));
+global_asm!(include_str!("init_entry.S"));
 
 /// Initialize trap handling
 pub fn init() {
@@ -137,6 +139,10 @@ pub fn trap_return() -> ! {
 
     let trap_cx_user_va: usize = current_trap_cx_user_va().into();
     let user_satp = current_user_token();
+    debug!(
+        "[kernel] trap_return: ..before return, trap_cx_user_va = {:#x}, user_satp = {:#x}",
+        trap_cx_user_va, user_satp
+    );
     extern "C" {
         fn __alltraps();
         fn __restore();
@@ -161,6 +167,31 @@ pub fn trap_from_kernel() -> ! {
     use riscv::register::sepc;
     error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
     panic!("a trap {:?} from kernel!", scause::read().cause());
+}
+
+#[no_mangle]
+pub fn initproc_entry() -> ! {
+    set_user_trap_entry();
+    let trap_cx_user_va: usize = TRAP_CONTEXT_BASE;
+    let user_satp = INITPROC.inner_exclusive_access().memory_set.token();
+    debug!(
+        "[kernel] initproc_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
+        trap_cx_user_va, user_satp
+    );
+    extern "C" {
+        fn __init_entry();
+    }
+    let restore_va = __init_entry as usize;
+    unsafe {
+        asm!(
+            "fence.i",
+            "jr {restore_va}",         // jump to new addr of __restore asm function
+            restore_va = in(reg) restore_va,
+            in("a0") trap_cx_user_va,      // a0 = virt addr of Trap Context
+            in("a1") user_satp,        // a1 = phy addr of initproc page table
+            options(noreturn)
+        );
+    }
 }
 
 pub use context::TrapContext;

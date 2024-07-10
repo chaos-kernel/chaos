@@ -106,6 +106,41 @@ impl TaskControlBlock {
             },
         }
     }
+    /// Create a new init_task
+    pub fn init_proc(
+        process: Arc<ProcessControlBlock>,
+        ustack_top: usize,
+        alloc_user_res: bool,
+    ) -> Self {
+        let res = TaskUserRes::new(Arc::clone(&process), ustack_top, alloc_user_res);
+        debug!("TaskUserRes allocated");
+        let trap_cx_ppn = res.trap_cx_ppn();
+        let kstack = kstack_alloc();
+        let kstack_top = kstack.get_top();
+        let process_inner = process.inner_exclusive_access();
+        let work_dir = Arc::clone(&process_inner.work_dir);
+        drop(process_inner);
+        Self {
+            process: Arc::downgrade(&process),
+            kstack,
+            inner: unsafe {
+                UPSafeCell::new(TaskControlBlockInner {
+                    res: Some(res),
+                    trap_cx_ppn,
+                    task_cx: TaskContext::goto_initproc_entry(kstack_top),
+                    task_status: TaskStatus::Ready,
+                    exit_code: None,
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    first_time: None,
+                    priority: 16,
+                    stride: 0,
+                    pass: BIG_STRIDE / 16,
+                    work_dir,
+                    clear_child_tid: 0,
+                })
+            },
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq)]

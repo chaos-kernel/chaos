@@ -29,4 +29,12 @@ impl TaskContext {
             s: [0; 12],
         }
     }
+
+    pub fn goto_initproc_entry(kstack_ptr: usize) -> Self {
+        Self {
+            ra: crate::trap::initproc_entry as usize,
+            sp: kstack_ptr,
+            s: [0; 12],
+        }
+    }
 }

@@ -352,6 +352,93 @@ impl ProcessControlBlock {
         process
     }
 
+    pub fn initproc(elf_data: &[u8]) -> Arc<Self> {
+        trace!("kernel: ProcessControlBlock::new_initproc");
+        // memory_set with elf program headers/trampoline/trap context/user stack
+        let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
+        // allocate a pid
+        let pid_handle = pid_alloc();
+        let process = Arc::new(Self {
+            pid: pid_handle,
+            inner: unsafe {
+                UPSafeCell::new(ProcessControlBlockInner {
+                    is_zombie: false,
+                    memory_set,
+                    parent: None,
+                    children: Vec::new(),
+                    exit_code: 0,
+                    fd_table: vec![
+                        // 0 -> stdin
+                        Some(Arc::new(Stdin)),
+                        // 1 -> stdout
+                        Some(Arc::new(Stdout)),
+                        // 2 -> stderr
+                        Some(Arc::new(Stdout)),
+                    ],
+                    signals: SignalFlags::empty(),
+                    tasks: Vec::new(),
+                    task_res_allocator: RecycleAllocator::new(),
+                    // mutex_list: Vec::new(),
+                    // semaphore_list: Vec::new(),
+                    // condvar_list: Vec::new(),
+                    deadlock_detect: false,
+                    available: Vec::new(),
+                    allocation: Vec::new(),
+                    need: Vec::new(),
+                    finish: Vec::new(),
+                    clock_stop_watch: 0,
+                    user_clock: 0,
+                    kernel_clock: 0,
+                    heap_base: user_heap_base.into(),
+                    heap_end: user_heap_base.into(),
+                    work_dir: ROOT_INODE.clone(),
+                })
+            },
+        });
+        info!(
+            "create init TaskControlBlock, ustack_top ={:#x}",
+            ustack_top
+        );
+        // create a main thread, we should allocate ustack and trap_cx here
+        let task = Arc::new(TaskControlBlock::init_proc(
+            Arc::clone(&process),
+            ustack_top,
+            true,
+        ));
+        info!("init TaskControlBlock create completed");
+        // prepare trap_cx of main thread
+        let task_inner = task.inner_exclusive_access();
+        let trap_cx = task_inner.get_trap_cx();
+        let ustack_top = task_inner.res.as_ref().unwrap().ustack_top();
+        let kstack_top = task.kstack.get_top();
+        drop(task_inner);
+        debug!("TrapContext::app_init_context");
+        // debug!("*trap_cx = {:?}", *trap_cx);
+        *trap_cx = TrapContext::app_init_context(
+            entry_point,
+            ustack_top,
+            KERNEL_SPACE.exclusive_access().token(),
+            kstack_top,
+            trap_handler as usize,
+        );
+        // add main thread to the process
+        let mut process_inner = process.inner_exclusive_access();
+        process_inner.tasks.push(Some(Arc::clone(&task)));
+        let mut res = process_inner.available.clone();
+        res.fill(0);
+        process_inner.allocation.push(res.clone());
+        process_inner.need.push(res.clone());
+        process_inner.finish.push(false);
+        drop(process_inner);
+        debug!("insert_into_pid2process");
+        insert_into_pid2process(process.getpid(), Arc::clone(&process));
+
+        // add initproc
+        add_task(task);
+
+        process
+    }
+
     /// Only support processes with a single thread.
     pub fn exec(self: &Arc<Self>, elf_data: &[u8], args: Vec<String>) {
         trace!("kernel: exec");

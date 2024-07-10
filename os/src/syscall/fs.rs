@@ -73,6 +73,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     );
     let process = current_process();
     let token = current_user_token();
+    debug!("kernel: sys_open path: {:?}", path);
     let path = translated_str(token, path);
     if let Some(inode) = open_file(
         ROOT_INODE.as_ref(),

@@ -200,7 +200,7 @@ lazy_static! {
             let start = initproc_start as usize as *const usize as *const u8;
             let len = initproc_end as usize - initproc_start as usize;
             let data = core::slice::from_raw_parts(start, len);
-            ProcessControlBlock::new(data)
+            ProcessControlBlock::initproc(data)
         }
     };
 }
