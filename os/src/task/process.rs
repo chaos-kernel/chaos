@@ -330,7 +330,7 @@ impl ProcessControlBlock {
         // debug!("*trap_cx = {:?}", *trap_cx);
         *trap_cx = TrapContext::app_init_context(
             entry_point,
-            ustack_top - 4,
+            ustack_top,
             KERNEL_SPACE.exclusive_access().token(),
             kstack_top,
             trap_handler as usize,

@@ -22,6 +22,7 @@ mod task;
 use self::id::TaskUserRes;
 use self::manager::add_block_task;
 use crate::{
+    board::QEMUExit,
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
     timer::remove_timer,
 };
@@ -116,19 +117,19 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // the process should terminate at once
     if tid == 0 {
         let pid = process.getpid();
-        // if pid == IDLE_PID {
-        //     println!(
-        //         "[kernel] Idle process exit with exit_code {} ...",
-        //         exit_code
-        //     );
-        //     if exit_code != 0 {
-        //         //crate::sbi::shutdown(255); //255 == -1 for err hint
-        //         crate::board::QEMU_EXIT_HANDLE.exit_failure();
-        //     } else {
-        //         //crate::sbi::shutdown(0); //0 for success hint
-        //         crate::board::QEMU_EXIT_HANDLE.exit_success();
-        //     }
-        // }
+        if pid == IDLE_PID {
+            println!(
+                "[kernel] Idle process exit with exit_code {} ...",
+                exit_code
+            );
+            if exit_code != 0 {
+                //crate::sbi::shutdown(255); //255 == -1 for err hint
+                crate::board::QEMU_EXIT_HANDLE.exit_failure();
+            } else {
+                //crate::sbi::shutdown(0); //0 for success hint
+                crate::board::QEMU_EXIT_HANDLE.exit_success();
+            }
+        }
         remove_from_pid2process(pid);
         let mut process_inner = process.inner_exclusive_access();
         // mark this process as a zombie process
@@ -136,14 +137,14 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         // record exit code of main process
         process_inner.exit_code = exit_code;
 
-        // {
-        //     // move all child processes under init process
-        //     let mut initproc_inner = INITPROC.inner_exclusive_access();
-        //     for child in process_inner.children.iter() {
-        //         child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
-        //         initproc_inner.children.push(child.clone());
-        //     }
-        // }
+        {
+            // move all child processes under init process
+            let mut initproc_inner = INITPROC.inner_exclusive_access();
+            for child in process_inner.children.iter() {
+                child.inner_exclusive_access().parent = Some(Arc::downgrade(&INITPROC));
+                initproc_inner.children.push(child.clone());
+            }
+        }
 
         // deallocate user res (including tid/trap_cx/ustack) of all threads
         // it has to be done before we dealloc the whole memory_set
@@ -191,14 +192,22 @@ lazy_static! {
     /// the name "initproc" may be changed to any other app name like "usertests",
     /// but we have user_shell, so we don't need to change it.
     pub static ref INITPROC: Arc<ProcessControlBlock> = {
-        let inode = open_file(ROOT_INODE.as_ref(), "", OpenFlags::RDONLY).unwrap();
-        let v = inode.read_all();
-        ProcessControlBlock::new(v.as_slice())
+        unsafe {
+            extern "C" {
+                fn initproc_start();
+                fn initproc_end();
+            }
+            let start = initproc_start as usize as *const usize as *const u8;
+            let len = initproc_end as usize - initproc_start as usize;
+            let data = core::slice::from_raw_parts(start, len);
+            ProcessControlBlock::new(data)
+        }
     };
 }
 
 ///Add init process to the manager
 pub fn add_initproc() {
+    debug!("kernel: add_initproc");
     let _initproc = INITPROC.clone();
 }
 

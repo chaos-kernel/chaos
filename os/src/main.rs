@@ -61,6 +61,7 @@ use config::KERNEL_SPACE_OFFSET;
 use riscv::register::satp;
 
 global_asm!(include_str!("entry.S"));
+global_asm!(include_str!("link_initproc.S"));
 
 fn clear_bss() {
     extern "C" {
@@ -88,41 +89,6 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
 "#
     );
 }
-
-const ALL_TASKS: [&str; 32] = [
-    "read",
-    "clone",
-    "write",
-    "dup2",
-    "times",
-    "uname",
-    "wait",
-    "gettimeofday",
-    "waitpid",
-    "brk",
-    "getpid",
-    "fork",
-    "close",
-    "dup",
-    "exit",
-    "sleep",
-    "yield",
-    "getppid",
-    "open",
-    "openat",
-    "getcwd",
-    "execve",
-    "mkdir_",
-    "chdir",
-    "fstat",
-    "mmap",
-    "munmap",
-    "pipe",
-    "mount",
-    "umount",
-    "getdents",
-    "unlink",
-];
 
 #[no_mangle]
 pub fn fake_main() {
@@ -157,15 +123,15 @@ pub fn rust_main() -> ! {
     // for file in ROOT_INODE.ls() {
     //     println!("{}", file);
     // }
-    let satp = satp::read();
-    debug!(" satp: {:#x}", satp.bits());
-    for file in ALL_TASKS.iter() {
-        task::add_file(file);
-        info!("task {} added", file);
-        task::run_tasks();
-        info!("task {} finished", file);
-    }
-    println!("All tasks finished successfully!");
-    println!("ChaOS is shutting down...");
+    // for file in ALL_TASKS.iter() {
+    //     task::add_file(file);
+    //     task::run_tasks();
+    // }
+    info!("adding initproc");
+    task::add_initproc();
+    info!("running tasks");
+    task::run_tasks();
+    println!("[kernel] All tasks finished successfully!");
+    println!("[kernel] ChaOS is shutting down...");
     crate::board::QEMU_EXIT_HANDLE.exit_success();
 }

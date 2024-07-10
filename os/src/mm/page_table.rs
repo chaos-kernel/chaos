@@ -125,7 +125,6 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
-                debug!("create a new pte of vpn: {:#x}", vpn.0);
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 // debug!(
