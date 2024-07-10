@@ -29,3 +29,9 @@
 在根目录中运行 `make all`，即可在根目录获得操作系统以及 SBI 的二进制文件
 
 运行 `make run` 编译内核程序并使用qemu启动。
+
+### 更改 chaos 初始进程
+
+chaos 通过将初始进程的 elf 文件链接到内核镜像中，从而在系统启动之后运行。链接脚本位于 `os/src/link_initproc.S`。
+
+脚本默认将 `user/target/riscv64gc-unknown-none-elf/release/initproc` 链接到内核中作为初始进程。通过修改 `.incbin` 来链接不同的应用程序作为初始进程。链接的文件必须要是 elf 格式文件。
