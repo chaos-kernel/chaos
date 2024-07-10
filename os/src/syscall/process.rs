@@ -9,6 +9,7 @@ use crate::{
         translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission,
         VirtAddr,
     },
+    syscall::errno::{ECHILD, ENOENT, ENOSYS, ESRCH},
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
@@ -146,7 +147,7 @@ pub fn sys_getppid() -> isize {
         parent.upgrade().unwrap().getpid() as isize
     } else {
         warn!("kwenel: getppid NOT IMPLEMENTED YET!!");
-        1
+        ESRCH
     }
 }
 /// fork child process syscall
@@ -240,7 +241,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -259,7 +260,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             .iter()
             .any(|p| pid == -1 || pid as usize == p.getpid())
         {
-            return -1;
+            return ECHILD;
             // ---- release current PCB
         }
         let pair = inner.children.iter().enumerate().find(|(_, p)| {
@@ -306,10 +307,10 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
             process.inner_exclusive_access().signals |= flag;
             0
         } else {
-            -1
+            EINVAL
         }
     } else {
-        -1
+        ESRCH
     }
 }
 
@@ -389,7 +390,7 @@ pub fn sys_mmap(
     );
     if start as isize == -1 || len == 0 {
         debug!("mmap: invalid arguments");
-        return EPERM;
+        return EINVAL;
     }
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
@@ -445,7 +446,7 @@ pub fn sys_spawn(_path: *const u8) -> isize {
         "kernel:pid[{}] sys_spawn",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    ENOSYS
     // let token = current_user_token();
     // let path = translated_str(token, path);
     // if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
@@ -469,7 +470,7 @@ pub fn sys_set_priority(prio: isize) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     if prio < 2 {
-        return -1;
+        return EINVAL;
     }
     let prio = prio as usize;
     let task = current_task().unwrap();

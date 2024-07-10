@@ -7,6 +7,7 @@ use crate::fs::file::File;
 use crate::fs::inode::{OSInode, Stat, ROOT_INODE};
 use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
 use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+use crate::syscall::errno::{EACCES, EBADF, EBUSY, EEXIST, EINVAL, ENOENT, ENOTDIR, SUCCESS};
 use crate::syscall::Dirent;
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
@@ -25,18 +26,18 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let process = current_process();
     let inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         if !file.writable() {
-            return -1;
+            return EACCES;
         }
         let file = file.clone();
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
         file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
     } else {
-        -1
+        EBADF
     }
 }
 /// read syscall
@@ -50,19 +51,19 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let process = current_process();
     let inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         let file = file.clone();
         if !file.readable() {
-            return -1;
+            return EACCES;
         }
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
         trace!("kernel: sys_read .. file.read");
         file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
     } else {
-        -1
+        EBADF
     }
 }
 /// openat sys
@@ -84,7 +85,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
         inner.fd_table[fd] = Some(inode);
         fd as isize
     } else {
-        -1
+        ENOENT
     }
 }
 pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
@@ -99,10 +100,10 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     if dirfd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[dirfd].is_none() {
-        return -1;
+        return EBADF;
     }
     let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
     // TODO: 好像无法判断是否是目录
@@ -117,7 +118,7 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
         inner.fd_table[fd] = Some(inode);
         fd as isize
     } else {
-        -1
+        ENOENT
     }
 }
 /// close syscall
@@ -130,10 +131,10 @@ pub fn sys_close(fd: usize) -> isize {
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     inner.fd_table[fd].take();
     0
@@ -165,10 +166,10 @@ pub fn sys_dup(fd: usize) -> isize {
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     let new_fd = inner.alloc_fd();
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
@@ -184,16 +185,16 @@ pub fn sys_dup3(fd: usize, new_fd: usize) -> isize {
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     while inner.fd_table.len() <= new_fd {
         inner.fd_table.push(None);
     }
     if inner.fd_table[new_fd].is_some() {
-        return -1;
+        return EBUSY;
     }
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
     new_fd as isize
@@ -209,16 +210,16 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     let process = task.process.upgrade().unwrap();
     let inner = process.inner_exclusive_access();
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         let file = file.clone();
         let stat = file.fstat();
         if stat.is_none() {
-            return -1;
+            return EBADF;
         }
         let stat = stat.unwrap();
         let mut v =
@@ -247,7 +248,7 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     if link(old_name.as_str(), new_name.as_str()).is_some() {
         0
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -262,7 +263,7 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
     if unlink(name.as_str()) {
         0
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -291,7 +292,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
         }
         buf as isize
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -323,14 +324,14 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
-            return -1;
+            return EBADF;
         }
         if inner.fd_table[dirfd].is_none() {
-            return -1;
+            return EBADF;
         }
         let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
         if !dir.is_dir() {
-            return -1;
+            return ENOTDIR;
         }
         inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
     }
@@ -344,7 +345,7 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
         inner.fd_table[fd] = Some(chinode);
         fd as isize
     } else {
-        -1
+        EACCES //TODO: to be confirmed
     }
 }
 
@@ -361,14 +362,14 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
-            return -1;
+            return EBADF;
         }
         if inner.fd_table[dirfd].is_none() {
-            return -1;
+            return EBADF;
         }
         let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
         if !dir.is_dir() {
-            return -1;
+            return ENOTDIR;
         }
         inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
     }

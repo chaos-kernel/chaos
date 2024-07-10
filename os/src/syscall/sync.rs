@@ -1,6 +1,7 @@
 use crate::board::CLOCK_FREQ;
 use crate::mm::{translated_ref, translated_refmut};
 use crate::sync::{Condvar, Mutex, MutexBlocking, MutexSpin, Semaphore};
+use crate::syscall::errno::EINVAL;
 use crate::task::{
     current_process, current_task, current_user_token, detect_deadlock,
     suspend_current_and_run_next,
@@ -381,7 +382,7 @@ pub fn sys_condvar_wait(condvar_id: usize, mutex_id: usize) -> isize {
 pub fn sys_enable_deadlock_detect(enabled: usize) -> isize {
     trace!("kernel: sys_enable_deadlock_detect");
     if enabled != 0 && enabled != 1 {
-        return -1;
+        return EINVAL;
     }
     let process = current_process();
     let mut process_inner = process.inner_exclusive_access();

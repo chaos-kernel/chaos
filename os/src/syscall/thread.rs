@@ -1,5 +1,6 @@
 use crate::{
     mm::kernel_token,
+    syscall::errno::{ECHILD, EINVAL, ESRCH},
     task::{add_task, current_task, TaskControlBlock},
     trap::{trap_handler, TrapContext},
 };
@@ -117,7 +118,7 @@ pub fn sys_waittid(tid: usize) -> i32 {
     let mut process_inner = process.inner_exclusive_access();
     // a thread cannot wait for itself
     if task_inner.res.as_ref().unwrap().tid == tid {
-        return -1;
+        return EINVAL as i32;
     }
     let mut exit_code: Option<i32> = None;
     let waited_task = process_inner.tasks[tid].as_ref();
@@ -127,7 +128,7 @@ pub fn sys_waittid(tid: usize) -> i32 {
         }
     } else {
         // waited thread does not exist
-        return -1;
+        return ESRCH as i32;
     }
     if let Some(exit_code) = exit_code {
         // dealloc the exited thread
@@ -135,6 +136,6 @@ pub fn sys_waittid(tid: usize) -> i32 {
         exit_code
     } else {
         // waited thread has not exited
-        -2
+        ECHILD as i32
     }
 }
