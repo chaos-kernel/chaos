@@ -46,7 +46,9 @@ fn main() -> i32 {
 
     for app in ALL_TASKS {
         app_num += 1;
-        if fork() == 0 {
+        let pid = fork();
+        println!("[initproc] now in = {}", pid);
+        if pid == 0 {
             // 在子进程中执行应用程序
             exec(app, &[core::ptr::null::<u8>()]);
         }

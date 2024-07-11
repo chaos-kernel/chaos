@@ -37,4 +37,12 @@ impl TaskContext {
             s: [0; 12],
         }
     }
+
+    pub fn goto_user_entry(kstack_ptr: usize) -> Self {
+        Self {
+            ra: crate::trap::user_entry as usize,
+            sp: kstack_ptr,
+            s: [0; 12],
+        }
+    }
 }

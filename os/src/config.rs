@@ -23,7 +23,7 @@ pub const USER_SPACE_END: usize = 0x0000_003F_FFFF_FFFF;
 /// kernel space end
 pub const KERNEL_SPACE_END: usize = 0xFFFF_FFFF_FFFF_FFFF;
 /// the virtual addr of trap context
-pub const TRAP_CONTEXT_BASE: usize = KERNEL_SPACE_END - PAGE_SIZE * 2 + 1;
+pub const TRAP_CONTEXT_BASE: usize = USER_SPACE_END - PAGE_SIZE * 2 + 1;
 /// qemu board info
 pub use crate::board::{CLOCK_FREQ, MMIO};
 /// Big stride (lcm of 2..20)

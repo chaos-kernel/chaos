@@ -112,17 +112,18 @@ pub fn trap_handler() -> ! {
         }
         _ => {
             panic!(
-                "Unsupported trap {:?}, stval = {:#x}!",
+                "[kernel] trap_handler: unsupport trap {:?} , bad addr = {:#x}, bad instruction = {:#x}",
                 scause.cause(),
-                stval
+                stval,
+                current_trap_cx().sepc,
             );
         }
     }
     // check signals
-    if let Some((errno, msg)) = check_signals_of_current() {
-        trace!("[kernel] trap_handler: .. check signals {}", msg);
-        exit_current_and_run_next(errno);
-    }
+    // if let Some((errno, msg)) = check_signals_of_current() {
+    //     trace!("[kernel] trap_handler: .. check signals {}", msg);
+    //     exit_current_and_run_next(errno);
+    // }
     trap_return();
 }
 
@@ -139,10 +140,6 @@ pub fn trap_return() -> ! {
 
     let trap_cx_user_va: usize = current_trap_cx_user_va().into();
     let user_satp = current_user_token();
-    debug!(
-        "[kernel] trap_return: ..before return, trap_cx_user_va = {:#x}, user_satp = {:#x}",
-        trap_cx_user_va, user_satp
-    );
     extern "C" {
         fn __alltraps();
         fn __restore();
@@ -182,11 +179,44 @@ pub fn initproc_entry() -> ! {
         fn __init_entry();
     }
     let restore_va = __init_entry as usize;
+    warn!("init satp to {:#x}", user_satp);
     unsafe {
         asm!(
             "fence.i",
             "jr {restore_va}",         // jump to new addr of __restore asm function
             restore_va = in(reg) restore_va,
+            in("a0") trap_cx_user_va,      // a0 = virt addr of Trap Context
+            in("a1") user_satp,        // a1 = phy addr of initproc page table
+            options(noreturn)
+        );
+    }
+}
+
+#[no_mangle]
+pub fn user_entry() -> ! {
+    set_user_trap_entry();
+    let trap_cx_user_va: usize = current_trap_cx_user_va().into();
+    let mut user_satp = current_user_token();
+    debug!(
+        "[kernel] user_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
+        trap_cx_user_va, user_satp
+    );
+    debug!(
+        "[kernel] user_entry, sepc = {:#x}, sp = {:#x}",
+        current_trap_cx().sepc,
+        current_trap_cx().x[10]
+    );
+    extern "C" {
+        fn __user_entry();
+    }
+    let entry_va = __user_entry as usize;
+    // user_satp = 0x80000000000807cb;
+    warn!("reset satp to {:#x}", user_satp);
+    unsafe {
+        asm!(
+            "fence.i",
+            "jr {entry_va}",         // jump to new addr of __restore asm function
+            entry_va = in(reg) entry_va,
             in("a0") trap_cx_user_va,      // a0 = virt addr of Trap Context
             in("a1") user_satp,        // a1 = phy addr of initproc page table
             options(noreturn)

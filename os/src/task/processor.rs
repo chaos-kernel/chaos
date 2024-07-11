@@ -73,20 +73,19 @@ pub fn run_tasks() {
                 .unwrap()
                 .inner_exclusive_access()
                 .clock_time_refresh();
-
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
             processor.current = Some(task);
             // release processor manually
             drop(processor);
+            info!("switch task");
             unsafe {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
         } else {
             return;
         }
-        warn!("satp: {:x}", satp::read().bits());
     }
 }
 

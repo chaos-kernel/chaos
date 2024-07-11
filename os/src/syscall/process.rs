@@ -232,6 +232,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
+    debug!("kernel: execve new app : {}", path);
     if let Some(app_inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let process = current_process();
