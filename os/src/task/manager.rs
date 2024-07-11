@@ -40,15 +40,15 @@ impl TaskManager {
         if self.ready_queue.is_empty() {
             return None;
         }
-        let mut min_idx = 0;
-        for (idx, _) in self.ready_queue.iter().enumerate() {
-            let stride_now = self.ready_queue[idx].inner_exclusive_access().stride;
-            let stride_min = self.ready_queue[min_idx].inner_exclusive_access().stride;
-            if stride_now < stride_min {
-                min_idx = idx;
-            }
-        }
-        self.ready_queue.swap(0, min_idx);
+        // let mut min_idx = 0;
+        // for (idx, _) in self.ready_queue.iter().enumerate() {
+        //     let stride_now = self.ready_queue[idx].inner_exclusive_access().stride;
+        //     let stride_min = self.ready_queue[min_idx].inner_exclusive_access().stride;
+        //     if stride_now < stride_min {
+        //         min_idx = idx;
+        //     }
+        // }
+        // self.ready_queue.swap(0, min_idx);
         self.ready_queue.pop_front()
     }
     pub fn remove(&mut self, task: Arc<TaskControlBlock>) {
