@@ -322,13 +322,17 @@ impl MemorySet {
     }
     /// Create a new address space by copy code&data from a exited process's address space.
     pub fn from_existed_user(user_space: &Self) -> Self {
-        let mut memory_set = Self::new_bare();
+        let mut memory_set = Self::new_process();
         // map trampoline
         // memory_set.map_trampoline();
         // copy mmap
         memory_set.mmap_end = user_space.mmap_end;
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
+            // skip kernel space, cause it's already mapped
+            if area.vpn_range.get_start().0 > KERNEL_SPACE_OFFSET {
+                continue;
+            }
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
             // copy data from another space
