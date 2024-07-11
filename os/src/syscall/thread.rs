@@ -1,6 +1,6 @@
 use crate::{
     mm::kernel_token,
-    task::{add_task, current_task, TaskControlBlock},
+    task::{add_task, current_task, kstack_alloc, TaskControlBlock},
     trap::{trap_handler, TrapContext},
 };
 use alloc::{sync::Arc, vec::Vec};
@@ -19,6 +19,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     );
     let task = current_task().unwrap();
     let process = task.process.upgrade().unwrap();
+    let kstack = kstack_alloc();
     // create a new thread
     let new_task = Arc::new(TaskControlBlock::new(
         Arc::clone(&process),
@@ -27,6 +28,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
             .as_ref()
             .unwrap()
             .ustack_top,
+        kstack,
         true,
     ));
     // add new task to scheduler

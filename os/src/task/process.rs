@@ -11,6 +11,7 @@ use crate::fs::{Stdin, Stdout};
 use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::EPERM;
+use crate::task::kstack_alloc;
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
@@ -272,6 +273,7 @@ impl ProcessControlBlock {
     pub fn new(elf_data: &[u8]) -> Arc<Self> {
         trace!("kernel: ProcessControlBlock::new");
         // memory_set with elf program headers/trampoline/trap context/user stack
+        let kstack = kstack_alloc();
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
         // allocate a pid
         let pid_handle = pid_alloc();
@@ -317,6 +319,7 @@ impl ProcessControlBlock {
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
             ustack_top,
+            kstack,
             true,
         ));
         info!("TaskControlBlock create completed");
@@ -356,6 +359,7 @@ impl ProcessControlBlock {
         trace!("kernel: ProcessControlBlock::new_initproc");
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
+        debug!("initproc: entry_point={:#x}", entry_point);
         // allocate a pid
         let pid_handle = pid_alloc();
         let process = Arc::new(Self {
@@ -506,6 +510,7 @@ impl ProcessControlBlock {
         trace!("kernel: sys_fork");
         let mut parent = self.inner_exclusive_access();
         assert_eq!(parent.thread_count(), 1);
+        let kstack = kstack_alloc();
         // clone parent's memory_set completely including trampoline/ustacks/trap_cxs
         let memory_set = MemorySet::from_existed_user(&parent.memory_set);
         // alloc a pid
@@ -564,6 +569,7 @@ impl ProcessControlBlock {
                 .ustack_top(),
             // here we do not allocate trap_cx or ustack again
             // but mention that we allocate a new kstack here
+            kstack,
             false,
         ));
         // attach task to child process
@@ -587,6 +593,7 @@ impl ProcessControlBlock {
         insert_into_pid2process(child.getpid(), Arc::clone(&child));
         // add this thread to scheduler
         add_task(task);
+        debug!("fork: child pid[{}] add to scheduler", pid);
         pid
     }
     /// clone2
@@ -611,9 +618,11 @@ impl ProcessControlBlock {
                 .unwrap()
                 .ustack_top
         };
+        let kstack = kstack_alloc(); //todo 这一行正确性未知，为了解决先赋值内核页表再映射内核栈问题
         let new_task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
             thread_stack_top,
+            kstack,
             true,
         ));
         let new_task_inner = new_task.inner_exclusive_access();
@@ -656,6 +665,7 @@ impl ProcessControlBlock {
         let mut parent = self.inner_exclusive_access();
         assert_eq!(parent.thread_count(), 1);
         // clone parent's memory_set completely including trampoline/ustacks/trap_cxs
+        let kstack = kstack_alloc();
         let memory_set = MemorySet::from_existed_user(&parent.memory_set);
         // alloc a pid
         let pid = pid_alloc();
@@ -713,6 +723,7 @@ impl ProcessControlBlock {
                 .ustack_top(),
             // here we do not allocate trap_cx or ustack again
             // but mention that we allocate a new kstack here
+            kstack,
             false,
         ));
         // attach task to child process
