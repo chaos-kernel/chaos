@@ -1,4 +1,4 @@
-# chaos
+# ChaOS
 
 ![USTB](./docs/image/USTB.jpg)
 
@@ -26,9 +26,13 @@
 
 ## 使用说明
 
-在根目录中运行 `make all`，即可在根目录获得操作系统以及 SBI 的二进制文件
+*注意：以下所有指令皆在项目根目录下执行*
 
-运行 `make run` 编译内核程序并使用qemu启动。
+若是第一次编译 chaos，需要运行 `make env` 来配置 cargo 编译环境。
+
+运行 `make all` 来编译项目，可在根目录获得操作系统以及 SBI 的二进制文件。
+
+运行 `make run` 来编译项目并且启动 QEMU 运行内核。
 
 ## 开发环境配置
 
@@ -92,7 +96,7 @@ qemu-riscv64 --version
 
 如果正确识别指令并输出版本为 `7.0.0`，即说明 QEMU 安装正确。
 
-### 更改 chaos 初始进程
+## 更改 chaos 初始进程
 
 chaos 通过将初始进程的 elf 文件链接到内核镜像中，从而在系统启动之后运行。链接脚本位于 `os/src/link_initproc.S`。
 
