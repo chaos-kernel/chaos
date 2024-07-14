@@ -1,7 +1,7 @@
 DOCKER_NAME ?= rcore-tutorial-v3
 MAKEFLAGS += --no-print-directory
 
-.PHONY: docker build_docker all clean
+.PHONY: docker build_docker all clean env
 
 all: fmt
 	@echo "Building user..."
@@ -12,7 +12,11 @@ all: fmt
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu
 	@echo "Copying kernel-qemu..."
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu
-	
+
+env:
+	@echo "Setting up cargo environment..."
+	@cd os && make env
+
 docker:
 	docker run --rm -it -v ${PWD}:/mnt -w /mnt ${DOCKER_NAME} bash
 
