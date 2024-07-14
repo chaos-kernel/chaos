@@ -4,17 +4,15 @@
 
 ## 参赛文档
 
-系统介绍文档在 [docs](./docs/) 文件夹。初赛文档是[这个](./docs/初赛文档.md)。
+系统介绍文档在 [docs](./docs/) 文件夹。初赛文档是 [这个](./docs/初赛文档.md)。
 
 开发日志发布在队员的个人博客上：
 
 - 陈宽宽：[【开发日志】chaos开发日志](https://sazikk.github.io/posts/%E5%BC%80%E5%8F%91%E6%97%A5%E5%BF%97-chaos%E5%BC%80%E5%8F%91%E6%97%A5%E5%BF%97/)
 - 王诺贤：[https://note.bosswnx.xyz/](https://note.bosswnx.xyz/)
 
-## 提示
-
-[GitLab 仓库](https://gitlab.eduxiji.net/T202410008992750/oskernel2024-chaos)与 [GitHub 仓库](https://github.com/bosswnx/chaos/)保持同步。
-
+[GitLab 仓库](https://gitlab.eduxiji.net/T202410008992750/oskernel2024-chaos) 与 [GitHub 仓库](https://github.com/bosswnx/chaos/) 保持同步。
+ 
 ## 参赛信息
 
 - 参赛队名： chaos
@@ -37,6 +35,8 @@
 ## 开发环境配置
 
 推荐开发环境为 x86_64 架构 Ubuntu 22.04 LTS，其他平台的开发稳定性不作保证。
+
+推荐使用 vscode + rust-analyzer 插件进行开发。
 
 首先安装 Rust：
 
@@ -95,6 +95,24 @@ qemu-riscv64 --version
 ```
 
 如果正确识别指令并输出版本为 `7.0.0`，即说明 QEMU 安装正确。
+
+## rust-analyzer 插件 ``can't find crate for `test` `` 报错解决
+
+在根目录下新建文件 `.vscode/settings.json`，添加以下内容：
+
+```json
+{
+    // Prevent "can't find crate for `test`" error on no_std
+    // Ref: https://github.com/rust-lang/vscode-rust/issues/729
+    "rust-analyzer.cargo.target": "riscv64gc-unknown-none-elf",
+    "rust-analyzer.checkOnSave.allTargets": false,
+    // "rust-analyzer.cargo.features": [
+    //     "board_qemu"
+    // ]
+}
+```
+
+重新加载 rust-analyzer 即可。
 
 ## 更改 chaos 初始进程
 
