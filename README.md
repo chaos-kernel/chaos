@@ -30,6 +30,68 @@
 
 运行 `make run` 编译内核程序并使用qemu启动。
 
+## 开发环境配置
+
+推荐开发环境为 x86_64 架构 Ubuntu 22.04 LTS，其他平台的开发稳定性不作保证。
+
+首先安装 Rust：
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+```
+
+安装过程中全程选择默认选项即可。
+
+可以将 Rust 的包管理器 cargo 的源替换成中科大源。打开或新建 `~/.cargo/config.toml` 文件，添加以下内容：
+
+```toml
+[source.crates-io]
+replace-with = 'ustc'
+
+[source.ustc]
+registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
+```
+
+然后编译安装 QEMU 7.0.0：
+
+```bash
+# 切换到 home 目录
+cd ~
+# 安装编译所需的依赖包
+sudo apt install autoconf automake autotools-dev curl libmpc-dev libmpfr-dev libgmp-dev \
+              gawk build-essential bison flex texinfo gperf libtool patchutils bc \
+              zlib1g-dev libexpat-dev pkg-config  libglib2.0-dev libpixman-1-dev git tmux python3 ninja-build
+# 下载源码包
+# 如果下载速度过慢可以使用我们提供的百度网盘链接：https://pan.baidu.com/s/1z-iWIPjxjxbdFS2Qf-NKxQ
+# 提取码 8woe
+wget https://download.qemu.org/qemu-7.0.0.tar.xz
+# 解压
+tar xvJf qemu-7.0.0.tar.xz
+# 编译安装并配置 RISC-V 支持
+cd qemu-7.0.0
+./configure --target-list=riscv64-softmmu,riscv64-linux-user
+make -j$(nproc)
+```
+
+将编译得到的以下三个目录添加到 `PATH` 中：
+
+```bash
+export PATH="$HOME/qemu-7.0.0/build/:$PATH"
+export PATH="$HOME/qemu-7.0.0/build/riscv64-softmmu:$PATH"
+export PATH="$HOME/qemu-7.0.0/build/riscv64-linux-user:$PATH"
+```
+
+也可将其移至其他地方存放，只要能放在 `PATH` 中即可。
+
+重启终端，确认 QEMU 版本：
+
+```bash
+qemu-system-riscv64 --version
+qemu-riscv64 --version
+```
+
+如果正确识别指令并输出版本为 `7.0.0`，即说明 QEMU 安装正确。
+
 ### 更改 chaos 初始进程
 
 chaos 通过将初始进程的 elf 文件链接到内核镜像中，从而在系统启动之后运行。链接脚本位于 `os/src/link_initproc.S`。
