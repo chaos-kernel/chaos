@@ -14,8 +14,10 @@ use crate::{
         suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
+    utils::string::c_ptr_to_string,
 };
 use core::{
+    arch::asm,
     borrow::BorrowMut,
     mem::{self, size_of},
     ptr,
@@ -26,6 +28,7 @@ use super::errno::{EINVAL, EPERM, SUCCESS};
 
 use alloc::vec;
 use alloc::{string::String, sync::Arc, vec::Vec};
+use riscv::register::sstatus;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -177,6 +180,11 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
+            let mut sp: usize;
+            unsafe {
+                asm!("mv {}, sp", out(reg) sp);
+            }
+            warn!("sp in syscall now :{:#x}", sp);
             return current_process.fork() as isize;
         } else {
             return current_process.fork2(stack_ptr) as isize; //todo仅用于初赛
@@ -219,22 +227,29 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
         "kernel:pid[{}] sys_execve",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    let token = current_user_token();
-    let path = translated_str(token, path);
+    unsafe {
+        sstatus::set_sum();
+    }
+    let path = c_ptr_to_string(path);
+    debug!("kernel: execve new app : {}", path);
     let mut args_vec: Vec<String> = Vec::new();
     loop {
-        let arg_str_ptr = *translated_ref(token, args);
-        if arg_str_ptr == 0 {
+        if unsafe { *args == 0 } {
             break;
         }
-        args_vec.push(translated_str(token, arg_str_ptr as *const u8));
+        args_vec.push(c_ptr_to_string(unsafe { (*args) as *const u8 }));
+        debug!("exec get an arg {}", args_vec[args_vec.len() - 1]);
         unsafe {
             args = args.add(1);
         }
     }
-    debug!("kernel: execve new app : {}", path);
+    unsafe {
+        sstatus::clear_sum();
+    }
     if let Some(app_inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::RDONLY) {
+        debug!("kernel: execve open app success : {}", path.as_str());
         let all_data = app_inode.read_all();
+        debug!("kernel: execve read app success : {}", path.as_str());
         let process = current_process();
         let argc = args_vec.len();
         process.exec(all_data.as_slice(), args_vec);

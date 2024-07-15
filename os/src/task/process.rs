@@ -18,7 +18,9 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use core::arch::asm;
 use core::cell::RefMut;
+use riscv::register::sstatus;
 
 #[allow(unused)]
 #[allow(missing_docs)]
@@ -358,6 +360,7 @@ impl ProcessControlBlock {
     pub fn initproc(elf_data: &[u8]) -> Arc<Self> {
         trace!("kernel: ProcessControlBlock::new_initproc");
         // memory_set with elf program headers/trampoline/trap context/user stack
+        let kstack = kstack_alloc();
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
         debug!("initproc: entry_point={:#x}", entry_point);
         // allocate a pid
@@ -407,6 +410,7 @@ impl ProcessControlBlock {
         let task = Arc::new(TaskControlBlock::init_proc(
             Arc::clone(&process),
             ustack_top,
+            kstack,
             true,
         ));
         info!("init TaskControlBlock create completed");
@@ -450,7 +454,6 @@ impl ProcessControlBlock {
         // memory_set with elf program headers/trampoline/trap context/user stack
         trace!("kernel: exec .. MemorySet::from_elf");
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
-        let new_token = memory_set.token();
         // substitute memory_set
         trace!("kernel: exec .. substitute memory_set");
         self.inner_exclusive_access().memory_set = memory_set;
@@ -468,29 +471,44 @@ impl ProcessControlBlock {
         // push arguments on user stack
         trace!("kernel: exec .. push arguments on user stack");
         let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
+
+        // Enable kernel to visit user space
+        unsafe {
+            sstatus::set_sum(); //todo Use RAII
+        }
+
+        // argv is a vector of each arg's addr
+        let mut argv = vec![0; args.len()];
+
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
-        let mut argv: Vec<_> = (0..=args.len())
-            .map(|arg| {
-                translated_refmut(
-                    new_token,
-                    (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
-                )
-            })
-            .collect();
-        *argv[args.len()] = 0;
         for i in 0..args.len() {
-            user_sp -= args[i].len() + 1;
-            *argv[i] = user_sp;
-            let mut p = user_sp;
-            for c in args[i].as_bytes() {
-                *translated_refmut(new_token, p as *mut u8) = *c;
-                p += 1;
+            unsafe {
+                *((argv_base + i * core::mem::size_of::<usize>()) as *mut usize) = argv[i];
             }
-            *translated_refmut(new_token, p as *mut u8) = 0;
         }
-        // make the user_sp aligned to 8B for k210 platform
+        unsafe {
+            *((argv_base + args.len() * core::mem::size_of::<usize>()) as *mut usize) = 0;
+        }
+
+        // Copy each arg to the newly allocated stack
+        for i in 0..args.len() {
+            // Here we leave one byte to store a '\0' as a terminator
+            user_sp -= args[i].len() + 1;
+            let p = user_sp as *mut u8;
+            unsafe {
+                argv[i] = user_sp;
+                p.copy_from(args[i].as_ptr(), args[i].len());
+                *((p as usize + args[i].len()) as *mut u8) = 0;
+            }
+        }
         user_sp -= user_sp % core::mem::size_of::<usize>();
+
+        // Disable kernel to visit user space
+        unsafe {
+            sstatus::clear_sum(); //todo Use RAII
+        }
+
         // initialize trap_cx
         trace!("kernel: exec .. initialize trap_cx");
         let mut trap_cx = TrapContext::app_init_context(
