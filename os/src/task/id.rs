@@ -162,12 +162,53 @@ impl TaskUserRes {
             process: Arc::downgrade(&process),
         };
         if alloc_user_res {
-            task_user_res.alloc_user_res();
+            //todo 因为只有初始进程创建即分配，所以这里只有初始进程会调用
+            //todo 这里是临时措施，接下来马上删了这个b user_res
+            task_user_res.alloc_initproc_res();
         }
         task_user_res
     }
     /// Allocate user resource for a task
     pub fn alloc_user_res(&self) {
+        let process = self.process.upgrade().unwrap();
+        let mut process_inner = process.inner_exclusive_access();
+        // alloc user stack
+        let ustack_top = self.ustack_top;
+        let ustack_bottom = ustack_top - USER_STACK_SIZE;
+        debug!(
+            "alloc_user_res: ustack_bottom={:#x} ustack_top={:#x}",
+            ustack_bottom, ustack_top
+        );
+        process_inner.memory_set.insert_framed_area(
+            ustack_bottom.into(),
+            ustack_top.into(),
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        );
+        // alloc trap_cx
+        let trap_cx_bottom = trap_cx_bottom_from_tid(self.tid);
+        let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
+        debug!(
+            "alloc_user_res: trap_cx_bottom={:#x} trap_cx_top={:#x}",
+            trap_cx_bottom, trap_cx_top
+        );
+        process_inner.memory_set.insert_framed_area(
+            trap_cx_bottom.into(),
+            trap_cx_top.into(),
+            MapPermission::R | MapPermission::W,
+        );
+        // debug!(
+        //     "trap_cx_bottom ppn = {:x}",
+        //     process_inner
+        //         .memory_set
+        //         .translate(crate::mm::VirtPageNum::from(VirtAddr::from(trap_cx_bottom)))
+        //         .unwrap()
+        //         .ppn()
+        //         .0
+        // );
+    }
+
+    /// Allocate user resource for a task
+    pub fn alloc_initproc_res(&self) {
         let process = self.process.upgrade().unwrap();
         let mut process_inner = process.inner_exclusive_access();
         // alloc user stack
@@ -260,7 +301,6 @@ impl TaskUserRes {
     }
     /// The physical page number(ppn) of the trap context for a task with tid
     pub fn trap_cx_ppn(&self) -> PhysPageNum {
-        //todo: 意义不明，暂时准备弃用
         let process = self.process.upgrade().unwrap();
         let process_inner = process.inner_exclusive_access();
         let trap_cx_bottom_va: VirtAddr = trap_cx_bottom_from_tid(self.tid).into();
