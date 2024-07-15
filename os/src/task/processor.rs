@@ -55,6 +55,7 @@ lazy_static! {
 ///Loop `fetch_task` to get the process that needs to run, and switch the process through `__switch`
 pub fn run_tasks() {
     loop {
+        debug!("start new turn of scheduling");
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
@@ -79,7 +80,7 @@ pub fn run_tasks() {
             processor.current = Some(task);
             // release processor manually
             drop(processor);
-            info!("switch task");
+            info!("switch task to pid now");
             unsafe {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
@@ -102,6 +103,23 @@ pub fn current_task() -> Option<Arc<TaskControlBlock>> {
 /// get current process
 pub fn current_process() -> Arc<ProcessControlBlock> {
     current_task().unwrap().process.upgrade().unwrap()
+}
+
+/// get current pid
+pub fn current_pid() -> Option<usize> {
+    if let Some(task) = current_task() {
+        if let Some(process) = task.process.upgrade() {
+            return Some(process.pid.0);
+        }
+    }
+    None
+}
+
+pub fn current_tid() -> Option<usize> {
+    if let Some(task) = current_task() {
+        return Some(task.inner_exclusive_access().res.as_ref().unwrap().tid);
+    }
+    None
 }
 
 /// Get the current user token(addr of page table)
