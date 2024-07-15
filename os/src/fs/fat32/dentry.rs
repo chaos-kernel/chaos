@@ -1,8 +1,7 @@
-use alloc::{string::String, sync::Arc, sync::Weak};
+use alloc::{string::String, sync::Arc};
 
+use super::fat::FAT;
 use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice};
-
-use super::{fat::FAT, file_system::Fat32FS};
 
 pub struct Fat32Dentry {
     pub sector_id: usize,

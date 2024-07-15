@@ -1,13 +1,16 @@
-use crate::board::CLOCK_FREQ;
-use crate::mm::{translated_ref, translated_refmut};
-use crate::sync::{Condvar, Mutex, MutexBlocking, MutexSpin, Semaphore};
-use crate::syscall::errno::EINVAL;
-use crate::task::{
-    current_process, current_task, current_user_token, detect_deadlock,
-    suspend_current_and_run_next,
-};
-use crate::timer::{get_time, NSEC_PER_SEC};
 use alloc::sync::Arc;
+
+use crate::{
+    board::CLOCK_FREQ,
+    mm::{translated_ref, translated_refmut},
+    sync::{Condvar, Mutex, MutexBlocking, MutexSpin, Semaphore},
+    syscall::errno::EINVAL,
+    task::{
+        current_process, current_task, current_user_token, detect_deadlock,
+        suspend_current_and_run_next,
+    },
+    timer::{get_time, NSEC_PER_SEC},
+};
 /// sleep syscall
 pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
     trace!(

@@ -1,23 +1,29 @@
 //! Implementation of  [`ProcessControlBlock`]
 
-use super::id::RecycleAllocator;
-use super::manager::insert_into_pid2process;
-use super::{add_task, SignalFlags};
-use super::{current_task, TaskControlBlock};
-use super::{pid_alloc, PidHandle};
-use crate::fs::file::File;
-use crate::fs::inode::{OSInode, ROOT_INODE};
-use crate::fs::{Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, UserBuffer, VirtAddr, KERNEL_SPACE};
-use crate::sync::{Condvar, Mutex, Semaphore, UPSafeCell};
-use crate::syscall::errno::EPERM;
-use crate::timer::get_time;
-use crate::trap::{trap_handler, TrapContext};
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc::{
+    string::String,
+    sync::{Arc, Weak},
+    vec,
+    vec::Vec,
+};
 use core::cell::RefMut;
+
+use super::{
+    add_task, current_task, id::RecycleAllocator, manager::insert_into_pid2process, pid_alloc,
+    PidHandle, SignalFlags, TaskControlBlock,
+};
+use crate::{
+    fs::{
+        file::File,
+        inode::{Inode, ROOT_INODE},
+        Stdin, Stdout,
+    },
+    mm::{translated_refmut, MemorySet, UserBuffer, VirtAddr, KERNEL_SPACE},
+    sync::{Condvar, Mutex, Semaphore, UPSafeCell},
+    syscall::errno::EPERM,
+    timer::get_time,
+    trap::{trap_handler, TrapContext},
+};
 
 #[allow(unused)]
 #[allow(missing_docs)]
@@ -152,7 +158,7 @@ pub struct ProcessControlBlockInner {
     ///
     pub heap_end: VirtAddr,
     /// working directory
-    pub work_dir: Arc<OSInode>,
+    pub work_dir: Arc<Inode>,
 }
 
 impl ProcessControlBlockInner {
@@ -234,7 +240,7 @@ impl ProcessControlBlockInner {
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();
         let file = self.fd_table[fd].clone().unwrap();
-        let file = unsafe { &*(file.as_ref() as *const dyn File as *const OSInode) };
+        let file = unsafe { &*(file.as_ref() as *const dyn File as *const Inode) };
         let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
             (Vec::new(), len)
         } else {

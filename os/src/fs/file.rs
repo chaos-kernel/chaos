@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
 
-use crate::mm::UserBuffer;
-
 use super::inode::Stat;
+use crate::mm::UserBuffer;
 
 /// trait File for all file types
 pub trait File {
@@ -20,7 +19,10 @@ pub trait File {
     fn fstat(&self) -> Option<Stat>;
     /// is directory
     fn is_dir(&self) -> bool {
-        let stat = self.fstat().unwrap();
-        stat.is_dir()
+        if let Some(stat) = self.fstat() {
+            stat.is_dir()
+        } else {
+            true
+        }
     }
 }

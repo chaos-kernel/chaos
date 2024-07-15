@@ -1,11 +1,10 @@
 use alloc::sync::Arc;
 
+use super::super_block::Fat32SB;
 use crate::{
     block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ},
     config::PAGE_SIZE,
 };
-
-use super::super_block::Fat32SB;
 
 pub struct FAT {
     pub start_sector: usize,

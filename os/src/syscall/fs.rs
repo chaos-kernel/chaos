@@ -1,17 +1,19 @@
-use core::borrow::Borrow;
-use core::cmp::min;
-use core::mem::size_of;
-use core::ptr;
+use alloc::{sync::Arc, vec};
+use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 
-use crate::fs::file::File;
-use crate::fs::inode::{OSInode, Stat, ROOT_INODE};
-use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
-use crate::syscall::errno::{EACCES, EBADF, EBUSY, EEXIST, EINVAL, ENOENT, ENOTDIR, SUCCESS};
-use crate::syscall::Dirent;
-use crate::task::{current_process, current_task, current_user_token};
-use alloc::sync::Arc;
-use alloc::vec;
+use crate::{
+    fs::{
+        file::File,
+        inode::{Inode, Stat, ROOT_INODE},
+        link, make_pipe, open_file, unlink, OpenFlags,
+    },
+    mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
+    syscall::{
+        errno::{EACCES, EBADF, EBUSY, EEXIST, EINVAL, ENOENT, ENOTDIR, SUCCESS},
+        Dirent,
+    },
+    task::{current_process, current_task, current_user_token},
+};
 
 pub const AT_FDCWD: i32 = -100;
 
@@ -110,7 +112,7 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     // if !dir.is_dir() {
     //     return -1;
     // }
-    let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+    let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
     if let Some(inode) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
@@ -333,7 +335,7 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
         if !dir.is_dir() {
             return ENOTDIR;
         }
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
     }
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
@@ -371,7 +373,8 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
         if !dir.is_dir() {
             return ENOTDIR;
         }
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+        debug!("test");
+        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
     }
     let token = inner.memory_set.token();
     let mut v = translated_byte_buffer(token, buf, len);

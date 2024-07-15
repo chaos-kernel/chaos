@@ -1,12 +1,16 @@
-use super::BlockDevice;
-use crate::mm::{
-    frame_alloc, frame_dealloc, kernel_token, FrameTracker, PageTable, PhysAddr, PhysPageNum,
-    StepByOne, VirtAddr,
-};
-use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
+
 use lazy_static::*;
 use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
+
+use super::BlockDevice;
+use crate::{
+    mm::{
+        frame_alloc, frame_dealloc, kernel_token, FrameTracker, PageTable, PhysAddr, PhysPageNum,
+        StepByOne, VirtAddr,
+    },
+    sync::UPSafeCell,
+};
 
 #[allow(unused)]
 const VIRTIO0: usize = 0x10001000;

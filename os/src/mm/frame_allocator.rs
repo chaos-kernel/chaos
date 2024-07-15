@@ -1,11 +1,12 @@
 //! Physical page frame allocator
 
-use super::{PhysAddr, PhysPageNum};
-use crate::config::MEMORY_END;
-use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
+
 use lazy_static::*;
+
+use super::{PhysAddr, PhysPageNum};
+use crate::{config::MEMORY_END, sync::UPSafeCell};
 
 /// tracker for physical page frame allocation and deallocation
 pub struct FrameTracker {

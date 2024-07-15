@@ -1,15 +1,17 @@
 //! RISC-V timer-related functionality
 
+use alloc::{collections::BinaryHeap, sync::Arc};
 use core::cmp::Ordering;
 
-use crate::config::CLOCK_FREQ;
-use crate::sbi::set_timer;
-use crate::sync::UPSafeCell;
-use crate::task::{current_task, wakeup_task, TaskControlBlock};
-use alloc::collections::BinaryHeap;
-use alloc::sync::Arc;
 use lazy_static::*;
 use riscv::register::time;
+
+use crate::{
+    config::CLOCK_FREQ,
+    sbi::set_timer,
+    sync::UPSafeCell,
+    task::{current_task, wakeup_task, TaskControlBlock},
+};
 ///纳秒转换关系
 pub const NSEC_PER_SEC: usize = 1_000_000_000;
 ///纳秒转换关系

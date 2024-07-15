@@ -1,14 +1,18 @@
 //! Allocator for pid, task user resource, kernel stack using a simple recycle strategy.
 
-use super::ProcessControlBlock;
-use crate::config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
-use crate::mm::{MapPermission, PhysPageNum, VirtAddr, KERNEL_SPACE};
-use crate::sync::UPSafeCell;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+
 use lazy_static::*;
+
+use super::ProcessControlBlock;
+use crate::{
+    config::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE},
+    mm::{MapPermission, PhysPageNum, VirtAddr, KERNEL_SPACE},
+    sync::UPSafeCell,
+};
 
 /// Allocator with a simple recycle strategy
 pub struct RecycleAllocator {

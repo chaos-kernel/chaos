@@ -1,8 +1,17 @@
+use alloc::{string::String, sync::Arc, vec, vec::Vec};
+use core::{
+    borrow::BorrowMut,
+    mem::{self, size_of},
+    ptr,
+};
+
+#[allow(unused)]
+use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
     fs::{
         file::File,
-        inode::{OSInode, ROOT_INODE},
+        inode::{Inode, ROOT_INODE},
         open_file, OpenFlags,
     },
     mm::{
@@ -16,17 +25,6 @@ use crate::{
     },
     timer::{get_time_ms, get_time_us},
 };
-use core::{
-    borrow::BorrowMut,
-    mem::{self, size_of},
-    ptr,
-};
-
-#[allow(unused)]
-use super::errno::{EINVAL, EPERM, SUCCESS};
-
-use alloc::vec;
-use alloc::{string::String, sync::Arc, vec::Vec};
 
 #[repr(C)]
 #[derive(Debug)]

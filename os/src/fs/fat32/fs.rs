@@ -1,60 +1,58 @@
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::cmp::min;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
-use spin::Mutex;
-
-use crate::block::{
-    block_cache::{block_cache_sync_all, get_block_cache},
-    block_dev::BlockDevice,
-    BLOCK_SZ,
-};
-
 use super::{
-    dentry::{self, Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes},
+    dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes},
     fat::FAT,
     inode::{Fat32Inode, Fat32InodeType},
     super_block::{Fat32SB, Fat32SBLayout},
 };
+use crate::{
+    block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ},
+    fs::{
+        fs::{FileSystem, FileSystemType},
+        inode::InodeOps,
+    },
+};
 
 pub struct Fat32FS {
-    pub sb: Fat32SB,
-    pub fat: Arc<FAT>,
     pub bdev: Arc<dyn BlockDevice>,
+    pub sb: Arc<Fat32SB>,
+    pub fat: Arc<FAT>,
 }
 
-impl Fat32FS {
-    /// load a exist fat32 file system from block device
-    pub fn load(bdev: Arc<dyn BlockDevice>) -> Arc<Mutex<Self>> {
-        get_block_cache(0, Arc::clone(&bdev))
+impl FileSystem for Fat32FS {
+    fn load(bdev: Arc<dyn BlockDevice>) -> Arc<Self> {
+        get_block_cache(0, bdev.clone())
             .lock()
-            .read(0, |sb_layout: &Fat32SBLayout| {
-                assert!(sb_layout.is_valid(), "Error loading FAT32!");
-                let fat32fs = Self {
-                    sb: Fat32SB::from_layout(sb_layout),
-                    fat: Arc::new(FAT::from_sb(
-                        Arc::new(Fat32SB::from_layout(sb_layout)),
-                        &bdev,
-                    )),
-                    bdev,
-                };
-                Arc::new(Mutex::new(fat32fs))
+            .read(0, |layout: &Fat32SBLayout| {
+                assert!(layout.is_valid(), "Error loading FAT32!");
+                Arc::new(Self {
+                    bdev: bdev.clone(),
+                    sb: Arc::new(Fat32SB::from_layout(layout)),
+                    fat: Arc::new(FAT::from_sb(Arc::new(Fat32SB::from_layout(layout)), &bdev)),
+                })
             })
     }
 
-    /// get root inode
-    pub fn root_inode(fs: &Arc<Mutex<Fat32FS>>) -> Fat32Inode {
-        let fs_ = fs.lock();
-        let start_cluster = fs_.sb.root_cluster as usize;
-        let bdev = Arc::clone(&fs_.bdev);
-        Fat32Inode {
-            type_: Fat32InodeType::Dir,
-            start_cluster,
-            fs: Arc::clone(fs),
-            bdev: Arc::clone(&bdev),
-            dentry: Arc::new(Mutex::new(Fat32Dentry::new(0, 0, &bdev, &fs_.fat))),
-        }
+    fn fs_type() -> FileSystemType {
+        FileSystemType::FAT32
     }
 
+    fn root_inode(self: Arc<Self>) -> Arc<dyn InodeOps> {
+        let start_cluster = self.sb.root_cluster as usize;
+        let inode = Fat32Inode {
+            type_: Fat32InodeType::Dir,
+            dentry: None,
+            start_cluster,
+            fs: self.clone(),
+            bdev: self.bdev.clone(),
+        };
+        Arc::new(inode)
+    }
+}
+
+impl Fat32FS {
     /// get cluster chain
     pub fn cluster_chain(&self, start_cluster: usize) -> Vec<usize> {
         let mut cluster_chain = Vec::new();

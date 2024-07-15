@@ -1,10 +1,11 @@
+use alloc::{sync::Arc, vec::Vec};
+
 use crate::{
     mm::kernel_token,
     syscall::errno::{ECHILD, EINVAL, ESRCH},
     task::{add_task, current_task, TaskControlBlock},
     trap::{trap_handler, TrapContext},
 };
-use alloc::{sync::Arc, vec::Vec};
 /// thread create syscall
 pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     trace!(

@@ -1,10 +1,7 @@
-use crate::mm::UserBuffer;
-use crate::sync::UPSafeCell;
 use alloc::sync::{Arc, Weak};
 
-use crate::task::suspend_current_and_run_next;
-
 use super::{file::File, inode::Stat};
+use crate::{mm::UserBuffer, sync::UPSafeCell, task::suspend_current_and_run_next};
 
 /// IPC pipe
 pub struct Pipe {

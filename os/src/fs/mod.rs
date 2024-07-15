@@ -2,6 +2,7 @@
 
 mod fat32;
 pub(crate) mod file;
+mod fs;
 pub mod inode;
 mod pipe;
 mod stdio;
@@ -39,7 +40,7 @@ bitflags! {
 }
 
 /// Open a file
-pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
+pub fn open_file(inode: &Inode, name: &str, flags: OpenFlags) -> Option<Arc<Inode>> {
     // TODO: read_write
     // let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
@@ -67,7 +68,7 @@ pub fn open_file(inode: &OSInode, name: &str, flags: OpenFlags) -> Option<Arc<OS
 }
 
 /// Link a file
-pub fn link(old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
+pub fn link(old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
     ROOT_INODE.link(old_name, new_name)
 }
 
@@ -86,6 +87,7 @@ pub fn list_apps() {
 }
 
 use alloc::sync::Arc;
-use inode::{Inode, OSInode, Stat, StatMode, ROOT_INODE};
+
+use inode::{Inode, InodeOps, Stat, StatMode, ROOT_INODE};
 pub use pipe::{make_pipe, Pipe};
 pub use stdio::{Stdin, Stdout};

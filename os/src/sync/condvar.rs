@@ -1,8 +1,11 @@
 //! Conditian variable
 
-use crate::sync::{Mutex, UPSafeCell};
-use crate::task::{block_current_and_run_next, current_task, wakeup_task, TaskControlBlock};
 use alloc::{collections::VecDeque, sync::Arc};
+
+use crate::{
+    sync::{Mutex, UPSafeCell},
+    task::{block_current_and_run_next, current_task, wakeup_task, TaskControlBlock},
+};
 
 /// Condition variable structure
 pub struct Condvar {

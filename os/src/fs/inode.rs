@@ -1,40 +1,49 @@
 //! inode
 
-use super::file::File;
-use crate::{
-    block::BLOCK_SZ, drivers::BLOCK_DEVICE, fs::fat32::file_system::Fat32FS, mm::UserBuffer,
-    sync::UPSafeCell, timer::TimeSpec,
-};
 use alloc::{
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
+
 use lazy_static::*;
 
+use super::file::File;
+use crate::{
+    block::BLOCK_SZ,
+    drivers::BLOCK_DEVICE,
+    fs::{
+        fat32::fs::Fat32FS,
+        fs::{FileSystem, FS_MANAGER},
+    },
+    mm::UserBuffer,
+    sync::UPSafeCell,
+    timer::TimeSpec,
+};
+
 /// inode in memory
-pub struct OSInode {
+pub struct Inode {
     readable: bool,
     writable: bool,
-    inner: UPSafeCell<OSInodeInner>,
+    inner: UPSafeCell<InodeInner>,
 }
 
 /// inner of inode in memory
-pub struct OSInodeInner {
+pub struct InodeInner {
     pos: usize,
     name: String,
-    inode: Arc<dyn Inode>,
+    inode: Arc<dyn InodeOps>,
 }
 
-impl OSInode {
+impl Inode {
     /// create a new inode in memory
-    pub fn new(readable: bool, writable: bool, name: String, inode: Arc<dyn Inode>) -> Self {
+    pub fn new(readable: bool, writable: bool, name: String, inode: Arc<dyn InodeOps>) -> Self {
         trace!("kernel: OSInode::new");
         Self {
             readable,
             writable,
             inner: unsafe {
-                UPSafeCell::new(OSInodeInner {
+                UPSafeCell::new(InodeInner {
                     pos: 0,
                     name,
                     inode,
@@ -65,28 +74,28 @@ impl OSInode {
         inner.inode.clone().fstat()
     }
     /// find the inode in memory with 'name'
-    pub fn find(&self, name: &str) -> Option<Arc<OSInode>> {
+    pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.clone().find(name) {
-            Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
+            Some(Arc::new(Inode::new(true, true, name.to_string(), inode)))
         } else {
             None
         }
     }
     /// create a inode in memory with 'name'
-    pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<OSInode>> {
+    pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.clone().create(name, stat) {
-            Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
+            Some(Arc::new(Inode::new(true, true, name.to_string(), inode)))
         } else {
             None
         }
     }
     /// link a inode in memory with 'old_name' and 'new_name'
-    pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
+    pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
         if let Some(inode) = inner.inode.clone().link(old_name, new_name) {
-            Some(Arc::new(OSInode::new(
+            Some(Arc::new(Inode::new(
                 true,
                 true,
                 new_name.to_string(),
@@ -129,15 +138,15 @@ impl OSInode {
 }
 
 /// Inode trait
-pub trait Inode: Send + Sync {
+pub trait InodeOps: Send + Sync {
     /// get status of file
     fn fstat(self: Arc<Self>) -> Stat;
     /// find the disk inode of the file with 'name'
-    fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn Inode>>;
+    fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn InodeOps>>;
     /// create a file with 'name' in the root directory
-    fn create(self: Arc<Self>, name: &str, stat: StatMode) -> Option<Arc<dyn Inode>>;
+    fn create(self: Arc<Self>, name: &str, stat: StatMode) -> Option<Arc<dyn InodeOps>>;
     /// create a link with a disk inode under current inode
-    fn link(self: Arc<Self>, old_name: &str, new_name: &str) -> Option<Arc<dyn Inode>>;
+    fn link(self: Arc<Self>, old_name: &str, new_name: &str) -> Option<Arc<dyn InodeOps>>;
     /// Remove a link under current inode
     fn unlink(self: Arc<Self>, name: &str) -> bool;
     /// list the file names in the root directory
@@ -258,19 +267,19 @@ bitflags! {
 
 lazy_static! {
     /// The root inode
-    pub static ref ROOT_INODE: Arc<OSInode> = {
+    pub static ref ROOT_INODE: Arc<Inode> = {
         let fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        let root_inode = Fat32FS::root_inode(&fs);
-        let inode: Arc<dyn Inode> = Arc::new(root_inode);
-        Arc::new(OSInode {
+        FS_MANAGER.lock().init(fs.clone());
+        let root_inode = fs.root_inode();
+        Arc::new(Inode {
             readable: true,
             writable: true,
-            inner: unsafe { UPSafeCell::new(OSInodeInner { pos: 0, name: "/".to_string(), inode }) }
+            inner: unsafe { UPSafeCell::new(InodeInner { pos: 0, name: "/".to_string(), inode: root_inode }) }
         })
     };
 }
 
-impl File for OSInode {
+impl File for Inode {
     /// file readable?
     fn readable(&self) -> bool {
         self.readable

@@ -4,14 +4,12 @@
 //! the current running state of CPU is recorded,
 //! and the replacement and transfer of control flow of different applications are executed.
 
-use super::__switch;
-use super::{fetch_task, TaskStatus};
-use super::{ProcessControlBlock, TaskContext, TaskControlBlock};
-use crate::sync::UPSafeCell;
-use crate::timer::get_time_ms;
-use crate::trap::TrapContext;
 use alloc::sync::Arc;
+
 use lazy_static::*;
+
+use super::{__switch, fetch_task, ProcessControlBlock, TaskContext, TaskControlBlock, TaskStatus};
+use crate::{sync::UPSafeCell, timer::get_time_ms, trap::TrapContext};
 
 /// Processor management structure
 pub struct Processor {

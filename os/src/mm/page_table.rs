@@ -1,9 +1,9 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
-use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
-use alloc::string::String;
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc::{string::String, vec, vec::Vec};
+
 use bitflags::*;
+
+use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 
 bitflags! {
     /// page table entry flags

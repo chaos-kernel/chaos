@@ -19,30 +19,29 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use self::id::TaskUserRes;
-use self::manager::add_block_task;
-use crate::{
-    board::QEMUExit,
-    fs::{inode::ROOT_INODE, open_file, OpenFlags},
-    timer::remove_timer,
-};
 use alloc::{sync::Arc, vec::Vec};
-use lazy_static::*;
-use manager::{add_stopping_task, fetch_task};
-pub use process::CloneFlags;
-use process::ProcessControlBlock;
-pub use process::CSIGNAL;
-use switch::__switch;
 
 pub use context::TaskContext;
 pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
+use lazy_static::*;
+use manager::{add_stopping_task, fetch_task};
 pub use manager::{add_task, pid2process, remove_from_pid2process, remove_task, wakeup_task};
+use process::ProcessControlBlock;
+pub use process::{CloneFlags, CSIGNAL};
 pub use processor::{
     current_kstack_top, current_process, current_task, current_trap_cx, current_trap_cx_user_va,
     current_user_token, run_tasks, schedule, take_current_task,
 };
 pub use signal::SignalFlags;
+use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+
+use self::{id::TaskUserRes, manager::add_block_task};
+use crate::{
+    board::QEMUExit,
+    fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    timer::remove_timer,
+};
 
 /// Make current task suspended and switch to the next task
 pub fn suspend_current_and_run_next() {

@@ -1,7 +1,8 @@
 //! The heap allocator.
 
-use crate::config::KERNEL_HEAP_SIZE;
 use buddy_system_allocator::LockedHeap;
+
+use crate::config::KERNEL_HEAP_SIZE;
 
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -23,8 +24,7 @@ pub fn init_heap() {
 
 #[allow(unused)]
 pub fn heap_test() {
-    use alloc::boxed::Box;
-    use alloc::vec::Vec;
+    use alloc::{boxed::Box, vec::Vec};
     extern "C" {
         fn sbss();
         fn ebss();

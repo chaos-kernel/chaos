@@ -1,13 +1,16 @@
 //! Types related to task management & Functions for completely changing TCB
 
-use super::id::TaskUserRes;
-use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
-use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
-use crate::fs::inode::OSInode;
-use crate::trap::TrapContext;
-use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
 use core::cell::RefMut;
+
+use super::{id::TaskUserRes, kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
+use crate::{
+    config::{BIG_STRIDE, MAX_SYSCALL_NUM},
+    fs::inode::Inode,
+    mm::PhysPageNum,
+    sync::UPSafeCell,
+    trap::TrapContext,
+};
 
 /// Task control block structure
 pub struct TaskControlBlock {
@@ -55,7 +58,7 @@ pub struct TaskControlBlockInner {
     ///
     pub clear_child_tid: usize,
     /// working directory
-    pub work_dir: Arc<OSInode>,
+    pub work_dir: Arc<Inode>,
 }
 
 impl TaskControlBlockInner {
