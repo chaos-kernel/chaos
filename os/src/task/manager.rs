@@ -124,7 +124,7 @@ pub fn add_stopping_task(task: Arc<TaskControlBlock>) {
 /// Get process by pid
 pub fn pid2process(pid: usize) -> Option<Arc<ProcessControlBlock>> {
     let map = PID2PCB.exclusive_access();
-    map.get(&pid).map(Arc::clone)
+    map.get(&pid).cloned()
 }
 
 /// Insert item(pid, pcb) into PID2PCB map (called by do_fork AND ProcessControlBlock::new)

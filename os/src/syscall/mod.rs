@@ -167,7 +167,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[3],
             args[4] as *mut usize,
         ),
-        SYSCALL_BRK => sys_brk(args[0] as usize),
+        SYSCALL_BRK => sys_brk(args[0]),
         SYSCALL_EXECVE => sys_execve(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(
             args[0] as isize,
@@ -196,7 +196,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_KILL => sys_kill(args[0], args[1] as u32),
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
         SYSCALL_MKDIRAT => sys_mkdirat64(args[0] as i32, args[1] as *const u8, args[2] as u32),
-        SYSCALL_GETDENTS64 => sys_getdents64(args[0] as i32, args[1] as *mut u8, args[2] as usize),
+        SYSCALL_GETDENTS64 => sys_getdents64(args[0] as i32, args[1] as *mut u8, args[2]),
         SYSCALL_UMOUNT2 => sys_umount2(args[0] as *const u8, args[1] as i32),
         SYSCALL_MOUNT => sys_mount(
             args[0] as *const u8,

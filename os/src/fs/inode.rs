@@ -76,34 +76,29 @@ impl Inode {
     /// find the inode in memory with 'name'
     pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
-        if let Some(inode) = inner.inode.clone().find(name) {
-            Some(Arc::new(Inode::new(true, true, name.to_string(), inode)))
-        } else {
-            None
-        }
+        inner
+            .inode
+            .clone()
+            .find(name)
+            .map(|inode| Arc::new(Inode::new(true, true, name.to_string(), inode)))
     }
     /// create a inode in memory with 'name'
     pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
-        if let Some(inode) = inner.inode.clone().create(name, stat) {
-            Some(Arc::new(Inode::new(true, true, name.to_string(), inode)))
-        } else {
-            None
-        }
+        inner
+            .inode
+            .clone()
+            .create(name, stat)
+            .map(|inode| Arc::new(Inode::new(true, true, name.to_string(), inode)))
     }
     /// link a inode in memory with 'old_name' and 'new_name'
     pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
         let inner = self.inner.exclusive_access();
-        if let Some(inode) = inner.inode.clone().link(old_name, new_name) {
-            Some(Arc::new(Inode::new(
-                true,
-                true,
-                new_name.to_string(),
-                inode,
-            )))
-        } else {
-            None
-        }
+        inner
+            .inode
+            .clone()
+            .link(old_name, new_name)
+            .map(|inode| Arc::new(Inode::new(true, true, new_name.to_string(), inode)))
     }
     /// unlink a inode in memory with 'name'
     pub fn unlink(&self, name: &str) -> bool {
@@ -294,7 +289,7 @@ impl File for Inode {
         let mut inner = self.inner.exclusive_access();
         let mut total_read_size = 0usize;
         for slice in buf.buffers.iter_mut() {
-            let read_size = inner.inode.clone().read_at(inner.pos, *slice);
+            let read_size = inner.inode.clone().read_at(inner.pos, slice);
             if read_size == 0 {
                 break;
             }
@@ -325,7 +320,7 @@ impl File for Inode {
         let mut inner = self.inner.exclusive_access();
         let mut total_write_size = 0usize;
         for slice in buf.buffers.iter() {
-            let write_size = inner.inode.clone().write_at(inner.pos, *slice);
+            let write_size = inner.inode.clone().write_at(inner.pos, slice);
             assert_eq!(write_size, slice.len());
             inner.pos += write_size;
             total_write_size += write_size;

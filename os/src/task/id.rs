@@ -20,6 +20,12 @@ pub struct RecycleAllocator {
     recycled: Vec<usize>,
 }
 
+impl Default for RecycleAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecycleAllocator {
     /// Create a new allocator
     pub fn new() -> Self {

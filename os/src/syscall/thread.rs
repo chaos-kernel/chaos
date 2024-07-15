@@ -71,7 +71,7 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
         new_task.kstack.get_top(),
         trap_handler as usize,
     );
-    (*new_task_trap_cx).x[10] = arg;
+    new_task_trap_cx.x[10] = arg;
     new_task_tid as isize
 }
 /// get current thread id syscall

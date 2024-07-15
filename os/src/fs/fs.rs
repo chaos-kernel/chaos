@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, sync::Arc};
 
 use lazy_static::lazy_static;
 use spin::Mutex;

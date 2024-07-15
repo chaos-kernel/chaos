@@ -39,7 +39,7 @@ impl Processor {
 
     ///Get current task in cloning semanteme
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
-        self.current.as_ref().map(Arc::clone)
+        self.current.clone()
     }
 }
 
@@ -59,7 +59,7 @@ pub fn run_tasks() {
             task_inner.stride += task_inner.pass;
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
-            if task_inner.first_time == None {
+            if task_inner.first_time.is_none() {
                 task_inner.first_time = Some(get_time_ms());
             }
 

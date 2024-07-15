@@ -1,4 +1,4 @@
-use alloc::{sync::Arc, vec};
+use alloc::sync::Arc;
 use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
     syscall::{
-        errno::{EACCES, EBADF, EBUSY, EEXIST, EINVAL, ENOENT, ENOTDIR, SUCCESS},
+        errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR},
         Dirent,
     },
     task::{current_process, current_task, current_user_token},
@@ -428,7 +428,7 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     }
 }
 
-pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
+pub fn sys_umount2(_target: *const u8, _flags: i32) -> isize {
     trace!(
         "kernel:pid[{}] sys_umount2",
         current_task().unwrap().process.upgrade().unwrap().getpid()
@@ -437,11 +437,11 @@ pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
 }
 
 pub fn sys_mount(
-    source: *const u8,
-    target: *const u8,
-    fs: *const u8,
-    flags: u32,
-    data: *const u8,
+    _source: *const u8,
+    _target: *const u8,
+    _fs: *const u8,
+    _flags: u32,
+    _data: *const u8,
 ) -> isize {
     trace!(
         "kernel:pid[{}] sys_mount",

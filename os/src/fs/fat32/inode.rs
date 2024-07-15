@@ -5,10 +5,8 @@ use alloc::{
 };
 use core::cmp::min;
 
-use spin::Mutex;
-
 use super::{
-    dentry::{self, Fat32Dentry, FileAttributes},
+    dentry::{Fat32Dentry, FileAttributes},
     fs::Fat32FS,
 };
 use crate::{
@@ -111,7 +109,7 @@ impl InodeOps for Fat32Inode {
         }))
     }
 
-    fn link(self: Arc<Self>, old_name: &str, new_name: &str) -> Option<Arc<dyn InodeOps>> {
+    fn link(self: Arc<Self>, _old_name: &str, _new_name: &str) -> Option<Arc<dyn InodeOps>> {
         todo!()
     }
 
@@ -183,12 +181,12 @@ impl InodeOps for Fat32Inode {
             }
             let dentry = self.dentry.clone().unwrap();
             fs.read_cluster(cluster_id, &mut cluster_buf);
-            let copy_size = min(dentry.file_size() as usize - pos, buf.len() - read_size);
+            let copy_size = min(dentry.file_size() - pos, buf.len() - read_size);
             buf[read_size..read_size + copy_size]
                 .copy_from_slice(&cluster_buf[pos % CLUSTER_SIZE..pos % CLUSTER_SIZE + copy_size]);
             read_size += copy_size;
             pos += copy_size;
-            if read_size >= buf.len() || pos >= dentry.file_size() as usize {
+            if read_size >= buf.len() || pos >= dentry.file_size() {
                 break;
             }
         }
@@ -274,7 +272,7 @@ impl Fat32Inode {
         if cluster_chain.len() * CLUSTER_SIZE >= size {
             return;
         }
-        let mut last_cluster_id = cluster_chain.last().unwrap().clone();
+        let mut last_cluster_id = *cluster_chain.last().unwrap();
         while cluster_chain.len() * CLUSTER_SIZE < size {
             last_cluster_id = fs.fat.increase_cluster(last_cluster_id).unwrap();
         }

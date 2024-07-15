@@ -88,6 +88,6 @@ pub fn list_apps() {
 
 use alloc::sync::Arc;
 
-use inode::{Inode, InodeOps, Stat, StatMode, ROOT_INODE};
+use inode::{Inode, InodeOps, StatMode, ROOT_INODE};
 pub use pipe::{make_pipe, Pipe};
 pub use stdio::{Stdin, Stdout};

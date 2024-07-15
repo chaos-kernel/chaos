@@ -1,10 +1,7 @@
 use alloc::sync::Arc;
 
 use super::super_block::Fat32SB;
-use crate::{
-    block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ},
-    config::PAGE_SIZE,
-};
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 pub struct FAT {
     pub start_sector: usize,
@@ -47,17 +44,17 @@ impl FAT {
             .modify(sector_offset, |num: &mut u32| {
                 *num = 0x0FFFFFFFu32;
             });
-        Some(cluster_id as usize)
+        Some(cluster_id)
     }
 
     pub fn increase_cluster(&self, cluster_id: usize) -> Option<usize> {
         let new_cluster_id = self.alloc_new_cluster()?;
-        let fat_offset = self.start_sector as usize * BLOCK_SZ + cluster_id * 4;
+        let fat_offset = self.start_sector * BLOCK_SZ + cluster_id * 4;
         let fat_sector = fat_offset / BLOCK_SZ;
         let fat_offset_in_sector = fat_offset % BLOCK_SZ;
-        get_block_cache(fat_sector as usize, Arc::clone(&self.bdev))
+        get_block_cache(fat_sector, Arc::clone(&self.bdev))
             .lock()
-            .modify(fat_offset_in_sector as usize, |num: &mut u32| {
+            .modify(fat_offset_in_sector, |num: &mut u32| {
                 *num = new_cluster_id as u32;
             });
         Some(new_cluster_id)
@@ -65,19 +62,19 @@ impl FAT {
 
     /// get next cluster number
     pub fn next_cluster_id(&self, cluster: usize) -> Option<usize> {
-        let fat_offset = self.start_sector as usize * BLOCK_SZ + cluster * 4;
+        let fat_offset = self.start_sector * BLOCK_SZ + cluster * 4;
         let fat_sector = fat_offset / BLOCK_SZ;
         let fat_offset_in_sector = fat_offset % BLOCK_SZ;
         let mut next_cluster = 0;
-        get_block_cache(fat_sector as usize, Arc::clone(&self.bdev))
+        get_block_cache(fat_sector, Arc::clone(&self.bdev))
             .lock()
-            .read(fat_offset_in_sector as usize, |data: &[u8; 4]| {
+            .read(fat_offset_in_sector, |data: &[u8; 4]| {
                 next_cluster = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
             });
         if next_cluster >= 0x0FFFFFF8 {
-            return None;
+            None
         } else {
-            return Some(next_cluster as usize);
+            Some(next_cluster as usize)
         }
     }
 
@@ -90,11 +87,8 @@ impl FAT {
         if next_offset >= 512 {
             let next_sector_id = sector_id + 1;
             if next_sector_id % self.sb.sectors_per_cluster as usize == 0 {
-                if let Some(next_sector_id) = self.next_cluster_id(sector_id) {
-                    Some((next_sector_id, 0))
-                } else {
-                    None
-                }
+                self.next_cluster_id(sector_id)
+                    .map(|next_sector_id| (next_sector_id, 0))
             } else {
                 Some((next_sector_id, 0))
             }

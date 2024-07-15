@@ -18,7 +18,7 @@ use crate::{
         inode::{Inode, ROOT_INODE},
         Stdin, Stdout,
     },
-    mm::{translated_refmut, MemorySet, UserBuffer, VirtAddr, KERNEL_SPACE},
+    mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE},
     sync::{Condvar, Mutex, Semaphore, UPSafeCell},
     syscall::errno::EPERM,
     timer::get_time,

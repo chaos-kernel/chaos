@@ -28,9 +28,7 @@ impl Fat32SB {
 
 impl Fat32SB {
     pub fn root_sector(&self) -> usize {
-        let res =
-            self.reserved_sectors_cnt as usize + self.fat_cnt as usize * self.fat_size_32 as usize;
-        res
+        self.reserved_sectors_cnt as usize + self.fat_cnt as usize * self.fat_size_32 as usize
     }
 }
 

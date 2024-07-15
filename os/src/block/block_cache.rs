@@ -83,6 +83,12 @@ pub struct BlockCacheManager {
     queue: VecDeque<(usize, Arc<Mutex<BlockCache>>)>,
 }
 
+impl Default for BlockCacheManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockCacheManager {
     /// Create a new BlockCacheManager with an empty queue (block_id, block_cache)
     pub fn new() -> Self {

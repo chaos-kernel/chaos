@@ -93,7 +93,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let process = task.process.upgrade().unwrap();
     let mut process_inner = process.inner_exclusive_access();
     let tid = task_inner.res.as_ref().unwrap().tid;
-    let additions: Vec<_> = process_inner.allocation[tid].iter().cloned().collect();
+    let additions: Vec<_> = process_inner.allocation[tid].to_vec();
     for (i, num) in additions.iter().enumerate() {
         process_inner.available[i] += num;
     }
@@ -158,7 +158,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
             // are limited in a single process. Therefore, the blocked tasks are
             // removed when the PCB is deallocated.
             trace!("kernel: exit_current_and_run_next .. remove_inactive_task");
-            remove_inactive_task(Arc::clone(&task));
+            remove_inactive_task(Arc::clone(task));
             let mut task_inner = task.inner_exclusive_access();
             if let Some(res) = task_inner.res.take() {
                 recycle_res.push(res);
@@ -211,7 +211,7 @@ pub fn add_initproc() {
 
 /// Run all files in the root directory
 pub fn add_file(file: &str) {
-    let inode = open_file(ROOT_INODE.as_ref(), &file, OpenFlags::RDONLY).unwrap();
+    let inode = open_file(ROOT_INODE.as_ref(), file, OpenFlags::RDONLY).unwrap();
     let v = inode.read_all();
     let _pcb = ProcessControlBlock::new(v.as_slice());
 }
@@ -270,6 +270,6 @@ pub fn detect_deadlock() -> bool {
             break;
         }
     }
-    let res = finish.iter().find(|x| **x == false).is_some();
+    let res = finish.iter().any(|x| !*x);
     res
 }

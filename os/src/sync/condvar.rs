@@ -17,6 +17,12 @@ pub struct CondvarInner {
     pub wait_queue: VecDeque<Arc<TaskControlBlock>>,
 }
 
+impl Default for Condvar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Condvar {
     /// Create a new condition variable
     pub fn new() -> Self {

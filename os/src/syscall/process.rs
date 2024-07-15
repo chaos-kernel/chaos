@@ -1,23 +1,12 @@
-use alloc::{string::String, sync::Arc, vec, vec::Vec};
-use core::{
-    borrow::BorrowMut,
-    mem::{self, size_of},
-    ptr,
-};
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::{borrow::BorrowMut, mem::size_of, ptr};
 
 #[allow(unused)]
 use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
-    fs::{
-        file::File,
-        inode::{Inode, ROOT_INODE},
-        open_file, OpenFlags,
-    },
-    mm::{
-        translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission,
-        VirtAddr,
-    },
+    fs::{file::File, inode::ROOT_INODE, open_file, OpenFlags},
+    mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str},
     syscall::errno::{ECHILD, ENOENT, ENOSYS, ESRCH},
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
@@ -176,9 +165,9 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
-            return current_process.fork() as isize;
+            current_process.fork() as isize
         } else {
-            return current_process.fork2(stack_ptr) as isize; //todo仅用于初赛
+            current_process.fork2(stack_ptr) as isize //todo仅用于初赛
         }
     } else {
         println!("[sys_clone] create thread");
@@ -194,22 +183,18 @@ pub fn sys_clone(
         }
 
         let token = current_user_token();
-        if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) {
-            if !ptid.is_null() {
-                *translated_refmut(token, ptid) = new_thread_ttid;
-            }
+        if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) && !ptid.is_null() {
+            *translated_refmut(token, ptid) = new_thread_ttid;
         }
-        if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) {
-            if !ctid.is_null() {
-                *translated_refmut(token, ctid) = new_thread_ttid;
-            }
+        if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) && !ctid.is_null() {
+            *translated_refmut(token, ctid) = new_thread_ttid;
         }
         if clone_signals.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
             let mut thread_inner = new_thread.inner_exclusive_access();
             thread_inner.clear_child_tid = ctid as usize;
         }
 
-        return new_thread_ttid as isize;
+        new_thread_ttid as isize
     }
 }
 /// exec syscall
