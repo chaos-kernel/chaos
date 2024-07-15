@@ -5,7 +5,11 @@ use crate::{
     fs::{
         file::File,
         inode::{Inode, Stat, ROOT_INODE},
-        link, make_pipe, open_file, unlink, OpenFlags,
+        link,
+        make_pipe,
+        open_file,
+        unlink,
+        OpenFlags,
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
     syscall::{
@@ -437,11 +441,7 @@ pub fn sys_umount2(_target: *const u8, _flags: i32) -> isize {
 }
 
 pub fn sys_mount(
-    _source: *const u8,
-    _target: *const u8,
-    _fs: *const u8,
-    _flags: u32,
-    _data: *const u8,
+    _source: *const u8, _target: *const u8, _fs: *const u8, _flags: u32, _data: *const u8,
 ) -> isize {
     trace!(
         "kernel:pid[{}] sys_mount",

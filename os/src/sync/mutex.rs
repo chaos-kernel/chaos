@@ -4,7 +4,10 @@ use alloc::{collections::VecDeque, sync::Arc};
 
 use super::UPSafeCell;
 use crate::task::{
-    block_current_and_run_next, current_task, suspend_current_and_run_next, wakeup_task,
+    block_current_and_run_next,
+    current_task,
+    suspend_current_and_run_next,
+    wakeup_task,
     TaskControlBlock,
 };
 
@@ -66,7 +69,7 @@ pub struct MutexBlocking {
 }
 
 pub struct MutexBlockingInner {
-    locked: bool,
+    locked:     bool,
     wait_queue: VecDeque<Arc<TaskControlBlock>>,
 }
 
@@ -83,7 +86,7 @@ impl MutexBlocking {
         Self {
             inner: unsafe {
                 UPSafeCell::new(MutexBlockingInner {
-                    locked: false,
+                    locked:     false,
                     wait_queue: VecDeque::new(),
                 })
             },

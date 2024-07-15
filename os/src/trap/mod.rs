@@ -19,16 +19,24 @@ use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
-    sie, stval, stvec,
+    sie,
+    stval,
+    stvec,
 };
 
 use crate::{
     config::TRAMPOLINE,
     syscall::syscall,
     task::{
-        check_signals_of_current, current_add_signal, current_process, current_trap_cx,
-        current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, SignalFlags,
+        check_signals_of_current,
+        current_add_signal,
+        current_process,
+        current_trap_cx,
+        current_trap_cx_user_va,
+        current_user_token,
+        exit_current_and_run_next,
+        suspend_current_and_run_next,
+        SignalFlags,
     },
     timer::{check_timer, set_next_trigger},
 };
@@ -95,7 +103,8 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
             error!(
-                "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+                "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = \
+                 {:#x}, kernel killed it.",
                 scause.cause(),
                 stval,
                 current_trap_cx().sepc,

@@ -8,11 +8,9 @@ use crate::block::block_dev::BlockDevice;
 
 pub trait FileSystem: Sync + Send {
     fn load(bdev: Arc<dyn BlockDevice>) -> Arc<Self>
-    where
-        Self: Sized;
+    where Self: Sized;
     fn fs_type() -> FileSystemType
-    where
-        Self: Sized;
+    where Self: Sized;
     fn root_inode(self: Arc<Self>) -> Arc<dyn InodeOps>;
 }
 
@@ -26,14 +24,14 @@ lazy_static! {
 }
 
 pub struct FileSystemManager {
-    root_fs: Option<Arc<dyn FileSystem>>,
+    root_fs:    Option<Arc<dyn FileSystem>>,
     mounted_fs: BTreeMap<String, Arc<dyn FileSystem>>,
 }
 
 impl FileSystemManager {
     pub fn new() -> Self {
         Self {
-            root_fs: None,
+            root_fs:    None,
             mounted_fs: BTreeMap::new(),
         }
     }

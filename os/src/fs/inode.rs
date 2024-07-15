@@ -25,13 +25,13 @@ use crate::{
 pub struct Inode {
     readable: bool,
     writable: bool,
-    inner: UPSafeCell<InodeInner>,
+    inner:    UPSafeCell<InodeInner>,
 }
 
 /// inner of inode in memory
 pub struct InodeInner {
-    pos: usize,
-    name: String,
+    pos:   usize,
+    name:  String,
     inode: Arc<dyn InodeOps>,
 }
 
@@ -161,48 +161,41 @@ pub trait InodeOps: Send + Sync {
 #[derive(Debug)]
 pub struct Stat {
     /// ID of device containing file
-    st_dev: u64,
+    st_dev:      u64,
     /// Inode number
-    st_ino: u64,
+    st_ino:      u64,
     /// File type and mode   
-    st_mode: u32,
+    st_mode:     u32,
     /// Number of hard links
-    st_nlink: u32,
+    st_nlink:    u32,
     /// User ID of the file's owner.
-    st_uid: u32,
+    st_uid:      u32,
     /// Group ID of the file's group.
-    st_gid: u32,
+    st_gid:      u32,
     /// Device ID (if special file)
-    st_rdev: u64,
-    __pad: u64,
+    st_rdev:     u64,
+    __pad:       u64,
     /// Size of file, in bytes.
     pub st_size: i64,
     /// Optimal block size for I/O.
-    st_blksize: u32,
-    __pad2: i32,
+    st_blksize:  u32,
+    __pad2:      i32,
     /// Number 512-byte blocks allocated.
-    st_blocks: u64,
+    st_blocks:   u64,
     /// Backward compatibility. Used for time of last access.
-    st_atime: TimeSpec,
+    st_atime:    TimeSpec,
     /// Time of last modification.
-    st_mtime: TimeSpec,
+    st_mtime:    TimeSpec,
     /// Time of last status change.
-    st_ctime: TimeSpec,
-    __unused: u64,
+    st_ctime:    TimeSpec,
+    __unused:    u64,
 }
 
 impl Stat {
     /// create a new stat
     pub fn new(
-        st_dev: u64,
-        st_ino: u64,
-        st_mode: u32,
-        st_nlink: u32,
-        st_rdev: u64,
-        st_size: i64,
-        st_atime_sec: i64,
-        st_mtime_sec: i64,
-        st_ctime_sec: i64,
+        st_dev: u64, st_ino: u64, st_mode: u32, st_nlink: u32, st_rdev: u64, st_size: i64,
+        st_atime_sec: i64, st_mtime_sec: i64, st_ctime_sec: i64,
     ) -> Self {
         Self {
             st_dev,
@@ -218,15 +211,15 @@ impl Stat {
             __pad2: 0,
             st_blocks: (st_size as u64 + BLOCK_SZ as u64 - 1) / BLOCK_SZ as u64,
             st_atime: TimeSpec {
-                tv_sec: st_atime_sec as usize,
+                tv_sec:  st_atime_sec as usize,
                 tv_nsec: 0,
             },
             st_mtime: TimeSpec {
-                tv_sec: st_mtime_sec as usize,
+                tv_sec:  st_mtime_sec as usize,
                 tv_nsec: 0,
             },
             st_ctime: TimeSpec {
-                tv_sec: st_ctime_sec as usize,
+                tv_sec:  st_ctime_sec as usize,
                 tv_nsec: 0,
             },
             __unused: 0,

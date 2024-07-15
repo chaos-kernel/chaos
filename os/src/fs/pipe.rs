@@ -7,7 +7,7 @@ use crate::{mm::UserBuffer, sync::UPSafeCell, task::suspend_current_and_run_next
 pub struct Pipe {
     readable: bool,
     writable: bool,
-    buffer: Arc<UPSafeCell<PipeRingBuffer>>,
+    buffer:   Arc<UPSafeCell<PipeRingBuffer>>,
 }
 
 impl Pipe {
@@ -39,10 +39,10 @@ enum RingBufferStatus {
 }
 
 pub struct PipeRingBuffer {
-    arr: [u8; RING_BUFFER_SIZE],
-    head: usize,
-    tail: usize,
-    status: RingBufferStatus,
+    arr:       [u8; RING_BUFFER_SIZE],
+    head:      usize,
+    tail:      usize,
+    status:    RingBufferStatus,
     write_end: Option<Weak<Pipe>>,
 }
 
@@ -55,10 +55,10 @@ impl Default for PipeRingBuffer {
 impl PipeRingBuffer {
     pub fn new() -> Self {
         Self {
-            arr: [0; RING_BUFFER_SIZE],
-            head: 0,
-            tail: 0,
-            status: RingBufferStatus::Empty,
+            arr:       [0; RING_BUFFER_SIZE],
+            head:      0,
+            tail:      0,
+            status:    RingBufferStatus::Empty,
             write_end: None,
         }
     }

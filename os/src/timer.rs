@@ -29,7 +29,7 @@ const MICRO_PER_SEC: usize = 1_000_000;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TimeSpec {
     /// The tv_sec member represents the elapsed time, in whole seconds.
-    pub tv_sec: usize,
+    pub tv_sec:  usize,
     /// The tv_usec member captures rest of the elapsed time, represented as the number of microseconds.
     pub tv_nsec: usize,
 }
@@ -59,7 +59,7 @@ pub struct TimerCondVar {
     /// The time when the timer expires, in milliseconds
     pub expire_ms: usize,
     /// The task to be woken up when the timer expires
-    pub task: Arc<TaskControlBlock>,
+    pub task:      Arc<TaskControlBlock>,
 }
 
 impl PartialEq for TimerCondVar {

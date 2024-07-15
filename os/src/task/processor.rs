@@ -22,7 +22,7 @@ pub struct Processor {
 impl Processor {
     pub fn new() -> Self {
         Self {
-            current: None,
+            current:      None,
             idle_task_cx: TaskContext::zero_init(),
         }
     }

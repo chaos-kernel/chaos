@@ -9,14 +9,21 @@ use alloc::{
 use core::cell::RefMut;
 
 use super::{
-    add_task, current_task, id::RecycleAllocator, manager::insert_into_pid2process, pid_alloc,
-    PidHandle, SignalFlags, TaskControlBlock,
+    add_task,
+    current_task,
+    id::RecycleAllocator,
+    manager::insert_into_pid2process,
+    pid_alloc,
+    PidHandle,
+    SignalFlags,
+    TaskControlBlock,
 };
 use crate::{
     fs::{
         file::File,
         inode::{Inode, ROOT_INODE},
-        Stdin, Stdout,
+        Stdin,
+        Stdout,
     },
     mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE},
     sync::{Condvar, Mutex, Semaphore, UPSafeCell},
@@ -108,57 +115,57 @@ pub struct ProcessControlBlock {
     /// immutable
     pub pid: PidHandle,
     /// mutable
-    inner: UPSafeCell<ProcessControlBlockInner>,
+    inner:   UPSafeCell<ProcessControlBlockInner>,
 }
 
 /// Inner of Process Control Block
 pub struct ProcessControlBlockInner {
     /// is zombie?
-    pub is_zombie: bool,
+    pub is_zombie:          bool,
     /// memory set(address space)
-    pub memory_set: MemorySet,
+    pub memory_set:         MemorySet,
     /// parent process
-    pub parent: Option<Weak<ProcessControlBlock>>,
+    pub parent:             Option<Weak<ProcessControlBlock>>,
     /// children process
-    pub children: Vec<Arc<ProcessControlBlock>>,
+    pub children:           Vec<Arc<ProcessControlBlock>>,
     /// exit code
-    pub exit_code: i32,
+    pub exit_code:          i32,
     /// file descriptor table
-    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table:           Vec<Option<Arc<dyn File + Send + Sync>>>,
     /// signal flags
-    pub signals: SignalFlags,
+    pub signals:            SignalFlags,
     /// tasks(also known as threads)
-    pub tasks: Vec<Option<Arc<TaskControlBlock>>>,
+    pub tasks:              Vec<Option<Arc<TaskControlBlock>>>,
     /// task resource allocator
     pub task_res_allocator: RecycleAllocator,
     /// mutex list
-    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>,
+    pub mutex_list:         Vec<Option<Arc<dyn Mutex>>>,
     /// semaphore list
-    pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
+    pub semaphore_list:     Vec<Option<Arc<Semaphore>>>,
     /// condvar list
-    pub condvar_list: Vec<Option<Arc<Condvar>>>,
+    pub condvar_list:       Vec<Option<Arc<Condvar>>>,
     /// enable deadlock detect
-    pub deadlock_detect: bool,
+    pub deadlock_detect:    bool,
     /// available list
-    pub available: Vec<u32>,
+    pub available:          Vec<u32>,
     /// allocation matrix
-    pub allocation: Vec<Vec<u32>>,
+    pub allocation:         Vec<Vec<u32>>,
     /// nedd matrix
-    pub need: Vec<Vec<u32>>,
+    pub need:               Vec<Vec<u32>>,
     /// finish list
-    pub finish: Vec<bool>,
+    pub finish:             Vec<bool>,
     /// clock time stop watch
-    pub clock_stop_watch: usize,
+    pub clock_stop_watch:   usize,
     /// user clock time
-    pub user_clock: usize,
+    pub user_clock:         usize,
     /// kernel clock time
-    pub kernel_clock: usize,
+    pub kernel_clock:       usize,
     /// Record the usage of heap_area in MemorySet
-    pub heap_base: VirtAddr,
+    pub heap_base:          VirtAddr,
     ///
-    pub heap_end: VirtAddr,
+    pub heap_end:           VirtAddr,
     /// working directory
-    pub work_dir: Arc<Inode>,
+    pub work_dir:           Arc<Inode>,
 }
 
 impl ProcessControlBlockInner {
@@ -230,12 +237,7 @@ impl ProcessControlBlockInner {
 
     /// mmap
     pub fn mmap(
-        &mut self,
-        start_addr: usize,
-        len: usize,
-        _prot: usize,
-        flags: usize,
-        fd: usize,
+        &mut self, start_addr: usize, len: usize, _prot: usize, flags: usize, fd: usize,
         offset: usize,
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();
@@ -282,7 +284,7 @@ impl ProcessControlBlock {
         // allocate a pid
         let pid_handle = pid_alloc();
         let process = Arc::new(Self {
-            pid: pid_handle,
+            pid:   pid_handle,
             inner: unsafe {
                 UPSafeCell::new(ProcessControlBlockInner {
                     is_zombie: false,
@@ -504,10 +506,7 @@ impl ProcessControlBlock {
     }
     /// clone2
     pub fn clone2(
-        self: &Arc<Self>,
-        _exit_signals: SignalFlags,
-        _clone_signals: CloneFlags,
-        stack_ptr: usize,
+        self: &Arc<Self>, _exit_signals: SignalFlags, _clone_signals: CloneFlags, stack_ptr: usize,
         tls: usize,
     ) -> Arc<TaskControlBlock> {
         trace!("kernel: clone");

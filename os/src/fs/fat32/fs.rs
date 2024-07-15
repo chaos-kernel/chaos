@@ -17,8 +17,8 @@ use crate::{
 
 pub struct Fat32FS {
     pub bdev: Arc<dyn BlockDevice>,
-    pub sb: Arc<Fat32SB>,
-    pub fat: Arc<FAT>,
+    pub sb:   Arc<Fat32SB>,
+    pub fat:  Arc<FAT>,
 }
 
 impl FileSystem for Fat32FS {
@@ -29,8 +29,8 @@ impl FileSystem for Fat32FS {
                 assert!(layout.is_valid(), "Error loading FAT32!");
                 Arc::new(Self {
                     bdev: bdev.clone(),
-                    sb: Arc::new(Fat32SB::from_layout(layout)),
-                    fat: Arc::new(FAT::from_sb(Arc::new(Fat32SB::from_layout(layout)), &bdev)),
+                    sb:   Arc::new(Fat32SB::from_layout(layout)),
+                    fat:  Arc::new(FAT::from_sb(Arc::new(Fat32SB::from_layout(layout)), &bdev)),
                 })
             })
     }
@@ -163,11 +163,7 @@ impl Fat32FS {
     }
 
     pub fn insert_dentry(
-        &self,
-        cluster_id: usize,
-        name: String,
-        attr: FileAttributes,
-        file_size: u32,
+        &self, cluster_id: usize, name: String, attr: FileAttributes, file_size: u32,
         start_cluster: usize,
     ) -> Option<Fat32Dentry> {
         let mut sector_id = self.fat.cluster_id_to_sector_id(cluster_id).unwrap();

@@ -6,7 +6,10 @@ use crate::{
     sync::{Condvar, Mutex, MutexBlocking, MutexSpin, Semaphore},
     syscall::errno::EINVAL,
     task::{
-        current_process, current_task, current_user_token, detect_deadlock,
+        current_process,
+        current_task,
+        current_user_token,
+        detect_deadlock,
         suspend_current_and_run_next,
     },
     timer::{get_time, NSEC_PER_SEC},

@@ -67,7 +67,7 @@ impl PageTableEntry {
 /// page table structure
 pub struct PageTable {
     root_ppn: PhysPageNum,
-    frames: Vec<FrameTracker>,
+    frames:   Vec<FrameTracker>,
 }
 
 /// Assume that it won't oom when creating/mapping.
@@ -83,14 +83,14 @@ impl PageTable {
         let frame = frame_alloc().unwrap();
         PageTable {
             root_ppn: frame.ppn,
-            frames: vec![frame],
+            frames:   vec![frame],
         }
     }
     /// Temporarily used to get arguments from user space.
     pub fn from_token(satp: usize) -> Self {
         Self {
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
-            frames: Vec::new(),
+            frames:   Vec::new(),
         }
     }
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
@@ -249,18 +249,18 @@ impl IntoIterator for UserBuffer {
     type IntoIter = UserBufferIterator;
     fn into_iter(self) -> Self::IntoIter {
         UserBufferIterator {
-            buffers: self.buffers,
+            buffers:        self.buffers,
             current_buffer: 0,
-            current_idx: 0,
+            current_idx:    0,
         }
     }
 }
 
 /// An iterator over a UserBuffer
 pub struct UserBufferIterator {
-    buffers: Vec<&'static mut [u8]>,
+    buffers:        Vec<&'static mut [u8]>,
     current_buffer: usize,
-    current_idx: usize,
+    current_idx:    usize,
 }
 
 impl Iterator for UserBufferIterator {

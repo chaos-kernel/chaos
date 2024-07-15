@@ -4,11 +4,11 @@ use super::fat::FAT;
 use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice};
 
 pub struct Fat32Dentry {
-    pub sector_id: usize,
+    pub sector_id:     usize,
     pub sector_offset: usize,
-    pub deleted: bool,
-    pub bdev: Arc<dyn BlockDevice>,
-    pub fat: Arc<FAT>,
+    pub deleted:       bool,
+    pub bdev:          Arc<dyn BlockDevice>,
+    pub fat:           Arc<FAT>,
 }
 
 bitflags! {
@@ -24,10 +24,7 @@ bitflags! {
 
 impl Fat32Dentry {
     pub fn new(
-        sector_id: usize,
-        sector_offset: usize,
-        bdev: &Arc<dyn BlockDevice>,
-        fat: &Arc<FAT>,
+        sector_id: usize, sector_offset: usize, bdev: &Arc<dyn BlockDevice>, fat: &Arc<FAT>,
     ) -> Self {
         Self {
             sector_id,
@@ -40,11 +37,11 @@ impl Fat32Dentry {
 
     pub fn new_deleted(bdev: &Arc<dyn BlockDevice>, fat: &Arc<FAT>) -> Self {
         Self {
-            sector_id: 0,
+            sector_id:     0,
             sector_offset: 0,
-            deleted: true,
-            bdev: Arc::clone(bdev),
-            fat: fat.clone(),
+            deleted:       true,
+            bdev:          Arc::clone(bdev),
+            fat:           fat.clone(),
         }
     }
 
@@ -161,27 +158,24 @@ impl Fat32Dentry {
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct Fat32DentryLayout {
-    name: [u8; 8],
-    ext: [u8; 3],
-    attr: u8,
-    reserved: u8,
-    create_time_ms: u8,
-    create_time: u16,
-    create_date: u16,
-    last_access_date: u16,
+    name:               [u8; 8],
+    ext:                [u8; 3],
+    attr:               u8,
+    reserved:           u8,
+    create_time_ms:     u8,
+    create_time:        u16,
+    create_date:        u16,
+    last_access_date:   u16,
     start_cluster_high: u16,
-    last_modify_time: u16,
-    last_modify_date: u16,
-    start_cluster_low: u16,
-    file_size: u32,
+    last_modify_time:   u16,
+    last_modify_date:   u16,
+    start_cluster_low:  u16,
+    file_size:          u32,
 }
 
 impl Fat32DentryLayout {
     pub fn new(
-        file_name: &str,
-        attr: FileAttributes,
-        start_cluster: usize,
-        file_size: u32,
+        file_name: &str, attr: FileAttributes, start_cluster: usize, file_size: u32,
     ) -> Self {
         let mut name = [0u8; 8];
         let mut ext = [0u8; 3];
@@ -277,14 +271,14 @@ impl Fat32DentryLayout {
 #[repr(C, packed)]
 /// the layout of a fat32 long dentry
 pub struct Fat32LDentryLayout {
-    pub order: u8,
-    pub name1: [u16; 5],
-    pub attr: u8,
-    pub reserved: u8,
-    pub checksum: u8,
-    pub name2: [u16; 6],
+    pub order:         u8,
+    pub name1:         [u16; 5],
+    pub attr:          u8,
+    pub reserved:      u8,
+    pub checksum:      u8,
+    pub name2:         [u16; 6],
     pub start_cluster: u16,
-    pub name3: [u16; 2],
+    pub name3:         [u16; 2],
 }
 
 impl Fat32LDentryLayout {
@@ -322,18 +316,18 @@ impl Fat32LDentryLayout {
             return None;
         }
         Some(Self {
-            order: layout.name[0],
-            name1: [
+            order:         layout.name[0],
+            name1:         [
                 layout.name[1] as u16 | ((layout.name[2] as u16) << 8),
                 layout.name[3] as u16 | ((layout.name[4] as u16) << 8),
                 layout.name[5] as u16 | ((layout.name[6] as u16) << 8),
                 layout.name[7] as u16 | ((layout.ext[0] as u16) << 8),
                 layout.ext[1] as u16 | ((layout.ext[2] as u16) << 8),
             ],
-            attr: layout.attr,
-            reserved: layout.reserved,
-            checksum: layout.create_time_ms,
-            name2: [
+            attr:          layout.attr,
+            reserved:      layout.reserved,
+            checksum:      layout.create_time_ms,
+            name2:         [
                 layout.create_time,
                 layout.create_date,
                 layout.last_access_date,
@@ -342,7 +336,7 @@ impl Fat32LDentryLayout {
                 layout.last_modify_date,
             ],
             start_cluster: layout.start_cluster_low,
-            name3: [layout.file_size as u16, (layout.file_size >> 16) as u16],
+            name3:         [layout.file_size as u16, (layout.file_size >> 16) as u16],
         })
     }
 

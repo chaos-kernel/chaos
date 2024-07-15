@@ -28,7 +28,7 @@ impl TaskManager {
         Self {
             ready_queue: VecDeque::new(),
             block_queue: VecDeque::new(),
-            stop_task: None,
+            stop_task:   None,
         }
     }
     /// Add process back to ready queue

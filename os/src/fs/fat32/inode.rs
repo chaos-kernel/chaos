@@ -19,11 +19,11 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Fat32Inode {
-    pub type_: Fat32InodeType,
-    pub dentry: Option<Arc<Fat32Dentry>>,
+    pub type_:         Fat32InodeType,
+    pub dentry:        Option<Arc<Fat32Dentry>>,
     pub start_cluster: usize,
-    pub fs: Arc<Fat32FS>,
-    pub bdev: Arc<dyn BlockDevice>,
+    pub fs:            Arc<Fat32FS>,
+    pub bdev:          Arc<dyn BlockDevice>,
 }
 
 impl InodeOps for Fat32Inode {
@@ -131,7 +131,7 @@ impl InodeOps for Fat32Inode {
             if dentry.name() == name {
                 if next.is_some() {
                     let inode = Arc::new(Fat32Inode {
-                        type_: if dentry.is_file() {
+                        type_:         if dentry.is_file() {
                             Fat32InodeType::File
                         } else if dentry.is_dir() {
                             Fat32InodeType::Dir
@@ -139,9 +139,9 @@ impl InodeOps for Fat32Inode {
                             Fat32InodeType::VolumeId
                         },
                         start_cluster: dentry.start_cluster_id(),
-                        fs: Arc::clone(&self.fs),
-                        bdev: Arc::clone(&self.bdev),
-                        dentry: Some(Arc::new(dentry)),
+                        fs:            Arc::clone(&self.fs),
+                        bdev:          Arc::clone(&self.bdev),
+                        dentry:        Some(Arc::new(dentry)),
                     });
                     return inode.unlink(next.unwrap());
                 } else {

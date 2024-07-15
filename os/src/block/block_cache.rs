@@ -8,10 +8,10 @@ use spin::Mutex;
 use super::{block_dev::BlockDevice, BLOCK_SZ};
 /// BlockCache is a cache for a block in disk.
 pub struct BlockCache {
-    cache: Vec<u8>,
-    block_id: usize,
+    cache:        Vec<u8>,
+    block_id:     usize,
     block_device: Arc<dyn BlockDevice>,
-    modified: bool,
+    modified:     bool,
 }
 
 impl BlockCache {
@@ -33,9 +33,7 @@ impl BlockCache {
     }
     /// Get a immutable reference to the data in the block cache according to the offset.
     pub fn get_ref<T>(&self, offset: usize) -> &T
-    where
-        T: Sized,
-    {
+    where T: Sized {
         let type_size = core::mem::size_of::<T>();
         assert!(offset + type_size <= BLOCK_SZ);
         let addr = self.addr_of_offset(offset);
@@ -43,9 +41,7 @@ impl BlockCache {
     }
     /// Get a mutable reference to the data in the block cache according to the offset.
     pub fn get_mut<T>(&mut self, offset: usize) -> &mut T
-    where
-        T: Sized,
-    {
+    where T: Sized {
         let type_size = core::mem::size_of::<T>();
         assert!(offset + type_size <= BLOCK_SZ);
         self.modified = true;
@@ -98,9 +94,7 @@ impl BlockCacheManager {
     }
     /// Get a block cache from the queue. according to the block_id.
     pub fn get_block_cache(
-        &mut self,
-        block_id: usize,
-        block_device: Arc<dyn BlockDevice>,
+        &mut self, block_id: usize, block_device: Arc<dyn BlockDevice>,
     ) -> Arc<Mutex<BlockCache>> {
         if let Some(pair) = self.queue.iter().find(|pair| pair.0 == block_id) {
             Arc::clone(&pair.1)
@@ -137,8 +131,7 @@ lazy_static! {
 }
 /// Get a block cache from the queue. according to the block_id.
 pub fn get_block_cache(
-    block_id: usize,
-    block_device: Arc<dyn BlockDevice>,
+    block_id: usize, block_device: Arc<dyn BlockDevice>,
 ) -> Arc<Mutex<BlockCache>> {
     BLOCK_CACHE_MANAGER
         .lock()

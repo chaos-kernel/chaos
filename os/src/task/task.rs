@@ -17,9 +17,9 @@ pub struct TaskControlBlock {
     /// immutable
     pub process: Weak<ProcessControlBlock>,
     /// Kernel stack corresponding to PID
-    pub kstack: KernelStack,
+    pub kstack:  KernelStack,
     /// mutable
-    inner: UPSafeCell<TaskControlBlockInner>,
+    inner:       UPSafeCell<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -36,29 +36,29 @@ impl TaskControlBlock {
 }
 
 pub struct TaskControlBlockInner {
-    pub res: Option<TaskUserRes>,
+    pub res:             Option<TaskUserRes>,
     /// The physical page number of the frame where the trap context is placed
-    pub trap_cx_ppn: PhysPageNum,
+    pub trap_cx_ppn:     PhysPageNum,
     /// Save task context
-    pub task_cx: TaskContext,
+    pub task_cx:         TaskContext,
     /// Maintain the execution status of the current process
-    pub task_status: TaskStatus,
+    pub task_status:     TaskStatus,
     /// It is set when active exit or execution error occurs
-    pub exit_code: Option<i32>,
+    pub exit_code:       Option<i32>,
     /// syscall times of tasks
-    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times:   [u32; MAX_SYSCALL_NUM],
     /// the time task was first run
-    pub first_time: Option<usize>,
+    pub first_time:      Option<usize>,
     /// priority
-    pub priority: usize,
+    pub priority:        usize,
     /// stride
-    pub stride: usize,
+    pub stride:          usize,
     /// pass
-    pub pass: usize,
+    pub pass:            usize,
     ///
     pub clear_child_tid: usize,
     /// working directory
-    pub work_dir: Arc<Inode>,
+    pub work_dir:        Arc<Inode>,
 }
 
 impl TaskControlBlockInner {

@@ -7,8 +7,17 @@ use lazy_static::*;
 use riscv::register::satp;
 
 use super::{
-    frame_alloc, FrameTracker, PTEFlags, PageTable, PageTableEntry, PhysAddr, PhysPageNum,
-    StepByOne, VPNRange, VirtAddr, VirtPageNum,
+    frame_alloc,
+    FrameTracker,
+    PTEFlags,
+    PageTable,
+    PageTableEntry,
+    PhysAddr,
+    PhysPageNum,
+    StepByOne,
+    VPNRange,
+    VirtAddr,
+    VirtPageNum,
 };
 use crate::{
     config::{MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, STACK_TOP, TRAMPOLINE},
@@ -46,18 +55,18 @@ pub struct MemorySet {
     /// page table
     pub page_table: PageTable,
     /// areas
-    pub areas: Vec<MapArea>,
+    pub areas:      Vec<MapArea>,
     /// heap
-    heap_area: BTreeMap<VirtPageNum, FrameTracker>,
+    heap_area:      BTreeMap<VirtPageNum, FrameTracker>,
     // The memory area formed by mmap does not need to be modified
     // we can use MapArea in Vec to hold FramTracker
     // we set a fixed address as the start address for mmap_area
     // the virtual memorySet is big enough to use it that doesnt concern address conflicts
-    pub mmap_area: BTreeMap<VirtPageNum, FrameTracker>,
+    pub mmap_area:  BTreeMap<VirtPageNum, FrameTracker>,
     // mmap_base will never change
-    pub mmap_base: VirtAddr,
+    pub mmap_base:  VirtAddr,
     // always aligh to PAGE_SIZE
-    pub mmap_end: VirtAddr,
+    pub mmap_end:   VirtAddr,
 }
 
 impl MemorySet {
@@ -65,11 +74,11 @@ impl MemorySet {
     pub fn new_bare() -> Self {
         Self {
             page_table: PageTable::new(),
-            areas: Vec::new(),
-            heap_area: BTreeMap::new(),
-            mmap_area: BTreeMap::new(),
-            mmap_base: MMAP_BASE.into(),
-            mmap_end: MMAP_BASE.into(),
+            areas:      Vec::new(),
+            heap_area:  BTreeMap::new(),
+            mmap_area:  BTreeMap::new(),
+            mmap_base:  MMAP_BASE.into(),
+            mmap_end:   MMAP_BASE.into(),
         }
     }
     /// Get he page table token
@@ -78,10 +87,7 @@ impl MemorySet {
     }
     /// Assume that no conflicts.
     pub fn insert_framed_area(
-        &mut self,
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-        permission: MapPermission,
+        &mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission,
     ) {
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
@@ -90,11 +96,7 @@ impl MemorySet {
     }
 
     pub fn insert_framed_area_with_data(
-        &mut self,
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-        permission: MapPermission,
-        data: &[u8],
+        &mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission, data: &[u8],
     ) {
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
@@ -401,12 +403,7 @@ impl MemorySet {
 
     /// mmap
     pub fn mmap(
-        &mut self,
-        start_addr: usize,
-        len: usize,
-        offset: usize,
-        context: Vec<u8>,
-        flags: Flags,
+        &mut self, start_addr: usize, len: usize, offset: usize, context: Vec<u8>, flags: Flags,
     ) -> isize {
         let start_addr_align: usize;
         let end_addr_align: usize;
@@ -507,18 +504,15 @@ impl MemorySet {
 }
 
 pub struct MapArea {
-    pub vpn_range: VPNRange,
+    pub vpn_range:   VPNRange,
     pub data_frames: BTreeMap<VirtPageNum, FrameTracker>,
-    pub map_type: MapType,
-    pub map_perm: MapPermission,
+    pub map_type:    MapType,
+    pub map_perm:    MapPermission,
 }
 
 impl MapArea {
     pub fn new(
-        start_va: VirtAddr,
-        end_va: VirtAddr,
-        map_type: MapType,
-        map_perm: MapPermission,
+        start_va: VirtAddr, end_va: VirtAddr, map_type: MapType, map_perm: MapPermission,
     ) -> Self {
         let start_vpn: VirtPageNum = start_va.floor();
         let end_vpn: VirtPageNum = end_va.ceil();
@@ -531,10 +525,10 @@ impl MapArea {
     }
     pub fn from_another(another: &Self) -> Self {
         Self {
-            vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
+            vpn_range:   VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
             data_frames: BTreeMap::new(),
-            map_type: another.map_type,
-            map_perm: another.map_perm,
+            map_type:    another.map_type,
+            map_perm:    another.map_perm,
         }
     }
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {

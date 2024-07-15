@@ -16,7 +16,7 @@ use crate::{
 
 /// Allocator with a simple recycle strategy
 pub struct RecycleAllocator {
-    current: usize,
+    current:  usize,
     recycled: Vec<usize>,
 }
 
@@ -30,7 +30,7 @@ impl RecycleAllocator {
     /// Create a new allocator
     pub fn new() -> Self {
         RecycleAllocator {
-            current: 0,
+            current:  0,
             recycled: Vec::new(),
         }
     }
@@ -119,9 +119,7 @@ impl KernelStack {
     /// Push a variable of type T into the top of the KernelStack and return its raw pointer
     #[allow(unused)]
     pub fn push_on_top<T>(&self, value: T) -> *mut T
-    where
-        T: Sized,
-    {
+    where T: Sized {
         let kernel_stack_top = self.get_top();
         let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
         unsafe {
@@ -139,11 +137,11 @@ impl KernelStack {
 /// User Resource for a task
 pub struct TaskUserRes {
     /// task id
-    pub tid: usize,
+    pub tid:        usize,
     /// user stack base
     pub ustack_top: usize,
     /// process belongs to
-    pub process: Weak<ProcessControlBlock>,
+    pub process:    Weak<ProcessControlBlock>,
 }
 /// Return the bottom addr (low addr) of the trap context for a task
 fn trap_cx_bottom_from_tid(tid: usize) -> usize {

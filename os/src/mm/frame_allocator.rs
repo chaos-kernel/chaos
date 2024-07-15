@@ -45,8 +45,8 @@ trait FrameAllocator {
 }
 
 pub struct StackFrameAllocator {
-    current: usize,
-    end: usize,
+    current:  usize,
+    end:      usize,
     recycled: Vec<usize>,
 }
 
@@ -60,8 +60,8 @@ impl StackFrameAllocator {
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
         Self {
-            current: 0,
-            end: 0,
+            current:  0,
+            end:      0,
             recycled: Vec::new(),
         }
     }
