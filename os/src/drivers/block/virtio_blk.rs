@@ -31,10 +31,13 @@ unsafe impl Sync for VirtIOBlock {}
 impl BlockDevice for VirtIOBlock {
     /// Read a block from the virtio_blk device
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        self.0
-            .exclusive_access()
-            .read_blocks(block_id, buf)
-            .expect("Error when reading VirtIOBlk");
+        let res = self.0.exclusive_access().read_blocks(block_id, buf);
+        debug!("read_block: {:?}, block_id: {:}", res, block_id);
+        if res.is_err() {
+            panic!("Error when reading VirtIOBlk, block_id {}", block_id);
+        } else {
+            res.unwrap()
+        }
     }
     ///
     fn write_block(&self, block_id: usize, buf: &[u8]) {
@@ -68,7 +71,7 @@ unsafe impl Hal for VirtioHal {
     /// use.
     fn dma_alloc(
         pages: usize,
-        direction: BufferDirection,
+        _direction: BufferDirection,
     ) -> (virtio_drivers::PhysAddr, NonNull<u8>) {
         let (frames, root_ppn) = frame_alloc_contiguous(pages);
         let pa: PhysAddr = root_ppn.into();
@@ -79,7 +82,7 @@ unsafe impl Hal for VirtioHal {
     /// Deallocates the given contiguous physical DMA memory pages.
     unsafe fn dma_dealloc(
         paddr: virtio_drivers::PhysAddr,
-        vaddr: NonNull<u8>,
+        _vaddr: NonNull<u8>,
         pages: usize,
     ) -> i32 {
         let pa = PhysAddr::from(paddr);

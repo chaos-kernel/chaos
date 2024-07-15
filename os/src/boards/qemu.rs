@@ -4,16 +4,22 @@
 pub const CLOCK_FREQ: usize = 12500000;
 //pub const MEMORY_END: usize = 0x801000000;
 
+pub const PERMISSION_RW: MapPermission = MapPermission::union(MapPermission::R, MapPermission::W);
+
 /// The base address of control registers in VIRT_TEST/RTC/Virtio_Block device
-pub const MMIO: &[(usize, usize)] = &[
-    (0xffff_ffc0_0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
-    (0xffff_ffc0_1000_1000, 0x00_1000), // Virtio Block in virt machine
+pub const MMIO: &[(usize, usize, MapPermission)] = &[
+    (0x10000000, 0x1000, PERMISSION_RW),   // UART
+    (0x10001000, 0x1000, PERMISSION_RW),   // VIRTIO
+    (0x02000000, 0x10000, PERMISSION_RW),  // CLINT
+    (0x0C000000, 0x400000, PERMISSION_RW), // PLIC
 ];
 
 pub type BlockDeviceImpl = crate::drivers::block::VirtIOBlock;
 
 //ref:: https://github.com/andre-richter/qemu-exit
 use core::arch::asm;
+
+use crate::mm::MapPermission;
 
 const EXIT_SUCCESS: u32 = 0x5555; // Equals `exit(0)`. qemu successful exit
 

@@ -4,7 +4,9 @@ use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
-use crate::config::{KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, USER_STACK_SIZE};
+use crate::config::{
+    KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, PAGE_SIZE_BITS, USER_STACK_SIZE,
+};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::SUCCESS;
 use crate::task::process::Flags;
@@ -258,8 +260,8 @@ impl MemorySet {
         for pair in MMIO {
             memory_set.push(
                 MapArea::new(
-                    (*pair).0.into(),
-                    ((*pair).0 + (*pair).1).into(),
+                    ((*pair).0 + (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS)).into(),
+                    ((*pair).0 + (*pair).1 + (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS)).into(),
                     MapType::Identical,
                     MapPermission::R | MapPermission::W,
                 ),
