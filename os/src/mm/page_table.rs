@@ -96,6 +96,7 @@ impl PageTable {
     }
     /// create a new page table for a new process, keep the kernel part of the page table the same
     pub fn new_process() -> Self {
+        info!("create a new page table for a new process!");
         let frame = frame_alloc().unwrap();
         let kernel_root_vpn: VirtPageNum = KERNEL_SPACE_OFFSET.into();
 

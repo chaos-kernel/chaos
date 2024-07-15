@@ -5,14 +5,15 @@ extern crate user_lib;
 
 use user_lib::{exec, fork, wait, yield_, println};
 const ALL_TASKS: [&str; 32] = [
-    "read\0",
+    "gettimeofday\0",
     "clone\0",
+    "read\0",
     "write\0",
     "dup2\0",
     "times\0",
     "uname\0",
     "wait\0",
-    "gettimeofday\0",
+    
     "waitpid\0",
     "brk\0",
     "getpid\0",

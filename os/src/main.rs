@@ -58,6 +58,7 @@ pub mod trap;
 pub mod utils;
 
 use config::KERNEL_SPACE_OFFSET;
+use fs::inode::ROOT_INODE;
 use riscv::register::satp;
 
 global_asm!(include_str!("entry.S"));
@@ -120,9 +121,6 @@ pub fn rust_main() -> ! {
     debug!("timer interrupt enabled");
     timer::set_next_trigger();
     debug!("timer set next trigger done");
-    // for file in ROOT_INODE.ls() {
-    //     println!("{}", file);
-    // }
     // for file in ALL_TASKS.iter() {
     //     task::add_file(file);
     //     task::run_tasks();
