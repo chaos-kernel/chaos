@@ -1,0 +1,35 @@
+name: Format Check
+
+on:
+  push:
+    branches:
+      - '**'  # 这将匹配所有分支
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Install Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Setup env
+      run: make env
+
+    - name: Run make fmt
+      run: make fmt
+
+    - name: Check for changes
+      run: |
+        if [[ `git status --porcelain` ]]; then
+          echo "Code formatting changes detected. Please run 'make fmt' locally and commit the changes."
+          git diff
+          exit 1
+        else
+          echo "No formatting changes detected."
+        fi

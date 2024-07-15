@@ -1,3 +1,46 @@
+# 最大行宽
+max_width = 100
+
+# 缩进样式
+tab_spaces = 4
+
+# 对函数参数进行换行的方式
+fn_params_layout = "Compressed"
+
+# 控制流结构的大括号样式
+brace_style = "SameLineWhere"
+
+# 控制 where 子句的格式
+where_single_line = true
+
+# 控制 struct 字段的对齐
+struct_field_align_threshold = 20
+
+# 控制 match 分支的对齐
+match_arm_blocks = true
+
+# 控制链式方法调用的格式
+chain_width = 60
+
+# 控制数组和切片的格式
+array_width = 60
+
+# 控制属性的格式
+attr_fn_like_width = 70
+
+# 控制 use 语句的格式
+imports_layout = "HorizontalVertical"
 imports_granularity = "Crate"
 group_imports = "StdExternalCrate"
 
+# 控制空行
+blank_lines_upper_bound = 1
+
+# 控制 trailing comma
+trailing_comma = "Vertical"
+
+# 控制 edition
+edition = "2021"
+
+# 控制 format strings
+format_strings = true
