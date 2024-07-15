@@ -23,6 +23,7 @@ use crate::task::{
 };
 use crate::timer::{check_timer, set_next_trigger};
 use core::arch::{asm, global_asm};
+use riscv::register::sepc;
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
@@ -65,6 +66,11 @@ pub fn enable_timer_interrupt() {
 /// trap handler
 #[no_mangle]
 pub fn trap_handler() -> ! {
+    let mut sp: usize;
+    unsafe {
+        asm!("mv {}, sp", out(reg) sp);
+    }
+    warn!("sp into trap handler now :{:#x}", sp);
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
@@ -94,7 +100,7 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::InstructionPageFault)
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
-            error!(
+            panic!(
                 "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
                 scause.cause(),
                 stval,
@@ -108,6 +114,12 @@ pub fn trap_handler() -> ! {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             set_next_trigger();
             check_timer();
+            let mut sp: usize;
+            unsafe {
+                asm!("mv {}, sp", out(reg) sp);
+            }
+            warn!("sp1 now :{:#x}", sp);
+            warn!("sepc = {:#x}", sepc::read());
             suspend_current_and_run_next();
         }
         _ => {
@@ -119,7 +131,7 @@ pub fn trap_handler() -> ! {
             );
         }
     }
-    // check signals
+    //check signals
     // if let Some((errno, msg)) = check_signals_of_current() {
     //     trace!("[kernel] trap_handler: .. check signals {}", msg);
     //     exit_current_and_run_next(errno);
@@ -130,6 +142,7 @@ pub fn trap_handler() -> ! {
 /// return to user space
 #[no_mangle]
 pub fn trap_return() -> ! {
+    info!("trap_return");
     //disable_supervisor_interrupt();
     set_user_trap_entry();
 
@@ -168,6 +181,7 @@ pub fn trap_from_kernel() -> ! {
 
 #[no_mangle]
 pub fn initproc_entry() -> ! {
+    debug!("entering initproc");
     set_user_trap_entry();
     let trap_cx_user_va: usize = TRAP_CONTEXT_BASE;
     let user_satp = INITPROC.inner_exclusive_access().memory_set.token();
@@ -194,9 +208,10 @@ pub fn initproc_entry() -> ! {
 
 #[no_mangle]
 pub fn user_entry() -> ! {
+    debug!("entering user app");
     set_user_trap_entry();
     let trap_cx_user_va: usize = current_trap_cx_user_va().into();
-    let mut user_satp = current_user_token();
+    let user_satp = current_user_token();
     debug!(
         "[kernel] user_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
         trap_cx_user_va, user_satp
@@ -210,7 +225,6 @@ pub fn user_entry() -> ! {
         fn __user_entry();
     }
     let entry_va = __user_entry as usize;
-    // user_satp = 0x80000000000807cb;
     warn!("reset satp to {:#x}", user_satp);
     unsafe {
         asm!(

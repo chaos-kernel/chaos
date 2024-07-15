@@ -114,12 +114,13 @@ impl TaskControlBlock {
     pub fn init_proc(
         process: Arc<ProcessControlBlock>,
         ustack_top: usize,
+        kstack: KernelStack,
         alloc_user_res: bool,
     ) -> Self {
+        info!("TaskControlBlock init_proc");
         let res = TaskUserRes::new(Arc::clone(&process), ustack_top, alloc_user_res);
         debug!("TaskUserRes allocated");
         let trap_cx_ppn = res.trap_cx_ppn();
-        let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
         let process_inner = process.inner_exclusive_access();
         let work_dir = Arc::clone(&process_inner.work_dir);
