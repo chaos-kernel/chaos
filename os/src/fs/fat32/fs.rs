@@ -35,7 +35,7 @@ impl FileSystem for Fat32FS {
             })
     }
 
-    fn fs_type() -> FileSystemType {
+    fn fs_type(&self) -> FileSystemType {
         FileSystemType::FAT32
     }
 

@@ -257,7 +257,7 @@ lazy_static! {
     /// The root inode
     pub static ref ROOT_INODE: Arc<Inode> = {
         let fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        FS_MANAGER.lock().init(fs.clone());
+        FS_MANAGER.lock().mount(fs.clone(), "/");
         let root_inode = fs.root_inode();
         Arc::new(Inode {
             readable: true,
