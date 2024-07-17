@@ -31,10 +31,24 @@ unsafe impl Sync for VirtIOBlock {}
 impl BlockDevice for VirtIOBlock {
     /// Read a block from the virtio_blk device
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        let res = self.0.exclusive_access().read_blocks(block_id, buf);
-        debug!("read_block: {:?}, block_id: {:}", res, block_id);
+        let mut res = self.0.exclusive_access().read_blocks(block_id, buf);
+        // debug!("read_block: {:?}, block_id: {:}", res, block_id);
         if res.is_err() {
-            panic!("Error when reading VirtIOBlk, block_id {}", block_id);
+            error!("Error when reading VirtIOBlk, block_id {}", block_id);
+            let mut times = 0 as usize;
+            while res.is_err() {
+                warn!("read_block: retrying block_id: {:}", block_id);
+                res = self.0.exclusive_access().read_blocks(block_id, buf);
+                times += 1;
+                if times > 10 {
+                    panic!("read_block {}: failed after 10 retries", block_id);
+                }
+            }
+            warn!(
+                "read_block: block_id: {:} success after {:} retries",
+                block_id, times
+            );
+            res.unwrap()
         } else {
             res.unwrap()
         }
