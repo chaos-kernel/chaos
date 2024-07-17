@@ -604,7 +604,7 @@ impl ProcessControlBlock {
         // modify kstack_top in trap_cx of this thread
         let task_inner = task.inner_exclusive_access();
         let trap_cx = task_inner.get_trap_cx();
-        trap_cx.kernel_sp = task.kstack.get_top();
+        // trap_cx.kernel_sp = task.kstack.get_top();
         trap_cx.x[10] = 0;
         drop(task_inner);
         let pid = child.getpid();

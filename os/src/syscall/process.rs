@@ -180,11 +180,6 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
-            let mut sp: usize;
-            unsafe {
-                asm!("mv {}, sp", out(reg) sp);
-            }
-            warn!("sp in syscall now :{:#x}", sp);
             return current_process.fork() as isize;
         } else {
             return current_process.fork2(stack_ptr) as isize; //todo仅用于初赛

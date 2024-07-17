@@ -70,7 +70,6 @@ pub fn trap_handler() -> ! {
     unsafe {
         asm!("mv {}, sp", out(reg) sp);
     }
-    warn!("sp into trap handler now :{:#x}", sp);
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
@@ -114,12 +113,6 @@ pub fn trap_handler() -> ! {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             set_next_trigger();
             check_timer();
-            let mut sp: usize;
-            unsafe {
-                asm!("mv {}, sp", out(reg) sp);
-            }
-            warn!("sp1 now :{:#x}", sp);
-            warn!("sepc = {:#x}", sepc::read());
             suspend_current_and_run_next();
         }
         _ => {
