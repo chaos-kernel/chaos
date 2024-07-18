@@ -2,9 +2,9 @@
 
 use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
-use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM};
+use crate::config::{BIG_STRIDE, MAX_SYSCALL_NUM, TRAP_CONTEXT_TRAMPOLINE};
 use crate::fs::inode::OSInode;
-use crate::mm::VirtPageNum;
+use crate::mm::VirtAddr;
 use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
@@ -47,12 +47,6 @@ pub struct TaskControlBlockInner {
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// the time task was first run
     pub first_time: Option<usize>,
-    /// priority
-    pub priority: usize,
-    /// stride
-    pub stride: usize,
-    /// pass
-    pub pass: usize,
     ///
     pub clear_child_tid: usize,
     /// working directory
@@ -62,6 +56,10 @@ pub struct TaskControlBlockInner {
 impl TaskControlBlockInner {
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.res.as_ref().unwrap().trap_cx_user_va().get_mut()
+    }
+
+    pub fn get_other_trap_cx(&self) -> &'static mut TrapContext {
+        VirtAddr::from(TRAP_CONTEXT_TRAMPOLINE).floor().get_mut()
     }
 
     #[allow(unused)]
@@ -101,9 +99,6 @@ impl TaskControlBlock {
                     exit_code: None,
                     syscall_times: [0; MAX_SYSCALL_NUM],
                     first_time: None,
-                    priority: 16,
-                    stride: 0,
-                    pass: BIG_STRIDE / 16,
                     work_dir,
                     clear_child_tid: 0,
                 })
@@ -137,9 +132,6 @@ impl TaskControlBlock {
                     exit_code: None,
                     syscall_times: [0; MAX_SYSCALL_NUM],
                     first_time: None,
-                    priority: 16,
-                    stride: 0,
-                    pass: BIG_STRIDE / 16,
                     work_dir,
                     clear_child_tid: 0,
                 })

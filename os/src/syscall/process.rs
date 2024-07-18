@@ -479,15 +479,7 @@ pub fn sys_set_priority(prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    if prio < 2 {
-        return -1;
-    }
-    let prio = prio as usize;
-    let task = current_task().unwrap();
-    let mut inner = task.inner_exclusive_access();
-    inner.priority = prio;
-    inner.pass = BIG_STRIDE / prio;
-    prio as isize
+    0
 }
 
 /// get current process times

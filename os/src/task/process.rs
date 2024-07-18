@@ -5,13 +5,14 @@ use super::manager::insert_into_pid2process;
 use super::{add_task, SignalFlags};
 use super::{current_task, TaskControlBlock};
 use super::{pid_alloc, PidHandle};
+use crate::config::TRAP_CONTEXT_TRAMPOLINE;
 use crate::fs::file::File;
 use crate::fs::inode::{OSInode, ROOT_INODE};
 use crate::fs::{Stdin, Stdout};
-use crate::mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE};
+use crate::mm::{translated_refmut, MapPermission, MemorySet, PTEFlags, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::EPERM;
-use crate::task::kstack_alloc;
+use crate::task::{kstack_alloc, process, TaskContext};
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
 use alloc::string::String;
@@ -20,6 +21,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::arch::asm;
 use core::cell::RefMut;
+use core::mem;
 use riscv::register::sstatus;
 
 #[allow(unused)]
@@ -134,14 +136,6 @@ pub struct ProcessControlBlockInner {
     // pub semaphore_list: Vec<Option<Arc<Semaphore>>>,
     // /// condvar list
     // pub condvar_list: Vec<Option<Arc<Condvar>>>,
-    /// enable deadlock detect
-    pub deadlock_detect: bool,
-    /// available list
-    pub available: Vec<u32>,
-    /// allocation matrix
-    pub allocation: Vec<Vec<u32>>,
-    /// nedd matrix
-    pub need: Vec<Vec<u32>>,
     /// finish list
     pub finish: Vec<bool>,
     /// clock time stop watch
@@ -302,10 +296,6 @@ impl ProcessControlBlock {
                     // mutex_list: Vec::new(),
                     // semaphore_list: Vec::new(),
                     // condvar_list: Vec::new(),
-                    deadlock_detect: false,
-                    available: Vec::new(),
-                    allocation: Vec::new(),
-                    need: Vec::new(),
                     finish: Vec::new(),
                     clock_stop_watch: 0,
                     user_clock: 0,
@@ -344,10 +334,6 @@ impl ProcessControlBlock {
         // add main thread to the process
         let mut process_inner = process.inner_exclusive_access();
         process_inner.tasks.push(Some(Arc::clone(&task)));
-        let mut res = process_inner.available.clone();
-        res.fill(0);
-        process_inner.allocation.push(res.clone());
-        process_inner.need.push(res.clone());
         process_inner.finish.push(false);
         drop(process_inner);
         debug!("insert_into_pid2process");
@@ -388,10 +374,6 @@ impl ProcessControlBlock {
                     // mutex_list: Vec::new(),
                     // semaphore_list: Vec::new(),
                     // condvar_list: Vec::new(),
-                    deadlock_detect: false,
-                    available: Vec::new(),
-                    allocation: Vec::new(),
-                    need: Vec::new(),
                     finish: Vec::new(),
                     clock_stop_watch: 0,
                     user_clock: 0,
@@ -432,10 +414,6 @@ impl ProcessControlBlock {
         // add main thread to the process
         let mut process_inner = process.inner_exclusive_access();
         process_inner.tasks.push(Some(Arc::clone(&task)));
-        let mut res = process_inner.available.clone();
-        res.fill(0);
-        process_inner.allocation.push(res.clone());
-        process_inner.need.push(res.clone());
         process_inner.finish.push(false);
         drop(process_inner);
         debug!("insert_into_pid2process");
@@ -456,7 +434,8 @@ impl ProcessControlBlock {
         let (memory_set, user_heap_base, ustack_top, entry_point) = MemorySet::from_elf(elf_data);
         // substitute memory_set
         trace!("kernel: exec .. substitute memory_set");
-        self.inner_exclusive_access().memory_set = memory_set;
+        let old_memory_set =
+            mem::replace(&mut self.inner_exclusive_access().memory_set, memory_set);
         // set heap position
         self.inner_exclusive_access().heap_base = user_heap_base.into();
         self.inner_exclusive_access().heap_end = user_heap_base.into();
@@ -466,7 +445,22 @@ impl ProcessControlBlock {
         let task = self.inner_exclusive_access().get_task(0);
         let mut task_inner = task.inner_exclusive_access();
         task_inner.res.as_mut().unwrap().ustack_top = ustack_top;
-        task_inner.res.as_mut().unwrap().alloc_user_res();
+
+        // 想要为另一个向另一个页表的虚拟地址写入trap_cx，需要把另一个页表中断上下文的物理地址映射到
+        // 当前进程的页表中，这样才能在当前进程的页表中找到trap_cx，这里我们映射到TRAP_CX_TRAMPOLINE
+        let user_trap_ppn = task_inner.res.as_mut().unwrap().alloc_user_res();
+        let mut current_pagetable = old_memory_set.page_table;
+        debug!(
+            "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
+            TRAP_CONTEXT_TRAMPOLINE, user_trap_ppn.0, current_pagetable.token()
+        );
+        current_pagetable.map(
+            VirtAddr::from(TRAP_CONTEXT_TRAMPOLINE).floor(),
+            user_trap_ppn,
+            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        );
+
+        task_inner.task_cx = TaskContext::goto_user_entry(task.kstack.get_top());
         task_inner.trap_cx_ppn = task_inner.res.as_mut().unwrap().trap_cx_ppn();
         // push arguments on user stack
         trace!("kernel: exec .. push arguments on user stack");
@@ -510,7 +504,7 @@ impl ProcessControlBlock {
         }
 
         // initialize trap_cx
-        trace!("kernel: exec .. initialize trap_cx");
+        trace!("kernel: exec .. initialize trap_cx for new process");
         let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
@@ -520,7 +514,7 @@ impl ProcessControlBlock {
         );
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
-        *task_inner.get_trap_cx() = trap_cx;
+        *task_inner.get_other_trap_cx() = trap_cx;
     }
 
     /// Only support processes with a single thread.
@@ -559,10 +553,6 @@ impl ProcessControlBlock {
                     // mutex_list: Vec::new(),
                     // semaphore_list: Vec::new(),
                     // condvar_list: Vec::new(),
-                    deadlock_detect: false,
-                    available: Vec::new(),
-                    allocation: Vec::new(),
-                    need: Vec::new(),
                     finish: Vec::new(),
                     clock_stop_watch: 0,
                     user_clock: 0,
@@ -593,11 +583,6 @@ impl ProcessControlBlock {
         // attach task to child process
         let mut child_inner = child.inner_exclusive_access();
         child_inner.tasks.push(Some(Arc::clone(&task)));
-        let mut res = child_inner.available.clone();
-        res.fill(0);
-        // 防死锁算法
-        child_inner.allocation.push(res.clone());
-        child_inner.need.push(res.clone());
         child_inner.finish.push(false);
         drop(child_inner);
 
@@ -713,10 +698,6 @@ impl ProcessControlBlock {
                     // mutex_list: Vec::new(),
                     // semaphore_list: Vec::new(),
                     // condvar_list: Vec::new(),
-                    deadlock_detect: false,
-                    available: Vec::new(),
-                    allocation: Vec::new(),
-                    need: Vec::new(),
                     finish: Vec::new(),
                     clock_stop_watch: 0,
                     user_clock: 0,
@@ -747,11 +728,6 @@ impl ProcessControlBlock {
         // attach task to child process
         let mut child_inner = child.inner_exclusive_access();
         child_inner.tasks.push(Some(Arc::clone(&task)));
-        let mut res = child_inner.available.clone();
-        res.fill(0);
-        // 防死锁算法
-        child_inner.allocation.push(res.clone());
-        child_inner.need.push(res.clone());
         child_inner.finish.push(false);
         drop(child_inner);
 

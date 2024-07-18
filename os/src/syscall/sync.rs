@@ -336,16 +336,15 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //     0
 // }
 
-/// enable deadlock detection syscall
-///
-/// YOUR JOB: Implement deadlock detection, but might not all in this syscall
-pub fn sys_enable_deadlock_detect(enabled: usize) -> isize {
-    trace!("kernel: sys_enable_deadlock_detect");
-    if enabled != 0 && enabled != 1 {
-        return -1;
-    }
-    let process = current_process();
-    let mut process_inner = process.inner_exclusive_access();
-    process_inner.deadlock_detect = enabled == 1;
-    0
-}
+///// enable deadlock detection syscall
+// //
+// pub fn sys_enable_deadlock_detect(enabled: usize) -> isize {
+//     trace!("kernel: sys_enable_deadlock_detect");
+//     if enabled != 0 && enabled != 1 {
+//         return -1;
+//     }
+//     let process = current_process();
+//     let mut process_inner = process.inner_exclusive_access();
+//     process_inner.deadlock_detect = enabled == 1;
+//     0
+// }

@@ -5,6 +5,7 @@ use crate::config::{KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAP_CONTEXT_BASE,
 use crate::mm::PTEFlags;
 use crate::mm::{MapPermission, PageTable, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
+use crate::task::current_process;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
@@ -169,7 +170,7 @@ impl TaskUserRes {
         task_user_res
     }
     /// Allocate user resource for a task
-    pub fn alloc_user_res(&self) {
+    pub fn alloc_user_res(&self) -> PhysPageNum {
         let process = self.process.upgrade().unwrap();
         let mut process_inner = process.inner_exclusive_access();
         // alloc user stack
@@ -196,6 +197,17 @@ impl TaskUserRes {
             trap_cx_top.into(),
             MapPermission::R | MapPermission::W,
         );
+        //想要为其他进程分配trap_cx，需要在这里映射到当前页表，否则无法写入
+        //实现无栈协程之后就不用考虑进程之间互相映射了
+        let trap_cx_bottom_va: VirtAddr = trap_cx_bottom.into();
+        let trap_cx_bottom_ppn = process_inner
+            .memory_set
+            .translate(trap_cx_bottom_va.into())
+            .unwrap()
+            .ppn();
+
+        trap_cx_bottom_ppn
+
         // debug!(
         //     "trap_cx_bottom ppn = {:x}",
         //     process_inner
@@ -235,6 +247,9 @@ impl TaskUserRes {
             trap_cx_top.into(),
             MapPermission::R | MapPermission::W,
         );
+        //将初始进程的trap_cx映射到当前初始化页表，确保可以在这个页表里写入，进入初始页表之后正常读取
+        //后面其他进程之间的互相写入改用TRAP_CONTEXT_TRAMPOLINE
+        //实现无栈协程之后就不用考虑进程之间互相映射了
         let trap_cx_bottom_va: VirtAddr = trap_cx_bottom.into();
         let trap_cx_bottom_ppn = process_inner
             .memory_set

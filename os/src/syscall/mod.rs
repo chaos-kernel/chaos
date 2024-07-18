@@ -188,7 +188,6 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         // SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
         // SYSCALL_SEMAPHORE_CREATE => sys_semaphore_create(args[0]),
         // SYSCALL_SEMAPHORE_UP => sys_semaphore_up(args[0]),
-        SYSCALL_ENABLE_DEADLOCK_DETECT => sys_enable_deadlock_detect(args[0]),
         // SYSCALL_SEMAPHORE_DOWN => sys_semaphore_down(args[0]),
         // SYSCALL_CONDVAR_CREATE => sys_condvar_create(),
         // SYSCALL_CONDVAR_SIGNAL => sys_condvar_signal(args[0]),

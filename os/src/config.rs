@@ -44,3 +44,4 @@ pub const MMAP_BASE: usize = 0x2000_0000;
 pub const PAGE_TABLE_LEVEL: usize = 3;
 /// kernel space offset
 pub const KERNEL_SPACE_OFFSET: usize = 0xffff_ffc0_0000_0;
+pub const TRAP_CONTEXT_TRAMPOLINE: usize = 0xFFFF_FFFF_FFFF_E000;

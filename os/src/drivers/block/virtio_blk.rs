@@ -48,6 +48,7 @@ impl BlockDevice for VirtIOBlock {
                 "read_block: block_id: {:} success after {:} retries",
                 block_id, times
             );
+            // debug!("buf: {:#x?}", buf);
             res.unwrap()
         } else {
             res.unwrap()

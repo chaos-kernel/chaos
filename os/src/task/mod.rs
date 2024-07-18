@@ -94,10 +94,6 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let process = task.process.upgrade().unwrap();
     let mut process_inner = process.inner_exclusive_access();
     let tid = task_inner.res.as_ref().unwrap().tid;
-    let additions: Vec<_> = process_inner.allocation[tid].iter().cloned().collect();
-    for (i, num) in additions.iter().enumerate() {
-        process_inner.available[i] += num;
-    }
     process_inner.finish[tid] = true;
     drop(process_inner);
     // record exit code
@@ -241,41 +237,4 @@ pub fn remove_inactive_task(task: Arc<TaskControlBlock>) {
     remove_task(Arc::clone(&task));
     trace!("kernel: remove_inactive_task .. remove_timer");
     remove_timer(Arc::clone(&task));
-}
-
-/// Detect if deadlock happened
-pub fn detect_deadlock() -> bool {
-    let process = current_process();
-    let process_inner = process.inner_exclusive_access();
-    let mut work = process_inner.available.clone();
-    let need = &process_inner.need;
-    let allocation = &process_inner.allocation;
-    let mut finish = process_inner.finish.clone();
-    loop {
-        let mut found = false;
-        for i in 0..process_inner.tasks.len() {
-            if finish[i] {
-                continue;
-            }
-            let mut can = true;
-            for j in 0..work.len() {
-                if need[i][j] > work[j] {
-                    can = false;
-                    break;
-                }
-            }
-            if can {
-                for j in 0..work.len() {
-                    work[j] += allocation[i][j];
-                }
-                finish[i] = true;
-                found = true;
-            }
-        }
-        if !found {
-            break;
-        }
-    }
-    let res = finish.iter().find(|x| **x == false).is_some();
-    res
 }
