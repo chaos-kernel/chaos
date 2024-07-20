@@ -22,6 +22,8 @@
 #![no_main]
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
+#![allow(dead_code)]
+#![feature(trait_upcasting)]
 #![feature(ascii_char)]
 
 use core::arch::global_asm;
@@ -44,6 +46,7 @@ mod console;
 pub mod block;
 pub mod config;
 pub mod drivers;
+// pub mod fs;
 pub mod fs;
 pub mod lang_items;
 pub mod logging;

@@ -3,13 +3,13 @@ use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 
 use crate::{
     fs::{
+        dentry,
         file::File,
-        inode::{Inode, Stat, ROOT_INODE},
-        link,
-        make_pipe,
+        flags::OpenFlags,
+        inode::{Inode, Stat},
         open_file,
-        unlink,
-        OpenFlags,
+        pipe::make_pipe,
+        ROOT_INODE,
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
     syscall::{
@@ -81,11 +81,13 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let process = current_process();
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(
-        ROOT_INODE.as_ref(),
+    let curdir = process.inner_exclusive_access().work_dir.clone();
+    if let Some(dentry) = open_file(
+        &curdir.inode(),
         path.as_str(),
         OpenFlags::from_bits(flags).unwrap(),
     ) {
+        let inode = dentry.inode();
         let mut inner = process.inner_exclusive_access();
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(inode);
@@ -116,11 +118,13 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     // if !dir.is_dir() {
     //     return -1;
     // }
-    let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
+    // 实验性转换
+    let inode = Arc::downcast::<Inode>(dir).unwrap();
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+    if let Some(dentry) = open_file(&inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
         let fd = inner.alloc_fd();
+        let inode = dentry.inode();
         inner.fd_table[fd] = Some(inode);
         fd as isize
     } else {
@@ -251,7 +255,9 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     let token = current_user_token();
     let old_name = translated_str(token, old_name);
     let new_name = translated_str(token, new_name);
-    if link(old_name.as_str(), new_name.as_str()).is_some() {
+    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    let target = curdir.inode().lookup(old_name.as_str()).unwrap();
+    if curdir.inode().link(&new_name, target) {
         0
     } else {
         ENOENT
@@ -266,7 +272,8 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
     );
     let token = current_user_token();
     let name = translated_str(token, name);
-    if unlink(name.as_str()) {
+    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    if curdir.inode().unlink(&name) {
         0
     } else {
         ENOENT
@@ -279,7 +286,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
     let token = current_user_token();
-    if let Some(path) = current_task()
+    if let path = current_task()
         .unwrap()
         .inner_exclusive_access()
         .work_dir
@@ -312,7 +319,8 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access();
     let dir = inner.work_dir.clone();
-    let dir = open_file(&dir, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
+    let inode = dir.inode();
+    let dir = open_file(&inode, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
     inner.work_dir = dir.unwrap();
     0
 }
@@ -326,7 +334,7 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
     let mut inner = process.inner_exclusive_access();
     let inode;
     if dirfd == AT_FDCWD {
-        inode = ROOT_INODE.as_ref();
+        inode = ROOT_INODE.clone();
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
@@ -339,16 +347,17 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
         if !dir.is_dir() {
             return ENOTDIR;
         }
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
+        inode = Arc::downcast::<Inode>(dir).unwrap();
     }
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(_) = open_file(inode, &path, OpenFlags::RDONLY) {
+    if let Some(_) = open_file(&inode, &path, OpenFlags::RDONLY) {
         return -1;
     }
-    if let Some(chinode) = open_file(inode, &path, OpenFlags::DIRECTORY | OpenFlags::CREATE) {
+    if let Some(dentry) = open_file(&inode, &path, OpenFlags::DIRECTORY | OpenFlags::CREATE) {
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(chinode);
+        let inode = dentry.inode();
+        inner.fd_table[fd] = Some(inode);
         fd as isize
     } else {
         EACCES //TODO: to be confirmed

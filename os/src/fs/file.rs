@@ -1,10 +1,11 @@
 use alloc::vec::Vec;
+use core::any::Any;
 
 use super::inode::Stat;
 use crate::mm::UserBuffer;
 
 /// trait File for all file types
-pub trait File {
+pub trait File: Any + Send + Sync {
     /// the file readable?
     fn readable(&self) -> bool;
     /// the file writable?

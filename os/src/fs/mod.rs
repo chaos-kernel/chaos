@@ -1,93 +1,63 @@
-//! File trait & inode(dir, file, pipe, stdin, stdout)
+use alloc::{boxed::Box, sync::Arc};
 
+use dentry::Dentry;
+use fat32::fs::Fat32FS;
+use flags::OpenFlags;
+use fs::FileSystemManager;
+use inode::{Inode, InodeType};
+use lazy_static::lazy_static;
+
+use crate::drivers::BLOCK_DEVICE;
+
+pub mod dentry;
 mod fat32;
-pub(crate) mod file;
+pub mod file;
+pub mod flags;
 mod fs;
 pub mod inode;
-mod pipe;
-mod stdio;
+mod path;
+pub mod pipe;
+pub mod stdio;
 
-impl OpenFlags {
-    /// Do not check validity for simplicity
-    /// Return (readable, writable)
-    pub fn read_write(&self) -> (bool, bool) {
-        if self.is_empty() {
-            (true, false)
-        } else if self.contains(Self::WRONLY) {
-            (false, true)
-        } else {
-            (true, true)
-        }
-    }
+lazy_static! {
+    pub static ref FS_MANAGER: FileSystemManager = FileSystemManager::new();
 }
 
-bitflags! {
-    ///  The flags argument to the open() system call is constructed by ORing together zero or more of the following values:
-    pub struct OpenFlags: u32 {
-        /// readyonly
-        const RDONLY = 0;
-        /// writeonly
-        const WRONLY = 1 << 0;
-        /// read and write
-        const RDWR = 1 << 1;
-        /// create new file
-        const CREATE = 1 << 6;
-        /// truncate file size to 0
-        const TRUNC = 1 << 10;
-        /// directory
-        const DIRECTORY = 1 << 21;
-    }
+lazy_static! {
+    pub static ref ROOT_INODE: Arc<Inode> = {
+        let fs = Fat32FS::load(BLOCK_DEVICE.clone());
+        let root_inode = Fat32FS::root_inode(&fs);
+        Arc::new(Inode::new(1, InodeType::Directory, Box::new(root_inode)))
+    };
 }
 
 /// Open a file
-pub fn open_file(inode: &Inode, name: &str, flags: OpenFlags) -> Option<Arc<Inode>> {
+pub fn open_file(inode: &Arc<Inode>, name: &str, flags: OpenFlags) -> Option<Arc<Dentry>> {
     // TODO: read_write
     // let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
-        if let Some(inode) = ROOT_INODE.find(name) {
+        if let Some(dentry) = inode.lookup(name) {
             // clear size
-            inode.clear();
-            Some(inode)
+            dentry.inode().clear();
+            Some(dentry)
         } else {
             // create file
-            let stat = if flags.contains(OpenFlags::DIRECTORY) {
-                StatMode::DIR
+            let type_ = if flags.contains(OpenFlags::DIRECTORY) {
+                InodeType::Directory
             } else {
-                StatMode::FILE
+                InodeType::Regular
             };
-            inode.create(name, stat)
+            let dentry = inode.create(name, type_)?;
+            Some(dentry)
         }
     } else {
-        inode.find(name).map(|inode| {
+        if let Some(dentry) = inode.lookup(name) {
             if flags.contains(OpenFlags::TRUNC) {
-                inode.clear();
+                dentry.inode().clear();
             }
-            inode
-        })
+            Some(dentry)
+        } else {
+            None
+        }
     }
 }
-
-/// Link a file
-pub fn link(old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
-    ROOT_INODE.link(old_name, new_name)
-}
-
-/// Unlink a file
-pub fn unlink(name: &str) -> bool {
-    ROOT_INODE.unlink(name)
-}
-
-/// List all apps in the root directory
-pub fn list_apps() {
-    println!("/**** APPS ****");
-    for app in ROOT_INODE.ls() {
-        println!("{}", app);
-    }
-    println!("**************/");
-}
-
-use alloc::sync::Arc;
-
-use inode::{Inode, InodeOps, StatMode, ROOT_INODE};
-pub use pipe::{make_pipe, Pipe};
-pub use stdio::{Stdin, Stdout};

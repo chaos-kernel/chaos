@@ -6,7 +6,7 @@ use core::cell::RefMut;
 use super::{id::TaskUserRes, kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
 use crate::{
     config::{BIG_STRIDE, MAX_SYSCALL_NUM},
-    fs::inode::Inode,
+    fs::{dentry::Dentry, inode::Inode},
     mm::PhysPageNum,
     sync::UPSafeCell,
     trap::TrapContext,
@@ -58,7 +58,7 @@ pub struct TaskControlBlockInner {
     ///
     pub clear_child_tid: usize,
     /// working directory
-    pub work_dir:        Arc<Inode>,
+    pub work_dir:        Arc<Dentry>,
 }
 
 impl TaskControlBlockInner {

@@ -20,10 +20,11 @@ use super::{
 };
 use crate::{
     fs::{
+        dentry::Dentry,
         file::File,
-        inode::{Inode, ROOT_INODE},
-        Stdin,
-        Stdout,
+        inode::Inode,
+        stdio::{Stdin, Stdout},
+        ROOT_INODE,
     },
     mm::{translated_refmut, MemorySet, VirtAddr, KERNEL_SPACE},
     sync::{Condvar, Mutex, Semaphore, UPSafeCell},
@@ -165,7 +166,7 @@ pub struct ProcessControlBlockInner {
     ///
     pub heap_end:           VirtAddr,
     /// working directory
-    pub work_dir:           Arc<Inode>,
+    pub work_dir:           Arc<Dentry>,
 }
 
 impl ProcessControlBlockInner {
@@ -242,20 +243,15 @@ impl ProcessControlBlockInner {
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();
         let file = self.fd_table[fd].clone().unwrap();
-        let file = unsafe { &*(file.as_ref() as *const dyn File as *const Inode) };
+        let inode = Arc::downcast::<Inode>(file).unwrap();
         let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
             (Vec::new(), len)
         } else {
-            debug!("mmap: file name: {}", file.name().unwrap());
-            let context = file.read_all();
+            let context = inode.read_all();
 
             let file_len = context.len();
             let length = len.min(file_len - offset);
             if file_len <= offset {
-                debug!(
-                    "mmap ERROR: offset exceeds file length context.len(): {}, offset: {}",
-                    file_len, offset
-                );
                 return EPERM;
             };
             (context, length)
@@ -316,7 +312,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: user_heap_base.into(),
                     heap_end: user_heap_base.into(),
-                    work_dir: ROOT_INODE.clone(),
+                    work_dir: Arc::new(Dentry::new("/", ROOT_INODE.clone(), None)),
                 })
             },
         });

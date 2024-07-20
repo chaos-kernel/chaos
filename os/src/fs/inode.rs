@@ -1,162 +1,182 @@
-//! inode
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
 
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use lazy_static::lazy_static;
+use spin::Mutex;
 
-use lazy_static::*;
+use super::{dentry::Dentry, file::File};
+use crate::{block::BLOCK_SZ, mm::UserBuffer, timer::TimeSpec};
 
-use super::file::File;
-use crate::{
-    block::BLOCK_SZ,
-    drivers::BLOCK_DEVICE,
-    fs::{
-        fat32::fs::Fat32FS,
-        fs::{FileSystem, FS_MANAGER},
-    },
-    mm::UserBuffer,
-    sync::UPSafeCell,
-    timer::TimeSpec,
-};
-
-/// inode in memory
 pub struct Inode {
-    readable: bool,
-    writable: bool,
-    inner:    UPSafeCell<InodeInner>,
-}
-
-/// inner of inode in memory
-pub struct InodeInner {
-    pos:   usize,
-    name:  String,
-    inode: Arc<dyn InodeOps>,
+    ino:   u64,
+    type_: InodeType,
+    size:  u64,
+    links: u32,
+    ops:   Box<dyn InodeOps>,
+    stat:  InodeStat,
 }
 
 impl Inode {
-    /// create a new inode in memory
-    pub fn new(readable: bool, writable: bool, name: String, inode: Arc<dyn InodeOps>) -> Self {
-        trace!("kernel: OSInode::new");
+    /// new
+    pub fn new(ino: u64, type_: InodeType, ops: Box<dyn InodeOps>) -> Self {
         Self {
-            readable,
-            writable,
-            inner: unsafe {
-                UPSafeCell::new(InodeInner {
-                    pos: 0,
-                    name,
-                    inode,
-                })
-            },
+            ino,
+            type_,
+            size: 0,
+            links: 1,
+            ops,
+            stat: InodeStat::Synced,
         }
     }
-    /// read all data from the inode in memory
+    /// loopup an inode in the directory
+    pub fn lookup(self: &Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
+        self.ops.lookup(&self, name)
+    }
+    /// create an inode in the directory
+    pub fn create(&self, name: &str, type_: InodeType) -> Option<Arc<Dentry>> {
+        self.ops.create(self, name, type_)
+    }
+    /// unlink an inode in the directory
+    pub fn unlink(&self, name: &str) -> bool {
+        self.ops.unlink(self, name)
+    }
+    /// link an inode in the directory
+    pub fn link(&self, name: &str, dentry: Arc<Dentry>) -> bool {
+        self.ops.link(self, name, dentry)
+    }
+    /// rename an inode in the directory
+    pub fn rename(&self, old_name: &str, new_name: &str) -> bool {
+        self.ops.rename(self, old_name, new_name)
+    }
+    /// make a directory in the directory
+    pub fn mkdir(&self, name: &str) -> Option<Arc<Dentry>> {
+        self.ops.mkdir(self, name)
+    }
+    /// remove a directory in the directory
+    pub fn rmdir(&self, name: &str) -> bool {
+        self.ops.rmdir(self, name)
+    }
+    /// list all inodes in the directory
+    pub fn ls(&self) -> Vec<String> {
+        self.ops.ls(self)
+    }
+    /// clear the inode
+    pub fn clear(&self) {
+        self.ops.clear(self)
+    }
+    /// sync the inode to disk
+    pub fn sync(&self) {
+        self.ops.sync(self)
+    }
+    /// read all data
     pub fn read_all(&self) -> Vec<u8> {
-        trace!("kernel: OSInode::read_all");
-        let mut inner = self.inner.exclusive_access();
-        inner.pos = 0;
         let mut buffer = [0u8; 512];
+        let mut read_size = 0;
         let mut v: Vec<u8> = Vec::new();
         loop {
-            let len = inner.inode.clone().read_at(inner.pos, &mut buffer);
+            let len = self.ops.read_at(self, read_size, &mut buffer);
             if len == 0 {
                 break;
             }
-            inner.pos += len;
+            read_size += len;
             v.extend_from_slice(&buffer[..len]);
         }
         v
     }
-    /// get the status of the inode in memory
-    pub fn fstat(&self) -> Stat {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().fstat()
-    }
-    /// find the inode in memory with 'name'
-    pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
-        let inner = self.inner.exclusive_access();
-        inner
-            .inode
-            .clone()
-            .find(name)
-            .map(|inode| Arc::new(Inode::new(true, true, name.to_string(), inode)))
-    }
-    /// create a inode in memory with 'name'
-    pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<Inode>> {
-        let inner = self.inner.exclusive_access();
-        inner
-            .inode
-            .clone()
-            .create(name, stat)
-            .map(|inode| Arc::new(Inode::new(true, true, name.to_string(), inode)))
-    }
-    /// link a inode in memory with 'old_name' and 'new_name'
-    pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<Inode>> {
-        let inner = self.inner.exclusive_access();
-        inner
-            .inode
-            .clone()
-            .link(old_name, new_name)
-            .map(|inode| Arc::new(Inode::new(true, true, new_name.to_string(), inode)))
-    }
-    /// unlink a inode in memory with 'name'
-    pub fn unlink(&self, name: &str) -> bool {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().unlink(name)
-    }
-    /// list the file names in the inode in memory
-    pub fn ls(&self) -> Vec<String> {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().ls()
-    }
-    /// read the content in offset position of the inode in memory into 'buf'
-    pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().read_at(offset, buf)
-    }
-    /// write the content in 'buf' into offset position of the inode in memory
-    pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().write_at(offset, buf)
-    }
-    /// set the inode in memory length to zero, delloc all data blocks of the inode
-    pub fn clear(&self) {
-        let inner = self.inner.exclusive_access();
-        inner.inode.clone().clear();
-    }
-    /// get the name
-    pub fn name(&self) -> Option<String> {
-        let inner = self.inner.exclusive_access();
-        inner.name.clone().into()
+}
+
+impl Drop for Inode {
+    fn drop(&mut self) {
+        if self.stat == InodeStat::Dirty {
+            self.sync();
+        }
     }
 }
 
-/// Inode trait
+/* Inode Operators */
+
 pub trait InodeOps: Send + Sync {
-    /// get status of file
-    fn fstat(self: Arc<Self>) -> Stat;
-    /// find the disk inode of the file with 'name'
-    fn find(self: Arc<Self>, name: &str) -> Option<Arc<dyn InodeOps>>;
-    /// create a file with 'name' in the root directory
-    fn create(self: Arc<Self>, name: &str, stat: StatMode) -> Option<Arc<dyn InodeOps>>;
-    /// create a link with a disk inode under current inode
-    fn link(self: Arc<Self>, old_name: &str, new_name: &str) -> Option<Arc<dyn InodeOps>>;
-    /// Remove a link under current inode
-    fn unlink(self: Arc<Self>, name: &str) -> bool;
-    /// list the file names in the root directory
-    fn ls(self: Arc<Self>) -> Vec<String>;
-    /// Read the content in offset position of the file into 'buf'
-    fn read_at(self: Arc<Self>, offset: usize, buf: &mut [u8]) -> usize;
-    /// Write the content in 'buf' into offset position of the file
-    fn write_at(self: Arc<Self>, offset: usize, buf: &[u8]) -> usize;
-    /// Set the file(disk inode) length to zero, delloc all data blocks of the file.
-    fn clear(self: Arc<Self>);
-    /// Get the current directory name
-    fn current_dirname(self: Arc<Self>) -> Option<String>;
+    /// lookup an inode in the directory with the name (just name not path)
+    fn lookup(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>>;
+    /// create an inode in the directory with the name and type
+    fn create(&self, inode: &Inode, name: &str, type_: InodeType) -> Option<Arc<Dentry>>;
+    /// unlink an inode in the directory with the name (just name not path)
+    fn unlink(&self, inode: &Inode, name: &str) -> bool;
+    /// link an inode in the directory with the name (just name not path)
+    fn link(&self, inode: &Inode, name: &str, target: Arc<Dentry>) -> bool;
+    /// rename an inode in the directory with the old name and new name
+    fn rename(&self, inode: &Inode, old_name: &str, new_name: &str) -> bool;
+    /// make a directory in the directory with the name
+    fn mkdir(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>>;
+    /// remove a directory in the directory with the name
+    fn rmdir(&self, inode: &Inode, name: &str) -> bool;
+    /// list all inodes in the directory
+    fn ls(&self, inode: &Inode) -> Vec<String>;
+    /// clear the inode
+    fn clear(&self, inode: &Inode);
+    /// read at the offset of the inode
+    fn read_at(&self, inode: &Inode, offset: usize, buf: &mut [u8]) -> usize;
+    /// write at the offset of the inode
+    fn write_at(&self, inode: &Inode, offset: usize, buf: &[u8]) -> usize;
+    /// sync the inode to disk
+    fn sync(&self, inode: &Inode);
 }
 
-/// The stat of a inode
+/* Inode Types */
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InodeType {
+    Regular,
+    Directory,
+    BlockDevice,
+    CharDevice,
+    Pipe,
+}
+
+/* Inode Status */
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InodeStat {
+    Dirty,
+    Synced,
+}
+
+/* Inode Manager */
+
+pub struct InodeManager {
+    inodes: BTreeMap<u64, Arc<Inode>>,
+}
+
+impl InodeManager {
+    pub fn new() -> Self {
+        Self {
+            inodes: BTreeMap::new(),
+        }
+    }
+
+    pub fn get(&self, ino: &u64) -> Option<Arc<Inode>> {
+        let inode = self.inodes.get(ino);
+        match inode {
+            Some(inode) => Some(Arc::clone(inode)),
+            None => None,
+        }
+    }
+
+    pub fn insert(&mut self, inode: Inode) {
+        self.inodes.insert(inode.ino, Arc::new(inode));
+    }
+
+    pub fn remove(&mut self) {
+        todo!();
+    }
+}
+
+lazy_static! {
+    pub static ref INODE_MANAGER: Mutex<InodeManager> = todo!();
+}
+
+/* Inode Stat */
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct Stat {
@@ -253,75 +273,69 @@ bitflags! {
     }
 }
 
-lazy_static! {
-    /// The root inode
-    pub static ref ROOT_INODE: Arc<Inode> = {
-        let fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        FS_MANAGER.lock().mount(fs.clone(), "/");
-        let root_inode = fs.root_inode();
-        Arc::new(Inode {
-            readable: true,
-            writable: true,
-            inner: unsafe { UPSafeCell::new(InodeInner { pos: 0, name: "/".to_string(), inode: root_inode }) }
-        })
-    };
-}
+/* Impl File for Inode */
 
 impl File for Inode {
-    /// file readable?
     fn readable(&self) -> bool {
-        self.readable
+        // TODO:
+        true
     }
-    /// file writable?
+
     fn writable(&self) -> bool {
-        self.writable
+        // TODO:
+        true
     }
-    /// read file data into buffer
+
     fn read(&self, mut buf: UserBuffer) -> usize {
-        trace!("kernel: OSInode::read");
-        let mut inner = self.inner.exclusive_access();
-        let mut total_read_size = 0usize;
+        let mut total_read_size = 0;
         for slice in buf.buffers.iter_mut() {
-            let read_size = inner.inode.clone().read_at(inner.pos, slice);
+            let read_size = self.ops.read_at(self, total_read_size, slice);
             if read_size == 0 {
                 break;
             }
-            inner.pos += read_size;
             total_read_size += read_size;
         }
         total_read_size
     }
-    /// read all data from file
+
     fn read_all(&self) -> Vec<u8> {
-        trace!("kernel: file::read_all");
-        let mut inner = self.inner.exclusive_access();
         let mut buffer = [0u8; 512];
         let mut v: Vec<u8> = Vec::new();
+        let mut total_read_size = 0;
         loop {
-            let len = inner.inode.clone().read_at(inner.pos, &mut buffer);
+            let len = self.ops.read_at(self, total_read_size, &mut buffer);
             if len == 0 {
                 break;
             }
-            inner.pos += len;
+            total_read_size += len;
             v.extend_from_slice(&buffer[..len]);
         }
         v
     }
-    /// write buffer data into file
+
     fn write(&self, buf: UserBuffer) -> usize {
-        trace!("kernel: OSInode::write");
-        let mut inner = self.inner.exclusive_access();
-        let mut total_write_size = 0usize;
+        let mut total_write_size = 0;
         for slice in buf.buffers.iter() {
-            let write_size = inner.inode.clone().write_at(inner.pos, slice);
-            assert_eq!(write_size, slice.len());
-            inner.pos += write_size;
+            let write_size = self.ops.write_at(self, total_write_size, slice);
+            if write_size == 0 {
+                break;
+            }
             total_write_size += write_size;
         }
         total_write_size
     }
+
     fn fstat(&self) -> Option<Stat> {
-        let inner = self.inner.exclusive_access();
-        Some(inner.inode.clone().fstat())
+        Some(Stat::new(
+            0,
+            self.ino,
+            0,
+            self.links,
+            0,
+            self.size as i64,
+            0,
+            0,
+            0,
+        ))
     }
 }

@@ -5,7 +5,7 @@ use core::{borrow::BorrowMut, mem::size_of, ptr};
 use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
-    fs::{file::File, inode::ROOT_INODE, open_file, OpenFlags},
+    fs::{dentry, flags::OpenFlags, open_file},
     mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str},
     syscall::errno::{ECHILD, ENOENT, ENOSYS, ESRCH},
     task::{
@@ -226,9 +226,11 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
-    if let Some(app_inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::RDONLY) {
-        let all_data = app_inode.read_all();
-        let process = current_process();
+    let process = current_process();
+    let work_dir = process.inner_exclusive_access().work_dir.clone();
+    if let Some(dentry) = open_file(&work_dir.inode(), path.as_str(), OpenFlags::RDONLY) {
+        let inode = dentry.inode();
+        let all_data = inode.read_all();
         let argc = args_vec.len();
         process.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later
