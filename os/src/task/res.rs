@@ -139,11 +139,11 @@ pub struct TaskUserRes {
     pub process: Weak<ProcessControlBlock>,
 }
 /// Return the bottom addr (low addr) of the trap context for a task
-fn trap_cx_bottom_from_tid(tid: usize) -> usize {
+pub fn trap_cx_bottom_from_tid(tid: usize) -> usize {
     TRAP_CONTEXT_BASE - tid * PAGE_SIZE
 }
 /// Return the bottom addr (high addr) of the user stack for a task
-fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
+pub fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
     ustack_base + tid * (PAGE_SIZE + USER_STACK_SIZE)
 }
 

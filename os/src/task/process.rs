@@ -1,17 +1,18 @@
 //! Implementation of  [`ProcessControlBlock`]
 
-use super::id::RecycleAllocator;
 use super::manager::insert_into_pid2process;
+use super::res::RecycleAllocator;
 use super::{add_task, SignalFlags};
 use super::{current_task, TaskControlBlock};
 use super::{pid_alloc, PidHandle};
-use crate::config::TRAP_CONTEXT_TRAMPOLINE;
+use crate::config::{PAGE_SIZE, TRAP_CONTEXT_TRAMPOLINE, USER_STACK_SIZE};
 use crate::fs::file::File;
 use crate::fs::inode::{OSInode, ROOT_INODE};
 use crate::fs::{Stdin, Stdout};
 use crate::mm::{translated_refmut, MapPermission, MemorySet, PTEFlags, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::syscall::errno::EPERM;
+use crate::task::res::trap_cx_bottom_from_tid;
 use crate::task::{kstack_alloc, process, TaskContext};
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
@@ -317,8 +318,8 @@ impl ProcessControlBlock {
         info!("TaskControlBlock create completed");
         // prepare trap_cx of main thread
         let task_inner = task.inner_exclusive_access();
-        let trap_cx = task_inner.get_trap_cx();
-        let ustack_top = task_inner.res.as_ref().unwrap().ustack_top();
+        let trap_cx = task.get_trap_cx();
+        let ustack_top = task_inner.user_stack_top;
         let kstack_top = task.kstack.get_top();
         drop(task_inner);
         debug!("TrapContext::app_init_context");
@@ -398,8 +399,8 @@ impl ProcessControlBlock {
         info!("init TaskControlBlock create completed");
         // prepare trap_cx of main thread
         let task_inner = task.inner_exclusive_access();
-        let trap_cx = task_inner.get_trap_cx();
-        let ustack_top = task_inner.res.as_ref().unwrap().ustack_top();
+        let trap_cx = task.get_trap_cx();
+        let ustack_top = task_inner.user_stack_top;
         let kstack_top = task.kstack.get_top();
         drop(task_inner);
         debug!("TrapContext::app_init_context");
@@ -444,11 +445,47 @@ impl ProcessControlBlock {
         trace!("kernel: exec .. alloc user resource for main thread again");
         let task = self.inner_exclusive_access().get_task(0);
         let mut task_inner = task.inner_exclusive_access();
-        task_inner.res.as_mut().unwrap().ustack_top = ustack_top;
+        task_inner.user_stack_top = ustack_top;
 
         // 想要为另一个向另一个页表的虚拟地址写入trap_cx，需要把另一个页表中断上下文的物理地址映射到
         // 当前进程的页表中，这样才能在当前进程的页表中找到trap_cx，这里我们映射到TRAP_CX_TRAMPOLINE
-        let user_trap_ppn = task_inner.res.as_mut().unwrap().alloc_user_res();
+        let user_trap_ppn = {
+            let mut process_inner = self.inner_exclusive_access();
+            // alloc user stack
+            let ustack_top = task_inner.user_stack_top;
+            let ustack_bottom = ustack_top - USER_STACK_SIZE;
+            debug!(
+                "alloc_user_res: ustack_bottom={:#x} ustack_top={:#x}",
+                ustack_bottom, ustack_top
+            );
+            process_inner.memory_set.insert_framed_area(
+                ustack_bottom.into(),
+                ustack_top.into(),
+                MapPermission::R | MapPermission::W | MapPermission::U,
+            );
+            // alloc trap_cx
+            let trap_cx_bottom = trap_cx_bottom_from_tid(task.tid);
+            let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
+            debug!(
+                "alloc_user_res: trap_cx_bottom={:#x} trap_cx_top={:#x}",
+                trap_cx_bottom, trap_cx_top
+            );
+            process_inner.memory_set.insert_framed_area(
+                trap_cx_bottom.into(),
+                trap_cx_top.into(),
+                MapPermission::R | MapPermission::W,
+            );
+            //想要为其他进程分配trap_cx，需要在这里映射到当前页表，否则无法写入
+            //实现无栈协程之后就不用考虑进程之间互相映射了
+            let trap_cx_bottom_va: VirtAddr = trap_cx_bottom.into();
+            let trap_cx_bottom_ppn = process_inner
+                .memory_set
+                .translate(trap_cx_bottom_va.into())
+                .unwrap()
+                .ppn();
+
+            trap_cx_bottom_ppn
+        };
         let mut current_pagetable = old_memory_set.page_table;
         debug!(
             "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
@@ -461,10 +498,27 @@ impl ProcessControlBlock {
         );
 
         task_inner.task_cx = TaskContext::goto_user_entry(task.kstack.get_top());
-        task_inner.trap_cx_ppn = task_inner.res.as_mut().unwrap().trap_cx_ppn();
+        task_inner.trap_cx_ppn = {
+            let process_inner = self.inner_exclusive_access();
+            let trap_cx_bottom_va: VirtAddr = trap_cx_bottom_from_tid(task.tid).into();
+            debug!(
+                "trap_cx_ppn = {:#x}",
+                process_inner
+                    .memory_set
+                    .translate(trap_cx_bottom_va.into())
+                    .unwrap()
+                    .ppn()
+                    .0
+            );
+            process_inner
+                .memory_set
+                .translate(trap_cx_bottom_va.into())
+                .unwrap()
+                .ppn()
+        };
         // push arguments on user stack
         trace!("kernel: exec .. push arguments on user stack");
-        let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
+        let mut user_sp = task_inner.user_stack_top;
 
         // Enable kernel to visit user space
         unsafe {
@@ -568,13 +622,7 @@ impl ProcessControlBlock {
         // create main thread of child process
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&child),
-            parent
-                .get_task(0)
-                .inner_exclusive_access()
-                .res
-                .as_ref()
-                .unwrap()
-                .ustack_top(),
+            parent.get_task(0).inner_exclusive_access().user_stack_top,
             // here we do not allocate trap_cx or ustack again
             // but mention that we allocate a new kstack here
             kstack,
@@ -588,7 +636,7 @@ impl ProcessControlBlock {
 
         // modify kstack_top in trap_cx of this thread
         let task_inner = task.inner_exclusive_access();
-        let trap_cx = task_inner.get_trap_cx();
+        let trap_cx = task.get_trap_cx();
         // trap_cx.kernel_sp = task.kstack.get_top();
         trap_cx.x[10] = 0;
         drop(task_inner);
@@ -615,11 +663,7 @@ impl ProcessControlBlock {
         let thread_stack_top = if stack_ptr != 0 {
             stack_ptr
         } else {
-            task.inner_exclusive_access()
-                .res
-                .as_ref()
-                .unwrap()
-                .ustack_top
+            task.inner_exclusive_access().user_stack_top
         };
         let kstack = kstack_alloc(); //todo 这一行正确性未知，为了解决先赋值内核页表再映射内核栈问题
         let new_task = Arc::new(TaskControlBlock::new(
@@ -629,8 +673,7 @@ impl ProcessControlBlock {
             true,
         ));
         let new_task_inner = new_task.inner_exclusive_access();
-        let new_task_res = new_task_inner.res.as_ref().unwrap();
-        let new_task_tid = new_task_res.tid;
+        let new_task_tid = new_task.tid;
         let mut process_inner = process.inner_exclusive_access();
         // add new thread to current process
         let tasks = &mut process_inner.tasks;
@@ -638,17 +681,17 @@ impl ProcessControlBlock {
             tasks.push(None);
         }
         tasks[new_task_tid] = Some(Arc::clone(&new_task));
-        let new_task_trap_cx = new_task_inner.get_trap_cx();
+        let new_task_trap_cx = new_task.get_trap_cx();
 
         // I don't know if this is correct
-        *new_task_trap_cx = *task.inner_exclusive_access().get_trap_cx();
+        *new_task_trap_cx = *task.get_trap_cx();
 
         // for child process, fork returns 0
         new_task_trap_cx.x[10] = 0;
         // set tp reg
         new_task_trap_cx.x[4] = tls;
         // set sp reg
-        new_task_trap_cx.set_sp(new_task_res.ustack_top());
+        new_task_trap_cx.set_sp(new_task_inner.user_stack_top);
         // modify kernel_sp in trap_cx
         new_task_trap_cx.kernel_sp = new_task.kstack.get_top();
 
@@ -713,13 +756,7 @@ impl ProcessControlBlock {
         // create main thread of child process
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&child),
-            parent
-                .get_task(0)
-                .inner_exclusive_access()
-                .res
-                .as_ref()
-                .unwrap()
-                .ustack_top(),
+            parent.get_task(0).inner_exclusive_access().user_stack_top,
             // here we do not allocate trap_cx or ustack again
             // but mention that we allocate a new kstack here
             kstack,
@@ -733,7 +770,7 @@ impl ProcessControlBlock {
 
         // modify kstack_top in trap_cx of this thread
         let task_inner = task.inner_exclusive_access();
-        let trap_cx = task_inner.get_trap_cx();
+        let trap_cx = task.get_trap_cx();
         trap_cx.kernel_sp = task.kstack.get_top();
         trap_cx.x[10] = 0;
         trap_cx.x[2] = stack_ptr;

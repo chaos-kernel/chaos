@@ -116,7 +116,7 @@ pub fn current_pid() -> Option<usize> {
 
 pub fn current_tid() -> Option<usize> {
     if let Some(task) = current_task() {
-        return Some(task.inner_exclusive_access().res.as_ref().unwrap().tid);
+        return Some(task.tid);
     }
     None
 }
@@ -129,21 +129,12 @@ pub fn current_user_token() -> usize {
 
 /// Get the mutable reference to trap context of current task
 pub fn current_trap_cx() -> &'static mut TrapContext {
-    current_task()
-        .unwrap()
-        .inner_exclusive_access()
-        .get_trap_cx()
+    current_task().unwrap().get_trap_cx()
 }
 
 /// get the user virtual address of trap context
 pub fn current_trap_cx_user_va() -> VirtAddr {
-    current_task()
-        .unwrap()
-        .inner_exclusive_access()
-        .res
-        .as_ref()
-        .unwrap()
-        .trap_cx_user_va()
+    current_task().unwrap().trap_cx_user_va()
 }
 
 /// get the top addr of kernel stack

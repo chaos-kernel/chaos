@@ -9,13 +9,7 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
     trace!(
         "kernel:pid[{}] tid[{}] sys_sleep",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
-        current_task()
-            .unwrap()
-            .inner_exclusive_access()
-            .res
-            .as_ref()
-            .unwrap()
-            .tid
+        current_task().unwrap().tid
     );
     #[inline]
     fn is_end(end_time: usize) -> bool {

@@ -10,17 +10,17 @@
 //! might not be what you expect.
 
 mod context;
-mod id;
 mod manager;
 pub mod process;
 mod processor;
+mod res;
 mod signal;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use self::id::TaskUserRes;
 use self::manager::add_block_task;
+use self::res::TaskUserRes;
 use crate::{
     board::QEMUExit,
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
@@ -35,12 +35,12 @@ pub use process::CSIGNAL;
 use switch::__switch;
 
 pub use context::TaskContext;
-pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
 pub use manager::{add_task, pid2process, remove_from_pid2process, remove_task, wakeup_task};
 pub use processor::{
     current_kstack_top, current_pid, current_process, current_task, current_tid, current_trap_cx,
     current_trap_cx_user_va, current_user_token, run_tasks, schedule, take_current_task,
 };
+pub use res::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
 pub use signal::SignalFlags;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -93,12 +93,11 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut task_inner = task.inner_exclusive_access();
     let process = task.process.upgrade().unwrap();
     let mut process_inner = process.inner_exclusive_access();
-    let tid = task_inner.res.as_ref().unwrap().tid;
+    let tid = task.tid;
     process_inner.finish[tid] = true;
     drop(process_inner);
     // record exit code
     task_inner.exit_code = Some(exit_code);
-    task_inner.res = None;
     // here we do not remove the thread since we are still using the kstack
     // it will be deallocated when sys_waittid is called
     drop(task_inner);
@@ -145,7 +144,9 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         // deallocate user res (including tid/trap_cx/ustack) of all threads
         // it has to be done before we dealloc the whole memory_set
         // otherwise they will be deallocated twice
-        let mut recycle_res = Vec::<TaskUserRes>::new();
+        /*
+         * now we removed TaskUserRes, so we do not need to deallocate it here.
+         */
         for task in process_inner.tasks.iter().filter(|t| t.is_some()) {
             let task = task.as_ref().unwrap();
             // if other tasks are Ready in TaskManager or waiting for a timer to be
@@ -157,15 +158,11 @@ pub fn exit_current_and_run_next(exit_code: i32) {
             trace!("kernel: exit_current_and_run_next .. remove_inactive_task");
             remove_inactive_task(Arc::clone(&task));
             let mut task_inner = task.inner_exclusive_access();
-            if let Some(res) = task_inner.res.take() {
-                recycle_res.push(res);
-            }
         }
         // dealloc_tid and dealloc_user_res require access to PCB inner, so we
         // need to collect those user res first, then release process_inner
         // for now to avoid deadlock/double borrow problem.
         drop(process_inner);
-        recycle_res.clear();
 
         let mut process_inner = process.inner_exclusive_access();
         process_inner.children.clear();

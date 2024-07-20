@@ -192,7 +192,7 @@ pub fn sys_clone(
         // so we will exchange the thread whose thread ID is equal to Process ID with the thread whose thread ID is equal to 0,
         // but the system will not exchange it internally
         let process_pid = current_process.getpid();
-        let mut new_thread_ttid = new_thread.inner_exclusive_access().gettid();
+        let mut new_thread_ttid = new_thread.gettid();
         if new_thread_ttid == process_pid {
             new_thread_ttid = 0;
         }
