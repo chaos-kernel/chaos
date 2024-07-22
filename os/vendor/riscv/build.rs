@@ -25,10 +25,10 @@ fn main() {
         println!("cargo:rustc-link-search={}", out_dir.display());
     }
 
-    if target.contains("riscv32") {
+    if target.starts_with("riscv32") {
         println!("cargo:rustc-cfg=riscv");
         println!("cargo:rustc-cfg=riscv32");
-    } else if target.contains("riscv64") {
+    } else if target.starts_with("riscv64") {
         println!("cargo:rustc-cfg=riscv");
         println!("cargo:rustc-cfg=riscv64");
     }

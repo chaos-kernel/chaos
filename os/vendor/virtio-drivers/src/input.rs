@@ -1,26 +1,27 @@
 use super::*;
+use crate::transport::Transport;
+use crate::volatile::{volread, volwrite, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
 use bitflags::*;
 use log::*;
-use volatile::{ReadOnly, WriteOnly};
 
 /// Virtual human interface devices such as keyboards, mice and tablets.
 ///
 /// An instance of the virtio device represents one such input device.
 /// Device behavior mirrors that of the evdev layer in Linux,
 /// making pass-through implementations on top of evdev easy.
-pub struct VirtIOInput<'a, H: Hal> {
-    header: &'static mut VirtIOHeader,
-    event_queue: VirtQueue<'a, H>,
-    status_queue: VirtQueue<'a, H>,
+pub struct VirtIOInput<H: Hal, T: Transport> {
+    transport: T,
+    event_queue: VirtQueue<H>,
+    status_queue: VirtQueue<H>,
     event_buf: Box<[InputEvent; 32]>,
 }
 
-impl<'a, H: Hal> VirtIOInput<'a, H> {
+impl<H: Hal, T: Transport> VirtIOInput<H, T> {
     /// Create a new VirtIO-Input driver.
-    pub fn new(header: &'static mut VirtIOHeader) -> Result<Self> {
+    pub fn new(mut transport: T) -> Result<Self> {
         let mut event_buf = Box::new([InputEvent::default(); QUEUE_SIZE]);
-        header.begin_init(|features| {
+        transport.begin_init(|features| {
             let features = Feature::from_bits_truncate(features);
             info!("Device features: {:?}", features);
             // negotiate these flags only
@@ -28,17 +29,17 @@ impl<'a, H: Hal> VirtIOInput<'a, H> {
             (features & supported_features).bits()
         });
 
-        let mut event_queue = VirtQueue::new(header, QUEUE_EVENT, QUEUE_SIZE as u16)?;
-        let status_queue = VirtQueue::new(header, QUEUE_STATUS, QUEUE_SIZE as u16)?;
+        let mut event_queue = VirtQueue::new(&mut transport, QUEUE_EVENT, QUEUE_SIZE as u16)?;
+        let status_queue = VirtQueue::new(&mut transport, QUEUE_STATUS, QUEUE_SIZE as u16)?;
         for (i, event) in event_buf.as_mut().iter_mut().enumerate() {
             let token = event_queue.add(&[], &[event.as_buf_mut()])?;
             assert_eq!(token, i as u16);
         }
 
-        header.finish_init();
+        transport.finish_init();
 
         Ok(VirtIOInput {
-            header,
+            transport,
             event_queue,
             status_queue,
             event_buf,
@@ -47,7 +48,7 @@ impl<'a, H: Hal> VirtIOInput<'a, H> {
 
     /// Acknowledge interrupt and process events.
     pub fn ack_interrupt(&mut self) -> bool {
-        self.header.ack_interrupt()
+        self.transport.ack_interrupt()
     }
 
     /// Pop the pending event.
@@ -55,7 +56,11 @@ impl<'a, H: Hal> VirtIOInput<'a, H> {
         if let Ok((token, _)) = self.event_queue.pop_used() {
             let event = &mut self.event_buf[token as usize];
             // requeue
-            if self.event_queue.add(&[], &[event.as_buf_mut()]).is_ok() {
+            if let Ok(new_token) = self.event_queue.add(&[], &[event.as_buf_mut()]) {
+                // This only works because nothing happen between `pop_used` and `add` that affects
+                // the list of free descriptors in the queue, so `add` reuses the descriptor which
+                // was just freed by `pop_used`.
+                assert_eq!(new_token, token);
                 return Some(*event);
             }
         }
@@ -70,11 +75,16 @@ impl<'a, H: Hal> VirtIOInput<'a, H> {
         subsel: u8,
         out: &mut [u8],
     ) -> u8 {
-        let config = unsafe { &mut *(self.header.config_space() as *mut Config) };
-        config.select.write(select as u8);
-        config.subsel.write(subsel);
-        let size = config.size.read();
-        let data = config.data.read();
+        let config = self.transport.config_space().cast::<Config>();
+        let size;
+        let data;
+        // Safe because config points to a valid MMIO region for the config space.
+        unsafe {
+            volwrite!(config, select, select as u8);
+            volwrite!(config, subsel, subsel);
+            size = volread!(config, size);
+            data = volread!(config, data);
+        }
         out[..size as usize].copy_from_slice(&data[..size as usize]);
         size
     }
