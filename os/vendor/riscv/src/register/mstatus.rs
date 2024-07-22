@@ -107,6 +107,21 @@ impl Mstatus {
         }
     }
 
+    #[inline]
+    pub fn set_mpie(&mut self, val: bool) {
+        self.bits.set_bit(7, val);
+    }
+
+    #[inline]
+    pub fn set_mie(&mut self, val: bool) {
+        self.bits.set_bit(3, val);
+    }
+
+    #[inline]
+    pub fn set_mpp(&mut self, val: MPP) {
+        self.bits.set_bits(11..13, val as usize);
+    }
+
     /// Floating-point extension state
     ///
     /// Encodes the status of the floating-point unit,

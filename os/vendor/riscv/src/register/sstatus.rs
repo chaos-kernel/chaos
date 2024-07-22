@@ -18,6 +18,12 @@ pub enum SPP {
 }
 
 impl Sstatus {
+    /// Returns the contents of the register as raw bits
+    #[inline]
+    pub fn bits(&self) -> usize {
+        self.bits
+    }
+
     /// User Interrupt Enable
     #[inline]
     pub fn uie(&self) -> bool {
@@ -93,6 +99,21 @@ impl Sstatus {
     #[inline]
     pub fn sd(&self) -> bool {
         self.bits.get_bit(size_of::<usize>() * 8 - 1)
+    }
+
+    #[inline]
+    pub fn set_spie(&mut self, val: bool) {
+        self.bits.set_bit(5, val);
+    }
+
+    #[inline]
+    pub fn set_sie(&mut self, val: bool) {
+        self.bits.set_bit(1, val);
+    }
+
+    #[inline]
+    pub fn set_spp(&mut self, val: SPP) {
+        self.bits.set_bit(8, val == SPP::Supervisor);
     }
 }
 

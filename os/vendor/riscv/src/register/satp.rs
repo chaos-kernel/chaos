@@ -1,6 +1,8 @@
 //! satp register
 
 #[cfg(riscv)]
+use addr::Frame;
+#[cfg(riscv)]
 use bit_field::BitField;
 
 /// satp register
@@ -66,6 +68,13 @@ impl Satp {
     #[cfg(riscv64)]
     pub fn ppn(&self) -> usize {
         self.bits.get_bits(0..44)
+    }
+
+    /// Physical frame
+    #[inline]
+    #[cfg(riscv)]
+    pub fn frame(&self) -> Frame {
+        Frame::of_ppn(self.ppn())
     }
 }
 

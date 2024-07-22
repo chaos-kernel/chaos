@@ -1,6 +1,6 @@
 //! VirtIO guest drivers.
 
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 #![deny(unused_must_use, missing_docs)]
 #![allow(clippy::identity_op)]
 #![allow(dead_code)]
@@ -11,21 +11,19 @@ mod blk;
 mod console;
 mod gpu;
 mod hal;
+mod header;
 mod input;
 mod net;
 mod queue;
-mod transport;
-mod volatile;
 
 pub use self::blk::{BlkResp, RespStatus, VirtIOBlk};
 pub use self::console::VirtIOConsole;
 pub use self::gpu::VirtIOGpu;
 pub use self::hal::{Hal, PhysAddr, VirtAddr};
+pub use self::header::*;
 pub use self::input::{InputConfigSelect, InputEvent, VirtIOInput};
 pub use self::net::VirtIONet;
 use self::queue::VirtQueue;
-pub use self::transport::mmio::{MmioError, MmioTransport, MmioVersion, VirtIOHeader};
-pub use self::transport::{DeviceStatus, DeviceType, Transport};
 use core::mem::size_of;
 use hal::*;
 

@@ -61,11 +61,11 @@ pub mod mimpid;
 pub mod mvendorid;
 
 // Machine Trap Setup
-pub mod misa;
-pub mod mstatus;
-// TODO: medeleg
+pub mod medeleg;
 pub mod mideleg;
 pub mod mie;
+pub mod misa;
+pub mod mstatus;
 pub mod mtvec;
 // TODO: mcounteren
 
@@ -98,3 +98,7 @@ pub use self::mhpmeventx::*;
 // TODO: Debug/Trace Registers (shared with Debug Mode)
 
 // TODO: Debug Mode Registers
+
+// Hypervisor Extension Registers
+mod hypervisorx64;
+pub use self::hypervisorx64::*;

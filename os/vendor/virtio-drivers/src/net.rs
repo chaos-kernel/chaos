@@ -1,11 +1,10 @@
 use core::mem::{size_of, MaybeUninit};
 
 use super::*;
-use crate::transport::Transport;
-use crate::volatile::{volread, ReadOnly, Volatile};
 use bitflags::*;
 use core::hint::spin_loop;
 use log::*;
+use volatile::{ReadOnly, Volatile};
 
 /// The virtio network device is a virtual ethernet card.
 ///
@@ -14,39 +13,35 @@ use log::*;
 /// Empty buffers are placed in one virtqueue for receiving packets, and
 /// outgoing packets are enqueued into another for transmission in that order.
 /// A third command queue is used to control advanced filtering features.
-pub struct VirtIONet<H: Hal, T: Transport> {
-    transport: T,
+pub struct VirtIONet<'a, H: Hal> {
+    header: &'static mut VirtIOHeader,
     mac: EthernetAddress,
-    recv_queue: VirtQueue<H>,
-    send_queue: VirtQueue<H>,
+    recv_queue: VirtQueue<'a, H>,
+    send_queue: VirtQueue<'a, H>,
 }
 
-impl<H: Hal, T: Transport> VirtIONet<H, T> {
+impl<H: Hal> VirtIONet<'_, H> {
     /// Create a new VirtIO-Net driver.
-    pub fn new(mut transport: T) -> Result<Self> {
-        transport.begin_init(|features| {
+    pub fn new(header: &'static mut VirtIOHeader) -> Result<Self> {
+        header.begin_init(|features| {
             let features = Features::from_bits_truncate(features);
             info!("Device features {:?}", features);
             let supported_features = Features::MAC | Features::STATUS;
             (features & supported_features).bits()
         });
         // read configuration space
-        let config = transport.config_space().cast::<Config>();
-        let mac;
-        // Safe because config points to a valid MMIO region for the config space.
-        unsafe {
-            mac = volread!(config, mac);
-            debug!("Got MAC={:?}, status={:?}", mac, volread!(config, status));
-        }
+        let config = unsafe { &mut *(header.config_space() as *mut Config) };
+        let mac = config.mac.read();
+        debug!("Got MAC={:?}, status={:?}", mac, config.status.read());
 
         let queue_num = 2; // for simplicity
-        let recv_queue = VirtQueue::new(&mut transport, QUEUE_RECEIVE, queue_num)?;
-        let send_queue = VirtQueue::new(&mut transport, QUEUE_TRANSMIT, queue_num)?;
+        let recv_queue = VirtQueue::new(header, QUEUE_RECEIVE, queue_num)?;
+        let send_queue = VirtQueue::new(header, QUEUE_TRANSMIT, queue_num)?;
 
-        transport.finish_init();
+        header.finish_init();
 
         Ok(VirtIONet {
-            transport,
+            header,
             mac,
             recv_queue,
             send_queue,
@@ -55,7 +50,7 @@ impl<H: Hal, T: Transport> VirtIONet<H, T> {
 
     /// Acknowledge interrupt.
     pub fn ack_interrupt(&mut self) -> bool {
-        self.transport.ack_interrupt()
+        self.header.ack_interrupt()
     }
 
     /// Get MAC address.
@@ -78,7 +73,7 @@ impl<H: Hal, T: Transport> VirtIONet<H, T> {
         let mut header = MaybeUninit::<Header>::uninit();
         let header_buf = unsafe { (*header.as_mut_ptr()).as_buf_mut() };
         self.recv_queue.add(&[], &[header_buf, buf])?;
-        self.transport.notify(QUEUE_RECEIVE as u32);
+        self.header.notify(QUEUE_RECEIVE as u32);
         while !self.recv_queue.can_pop() {
             spin_loop();
         }
@@ -92,7 +87,7 @@ impl<H: Hal, T: Transport> VirtIONet<H, T> {
     pub fn send(&mut self, buf: &[u8]) -> Result {
         let header = unsafe { MaybeUninit::<Header>::zeroed().assume_init() };
         self.send_queue.add(&[header.as_buf(), buf], &[])?;
-        self.transport.notify(QUEUE_TRANSMIT as u32);
+        self.header.notify(QUEUE_TRANSMIT as u32);
         while !self.send_queue.can_pop() {
             spin_loop();
         }

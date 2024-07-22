@@ -1,10 +1,9 @@
 use super::*;
 use crate::queue::VirtQueue;
-use crate::transport::Transport;
-use crate::volatile::{ReadOnly, Volatile, WriteOnly};
 use bitflags::*;
 use core::{fmt, hint::spin_loop};
 use log::*;
+use volatile::{ReadOnly, Volatile, WriteOnly};
 
 /// A virtio based graphics adapter.
 ///
@@ -13,17 +12,17 @@ use log::*;
 /// a gpu with 3D support on the host machine.
 /// In 2D mode the virtio-gpu device provides support for ARGB Hardware cursors
 /// and multiple scanouts (aka heads).
-pub struct VirtIOGpu<'a, H: Hal, T: Transport> {
-    transport: T,
-    rect: Option<Rect>,
+pub struct VirtIOGpu<'a, H: Hal> {
+    header: &'static mut VirtIOHeader,
+    rect: Rect,
     /// DMA area of frame buffer.
     frame_buffer_dma: Option<DMA<H>>,
     /// DMA area of cursor image buffer.
     cursor_buffer_dma: Option<DMA<H>>,
     /// Queue for sending control commands.
-    control_queue: VirtQueue<H>,
+    control_queue: VirtQueue<'a, H>,
     /// Queue for sending cursor commands.
-    cursor_queue: VirtQueue<H>,
+    cursor_queue: VirtQueue<'a, H>,
     /// Queue buffer DMA
     queue_buf_dma: DMA<H>,
     /// Send buffer for queue.
@@ -32,10 +31,10 @@ pub struct VirtIOGpu<'a, H: Hal, T: Transport> {
     queue_buf_recv: &'a mut [u8],
 }
 
-impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
+impl<H: Hal> VirtIOGpu<'_, H> {
     /// Create a new VirtIO-Gpu driver.
-    pub fn new(mut transport: T) -> Result<Self> {
-        transport.begin_init(|features| {
+    pub fn new(header: &'static mut VirtIOHeader) -> Result<Self> {
+        header.begin_init(|features| {
             let features = Features::from_bits_truncate(features);
             info!("Device features {:?}", features);
             let supported_features = Features::empty();
@@ -43,24 +42,23 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
         });
 
         // read configuration space
-        let config_space = transport.config_space().cast::<Config>();
-        let config = unsafe { config_space.as_ref() };
+        let config = unsafe { &mut *(header.config_space() as *mut Config) };
         info!("Config: {:?}", config);
 
-        let control_queue = VirtQueue::new(&mut transport, QUEUE_TRANSMIT, 2)?;
-        let cursor_queue = VirtQueue::new(&mut transport, QUEUE_CURSOR, 2)?;
+        let control_queue = VirtQueue::new(header, QUEUE_TRANSMIT, 2)?;
+        let cursor_queue = VirtQueue::new(header, QUEUE_CURSOR, 2)?;
 
         let queue_buf_dma = DMA::new(2)?;
         let queue_buf_send = unsafe { &mut queue_buf_dma.as_buf()[..PAGE_SIZE] };
         let queue_buf_recv = unsafe { &mut queue_buf_dma.as_buf()[PAGE_SIZE..] };
 
-        transport.finish_init();
+        header.finish_init();
 
         Ok(VirtIOGpu {
-            transport,
+            header,
             frame_buffer_dma: None,
             cursor_buffer_dma: None,
-            rect: None,
+            rect: Rect::default(),
             control_queue,
             cursor_queue,
             queue_buf_dma,
@@ -71,13 +69,12 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
 
     /// Acknowledge interrupt.
     pub fn ack_interrupt(&mut self) -> bool {
-        self.transport.ack_interrupt()
+        self.header.ack_interrupt()
     }
 
     /// Get the resolution (width, height).
-    pub fn resolution(&mut self) -> Result<(u32, u32)> {
-        let display_info = self.get_display_info()?;
-        Ok((display_info.rect.width, display_info.rect.height))
+    pub fn resolution(&self) -> (u32, u32) {
+        (self.rect.width, self.rect.height)
     }
 
     /// Setup framebuffer
@@ -85,7 +82,7 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
         // get display info
         let display_info = self.get_display_info()?;
         info!("=> {:?}", display_info);
-        self.rect = Some(display_info.rect);
+        self.rect = display_info.rect;
 
         // create resource 2d
         self.resource_create_2d(
@@ -111,11 +108,10 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
 
     /// Flush framebuffer to screen.
     pub fn flush(&mut self) -> Result {
-        let rect = self.rect.ok_or(Error::NotReady)?;
         // copy data from guest to host
-        self.transfer_to_host_2d(rect, 0, RESOURCE_ID_FB)?;
+        self.transfer_to_host_2d(self.rect, 0, RESOURCE_ID_FB)?;
         // flush data to screen
-        self.resource_flush(rect, RESOURCE_ID_FB)?;
+        self.resource_flush(self.rect, RESOURCE_ID_FB)?;
         Ok(())
     }
 
@@ -165,7 +161,7 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
         }
         self.control_queue
             .add(&[self.queue_buf_send], &[self.queue_buf_recv])?;
-        self.transport.notify(QUEUE_TRANSMIT as u32);
+        self.header.notify(QUEUE_TRANSMIT as u32);
         while !self.control_queue.can_pop() {
             spin_loop();
         }
@@ -179,7 +175,7 @@ impl<H: Hal, T: Transport> VirtIOGpu<'_, H, T> {
             (self.queue_buf_send.as_mut_ptr() as *mut Req).write(req);
         }
         self.cursor_queue.add(&[self.queue_buf_send], &[])?;
-        self.transport.notify(QUEUE_CURSOR as u32);
+        self.header.notify(QUEUE_CURSOR as u32);
         while !self.cursor_queue.can_pop() {
             spin_loop();
         }

@@ -3,10 +3,13 @@
 use bit_field::BitField;
 use core::mem::size_of;
 
-/// scause register
+/**
+ * scause register
+ * 最高位为 1 表示 interrupt，为 0 表示 exception，其余位置表示错误码
+ */
 #[derive(Clone, Copy)]
 pub struct Scause {
-    bits: usize,
+    bits: usize,  
 }
 
 /// Trap Cause
@@ -20,10 +23,13 @@ pub enum Trap {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Interrupt {
     UserSoft,
+    VirtualSupervisorSoft,
     SupervisorSoft,
     UserTimer,
+    VirtualSupervisorTimer,
     SupervisorTimer,
     UserExternal,
+    VirtualSupervisorExternal,
     SupervisorExternal,
     Unknown,
 }
@@ -39,9 +45,14 @@ pub enum Exception {
     StoreMisaligned,
     StoreFault,
     UserEnvCall,
+    VirtualSupervisorEnvCall,
     InstructionPageFault,
     LoadPageFault,
     StorePageFault,
+    InstructionGuestPageFault,
+    LoadGuestPageFault,
+    VirtualInstruction,
+    StoreGuestPageFault,
     Unknown,
 }
 
@@ -50,10 +61,13 @@ impl Interrupt {
         match nr {
             0 => Interrupt::UserSoft,
             1 => Interrupt::SupervisorSoft,
+            2 => Interrupt::VirtualSupervisorSoft,
             4 => Interrupt::UserTimer,
             5 => Interrupt::SupervisorTimer,
+            6 => Interrupt::VirtualSupervisorTimer,
             8 => Interrupt::UserExternal,
             9 => Interrupt::SupervisorExternal,
+            10 => Interrupt::VirtualSupervisorExternal,
             _ => Interrupt::Unknown,
         }
     }
@@ -70,9 +84,14 @@ impl Exception {
             6 => Exception::StoreMisaligned,
             7 => Exception::StoreFault,
             8 => Exception::UserEnvCall,
+            10 => Exception::VirtualSupervisorEnvCall,
             12 => Exception::InstructionPageFault,
             13 => Exception::LoadPageFault,
             15 => Exception::StorePageFault,
+            20 => Exception::InstructionGuestPageFault,
+            21 => Exception::LoadGuestPageFault,
+            22 => Exception::VirtualInstruction,
+            23 => Exception::StoreGuestPageFault,
             _ => Exception::Unknown,
         }
     }

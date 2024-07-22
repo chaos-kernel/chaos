@@ -3,29 +3,39 @@
 # When uploading crates to the registry Cargo will automatically
 # "normalize" Cargo.toml files for maximal compatibility
 # with all versions of Cargo and also rewrite `path` dependencies
-# to registry (e.g., crates.io) dependencies
+# to registry (e.g., crates.io) dependencies.
 #
-# If you believe there's an error in this file please file an
-# issue against the rust-lang/cargo repository. If you're
-# editing this file be aware that the upstream Cargo.toml
-# will likely look very different (and much more reasonable)
+# If you are reading this file be aware that the original Cargo.toml
+# will likely look very different (and much more reasonable).
+# See Cargo.toml.orig for the original contents.
 
 [package]
 name = "riscv"
 version = "0.6.0"
 authors = ["The RISC-V Team <risc-v@teams.rust-embedded.org>"]
 description = "Low level access to RISC-V processors"
-keywords = ["riscv", "register", "peripheral"]
-categories = ["embedded", "hardware-support", "no-std"]
+readme = "README.md"
+keywords = [
+    "riscv",
+    "register",
+    "peripheral",
+]
+categories = [
+    "embedded",
+    "hardware-support",
+    "no-std",
+]
 license = "ISC"
 repository = "https://github.com/rust-embedded/riscv"
-[dependencies.bare-metal]
-version = "0.2.5"
 
-[dependencies.bit_field]
-version = "0.10.0"
-[build-dependencies.riscv-target]
-version = "0.1.2"
+[dependencies]
+bare-metal = "0.2.5"
+bit_field = "0.10.0"
+bitflags = "1.0"
+log = "0.4"
+
+[build-dependencies]
+riscv-target = "0.1.2"
 
 [features]
 inline-asm = []

@@ -1,25 +1,25 @@
 use super::*;
+use crate::header::VirtIOHeader;
 use crate::queue::VirtQueue;
-use crate::transport::Transport;
-use crate::volatile::{volread, Volatile};
 use bitflags::*;
 use core::hint::spin_loop;
 use log::*;
+use volatile::Volatile;
 
 /// The virtio block device is a simple virtual block device (ie. disk).
 ///
 /// Read and write requests (and other exotic requests) are placed in the queue,
 /// and serviced (probably out of order) by the device except where noted.
-pub struct VirtIOBlk<H: Hal, T: Transport> {
-    transport: T,
-    queue: VirtQueue<H>,
+pub struct VirtIOBlk<'a, H: Hal> {
+    header: &'static mut VirtIOHeader,
+    queue: VirtQueue<'a, H>,
     capacity: usize,
 }
 
-impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
+impl<H: Hal> VirtIOBlk<'_, H> {
     /// Create a new VirtIO-Blk driver.
-    pub fn new(mut transport: T) -> Result<Self> {
-        transport.begin_init(|features| {
+    pub fn new(header: &'static mut VirtIOHeader) -> Result<Self> {
+        header.begin_init(|features| {
             let features = BlkFeature::from_bits_truncate(features);
             info!("device features: {:?}", features);
             // negotiate these flags only
@@ -28,25 +28,26 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
         });
 
         // read configuration space
-        let config = transport.config_space().cast::<BlkConfig>();
+        let config = unsafe { &mut *(header.config_space() as *mut BlkConfig) };
         info!("config: {:?}", config);
-        // Safe because config is a valid pointer to the device configuration space.
-        let capacity = unsafe { volread!(config, capacity) };
-        info!("found a block device of size {}KB", capacity / 2);
+        info!(
+            "found a block device of size {}KB",
+            config.capacity.read() / 2
+        );
 
-        let queue = VirtQueue::new(&mut transport, 0, 16)?;
-        transport.finish_init();
+        let queue = VirtQueue::new(header, 0, 16)?;
+        header.finish_init();
 
         Ok(VirtIOBlk {
-            transport,
+            header,
             queue,
-            capacity: capacity as usize,
+            capacity: config.capacity.read() as usize,
         })
     }
 
     /// Acknowledge interrupt.
     pub fn ack_interrupt(&mut self) -> bool {
-        self.transport.ack_interrupt()
+        self.header.ack_interrupt()
     }
 
     /// Read a block.
@@ -59,7 +60,7 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
         };
         let mut resp = BlkResp::default();
         self.queue.add(&[req.as_buf()], &[buf, resp.as_buf_mut()])?;
-        self.transport.notify(0);
+        self.header.notify(0);
         while !self.queue.can_pop() {
             spin_loop();
         }
@@ -111,7 +112,7 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
             sector: block_id as u64,
         };
         let token = self.queue.add(&[req.as_buf()], &[buf, resp.as_buf_mut()])?;
-        self.transport.notify(0);
+        self.header.notify(0);
         Ok(token)
     }
 
@@ -125,7 +126,7 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
         };
         let mut resp = BlkResp::default();
         self.queue.add(&[req.as_buf(), buf], &[resp.as_buf_mut()])?;
-        self.transport.notify(0);
+        self.header.notify(0);
         while !self.queue.can_pop() {
             spin_loop();
         }
@@ -166,7 +167,7 @@ impl<H: Hal, T: Transport> VirtIOBlk<H, T> {
             sector: block_id as u64,
         };
         let token = self.queue.add(&[req.as_buf(), buf], &[resp.as_buf_mut()])?;
-        self.transport.notify(0);
+        self.header.notify(0);
         Ok(token)
     }
 
