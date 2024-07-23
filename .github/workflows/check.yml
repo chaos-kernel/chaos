@@ -1,4 +1,4 @@
-name: Format Check
+name: Check
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
     - name: Run make fmt
       run: make fmt
 
-    - name: Check for changes
+    - name: Format check
       run: |
         if [[ `git status --porcelain` ]]; then
           echo "Code formatting changes detected. Please run 'make fmt' locally and commit the changes."
@@ -33,3 +33,6 @@ jobs:
         else
           echo "No formatting changes detected."
         fi
+
+    - name: Build check
+      run: make all
