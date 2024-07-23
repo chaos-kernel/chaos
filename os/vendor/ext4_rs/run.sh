@@ -10,8 +10,6 @@ sudo ln -s ./1.txt ./linktest
 cd ..
 
 ## copy files to image
-umount tmp
-rm -rf tmp
 mkdir tmp
 sudo mount ./ex4.img ./tmp/
 cd tmp

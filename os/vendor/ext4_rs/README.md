@@ -1,19 +1,11 @@
 # a cross-platform rust ext4 crate
 
-[![Crates.io Version](https://img.shields.io/crates/v/ext4_rs)](https://crates.io/crates/ext4_rs)
-[![Crates.io License](https://img.shields.io/crates/l/ext4_rs)](LICENSE)
-[![docs.rs](https://img.shields.io/docsrs/ext4_rs)](https://docs.rs/ext4_rs)
-
 ## env
 wsl2 ubuntu22.04
 
 rust version nightly-2024-06-01
 
 rustc 1.80.0-nightly (ada5e2c7b 2024-05-31)
-
-mkfs.ext4 1.46.5 (30-Dec-2021) 
-
-For small images, the newer mkfs.ext4 uses a 512-byte block size. Use **mkfs.ext4 -b 4096** to set a 4096-byte block size.
 
 ## run example
 ```sh
