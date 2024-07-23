@@ -3,13 +3,15 @@ use alloc::{boxed::Box, sync::Arc};
 use dentry::Dentry;
 use fat32::fs::Fat32FS;
 use flags::OpenFlags;
-use fs::FileSystemManager;
+use fs::{FileSystem, FileSystemManager};
 use inode::{Inode, InodeType};
 use lazy_static::lazy_static;
+use spin::Mutex;
 
 use crate::drivers::BLOCK_DEVICE;
 
 pub mod dentry;
+mod ext4;
 mod fat32;
 pub mod file;
 pub mod flags;
@@ -20,14 +22,17 @@ pub mod pipe;
 pub mod stdio;
 
 lazy_static! {
-    pub static ref FS_MANAGER: FileSystemManager = FileSystemManager::new();
+    pub static ref FS_MANAGER: Mutex<FileSystemManager> = Mutex::new(FileSystemManager::new());
 }
 
 lazy_static! {
     pub static ref ROOT_INODE: Arc<Inode> = {
-        let fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        let root_inode = Fat32FS::root_inode(&fs);
-        Arc::new(Inode::new(1, InodeType::Directory, Box::new(root_inode)))
+        let fat32fs = Fat32FS::load(BLOCK_DEVICE.clone());
+        let fat32inode = Fat32FS::root_inode(&fat32fs);
+        let root_inode = Inode::new(1, InodeType::Directory, Box::new(fat32inode));
+        let fs = FileSystem::new(fs::FileSystemType::VFAT, root_inode);
+        FS_MANAGER.lock().mount(fs, "/");
+        FS_MANAGER.lock().rootfs().root_inode()
     };
 }
 

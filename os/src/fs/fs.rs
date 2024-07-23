@@ -1,10 +1,23 @@
 use alloc::{collections::BTreeMap, sync::Arc};
 
-use super::{inode::Inode, path::Path};
+use super::{file::File, inode::Inode, path::Path};
 
 pub struct FileSystem {
     type_:      FileSystemType,
     root_inode: Arc<Inode>,
+}
+
+impl FileSystem {
+    pub fn new(type_: FileSystemType, root_inode: Inode) -> Self {
+        Self {
+            type_,
+            root_inode: Arc::new(root_inode),
+        }
+    }
+
+    pub fn root_inode(&self) -> Arc<Inode> {
+        self.root_inode.clone()
+    }
 }
 
 /* File System Type */
@@ -45,9 +58,9 @@ impl FileSystemManager {
         }
     }
 
-    pub fn mount(&mut self, fs: Arc<FileSystem>, path: &str) {
+    pub fn mount(&mut self, fs: FileSystem, path: &str) {
         let path = Path::new(path);
-        self.mounted_fs.insert(path, fs);
+        self.mounted_fs.insert(path, Arc::new(fs));
     }
 
     pub fn unmount(&mut self, path: &str) {
