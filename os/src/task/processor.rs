@@ -67,6 +67,12 @@ pub fn run_tasks() {
                 task_inner.first_time = Some(get_time_ms());
             }
 
+            // 切换进程也要切换页表
+            task_inner.task_cx.ra = match task.pid.0 {
+                0 => crate::trap::initproc_entry as usize,
+                _ => crate::trap::user_entry as usize,
+            };
+
             //被调度，开始计算进程时钟时间
             task_inner.clock_time_refresh();
             // release coming task_inner manually
