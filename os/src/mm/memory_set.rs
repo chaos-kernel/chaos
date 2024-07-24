@@ -2,7 +2,7 @@
 
 use super::{frame_alloc, FrameTracker};
 use super::{PTEFlags, PageTable, PageTableEntry};
-use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
+use super::{PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
 use crate::config::{
     KERNEL_SPACE_OFFSET, MEMORY_END, MMAP_BASE, MMIO, PAGE_SIZE, PAGE_SIZE_BITS, USER_STACK_SIZE,
@@ -40,7 +40,7 @@ lazy_static! {
 
 /// the kernel token
 pub fn kernel_token() -> usize {
-    KERNEL_SPACE.exclusive_access().token()
+    KERNEL_SPACE.exclusive_access(file!(), line!()).token()
 }
 
 /// address space
@@ -151,6 +151,7 @@ impl MemorySet {
         {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
+            warn!("remove area with start_vpn: {:#x}", start_vpn.0);
             unsafe {
                 asm!("sfence.vma");
             }
@@ -698,7 +699,7 @@ bitflags! {
 /// test map function in page table
 #[allow(unused)]
 pub fn remap_test() {
-    let mut kernel_space = KERNEL_SPACE.exclusive_access();
+    let mut kernel_space = KERNEL_SPACE.exclusive_access(file!(), line!());
     let mid_text: VirtAddr = (stext as usize + (etext as usize - stext as usize) / 2).into();
     let mid_rodata: VirtAddr =
         (srodata as usize + (erodata as usize - srodata as usize) / 2).into();

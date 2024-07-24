@@ -6,7 +6,7 @@
 
 use super::__switch;
 use super::{fetch_task, TaskStatus};
-use super::{ProcessControlBlock, TaskContext, TaskControlBlock};
+use super::{TaskContext, TaskControlBlock};
 use crate::mm::VirtAddr;
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
@@ -56,11 +56,11 @@ lazy_static! {
 pub fn run_tasks() {
     loop {
         debug!("start new turn of scheduling");
-        let mut processor = PROCESSOR.exclusive_access();
+        let mut processor = PROCESSOR.exclusive_access(file!(), line!());
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
-            let mut task_inner = task.inner_exclusive_access();
+            let mut task_inner = task.inner_exclusive_access(file!(), line!());
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
             if task_inner.first_time == None {
@@ -68,11 +68,7 @@ pub fn run_tasks() {
             }
 
             //被调度，开始计算进程时钟时间
-            task.process
-                .upgrade()
-                .unwrap()
-                .inner_exclusive_access()
-                .clock_time_refresh();
+            task_inner.clock_time_refresh();
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
@@ -91,25 +87,18 @@ pub fn run_tasks() {
 
 /// Get current task through take, leaving a None in its place
 pub fn take_current_task() -> Option<Arc<TaskControlBlock>> {
-    PROCESSOR.exclusive_access().take_current()
+    PROCESSOR.exclusive_access(file!(), line!()).take_current()
 }
 
 /// Get a copy of the current task
 pub fn current_task() -> Option<Arc<TaskControlBlock>> {
-    PROCESSOR.exclusive_access().current()
-}
-
-/// get current process
-pub fn current_process() -> Arc<ProcessControlBlock> {
-    current_task().unwrap().process.upgrade().unwrap()
+    PROCESSOR.exclusive_access(file!(), line!()).current()
 }
 
 /// get current pid
 pub fn current_pid() -> Option<usize> {
     if let Some(task) = current_task() {
-        if let Some(process) = task.process.upgrade() {
-            return Some(process.pid.0);
-        }
+        return Some(task.pid.0);
     }
     None
 }
@@ -144,7 +133,7 @@ pub fn current_kstack_top() -> usize {
 
 /// Return to idle control flow for new scheduling
 pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
-    let mut processor = PROCESSOR.exclusive_access();
+    let mut processor = PROCESSOR.exclusive_access(file!(), line!());
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
     drop(processor);
     unsafe {

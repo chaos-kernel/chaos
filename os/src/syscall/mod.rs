@@ -136,7 +136,7 @@ use crate::{fs::inode::Stat, task::current_task};
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     let task = current_task().unwrap();
-    let mut inner = task.inner_exclusive_access();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
     inner.syscall_times[syscall_id] += 1;
     drop(inner);
     drop(task);

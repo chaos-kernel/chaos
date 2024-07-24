@@ -10,6 +10,7 @@ use crate::mm::{
 use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
 use lazy_static::*;
+use spin::Mutex;
 // use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 use virtio_drivers::device::blk::VirtIOBlk;
 use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
@@ -18,7 +19,7 @@ use virtio_drivers::{BufferDirection, Hal};
 #[allow(unused)]
 const VIRTIO0: usize = 0x10001000 + KERNEL_SPACE_OFFSET * PAGE_SIZE;
 /// VirtIOBlock device driver strcuture for virtio_blk device
-pub struct VirtIOBlock(UPSafeCell<VirtIOBlk<VirtioHal, MmioTransport>>);
+pub struct VirtIOBlock(Mutex<VirtIOBlk<VirtioHal, MmioTransport>>);
 
 lazy_static! {
     /// The global io data queue for virtio_blk device
@@ -31,14 +32,13 @@ unsafe impl Sync for VirtIOBlock {}
 impl BlockDevice for VirtIOBlock {
     /// Read a block from the virtio_blk device
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        let mut res = self.0.exclusive_access().read_blocks(block_id, buf);
-        // debug!("read_block: {:?}, block_id: {:}", res, block_id);
+        let mut res = self.0.lock().read_blocks(block_id, buf);
         if res.is_err() {
             error!("Error when reading VirtIOBlk, block_id {}", block_id);
             let mut times = 0 as usize;
             while res.is_err() {
                 warn!("read_block: retrying block_id: {:}", block_id);
-                res = self.0.exclusive_access().read_blocks(block_id, buf);
+                res = self.0.lock().read_blocks(block_id, buf);
                 times += 1;
                 if times > 10 {
                     panic!("read_block {}: failed after 10 retries", block_id);
@@ -56,8 +56,9 @@ impl BlockDevice for VirtIOBlock {
     }
     ///
     fn write_block(&self, block_id: usize, buf: &[u8]) {
+        debug!("write_block: block_id: {:}", block_id);
         self.0
-            .exclusive_access()
+            .lock()
             .write_blocks(block_id, buf)
             .expect("Error when writing VirtIOBlk");
     }
@@ -69,12 +70,14 @@ impl VirtIOBlock {
     pub fn new() -> Self {
         unsafe {
             let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
-            Self(UPSafeCell::new(
+            let blk = Self(Mutex::new(
                 VirtIOBlk::<VirtioHal, MmioTransport>::new(
                     MmioTransport::new(header.into()).unwrap(),
                 )
                 .unwrap(),
-            ))
+            ));
+            debug!("VirtIOBlock created");
+            blk
         }
     }
 }
@@ -117,7 +120,7 @@ unsafe impl Hal for VirtioHal {
     unsafe fn share(buffer: NonNull<[u8]>, direction: BufferDirection) -> virtio_drivers::PhysAddr {
         unsafe {
             KERNEL_SPACE
-                .exclusive_access()
+                .exclusive_access(file!(), line!())
                 .page_table
                 .translate_va(VirtAddr::from(buffer.as_ptr() as *const usize as usize))
                 .unwrap()

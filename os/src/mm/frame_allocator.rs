@@ -130,7 +130,7 @@ pub fn init_frame_allocator() {
         "PhysAddr::from(MEMORY_END)={:?}",
         PhysAddr::from(MEMORY_END)
     );
-    FRAME_ALLOCATOR.exclusive_access().init(
+    FRAME_ALLOCATOR.exclusive_access(file!(), line!()).init(
         PhysAddr::from(KernelAddr::from(ekernel as usize)).ceil(),
         PhysAddr::from(KernelAddr::from(MEMORY_END)).floor(),
     );
@@ -139,21 +139,25 @@ pub fn init_frame_allocator() {
 /// Allocate a physical page frame in FrameTracker style
 pub fn frame_alloc() -> Option<FrameTracker> {
     FRAME_ALLOCATOR
-        .exclusive_access()
+        .exclusive_access(file!(), line!())
         .alloc()
         .map(FrameTracker::new)
 }
 
 /// Allocate n contiguous physical page frames in FrameTracker style
 pub fn frame_alloc_contiguous(num: usize) -> (Vec<FrameTracker>, PhysPageNum) {
-    let (frames, root_ppn) = FRAME_ALLOCATOR.exclusive_access().alloc_contiguous(num);
+    let (frames, root_ppn) = FRAME_ALLOCATOR
+        .exclusive_access(file!(), line!())
+        .alloc_contiguous(num);
     let frame_trackers: Vec<FrameTracker> = frames.iter().map(|&p| FrameTracker::new(p)).collect();
     (frame_trackers, root_ppn)
 }
 
 /// Deallocate a physical page frame with a given ppn
 pub fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
+    FRAME_ALLOCATOR
+        .exclusive_access(file!(), line!())
+        .dealloc(ppn);
 }
 
 #[allow(unused)]

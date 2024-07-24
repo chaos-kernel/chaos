@@ -1,32 +1,19 @@
 use crate::{
     config::*,
-    fs::{
-        file::File,
-        inode::{OSInode, ROOT_INODE},
-        open_file, OpenFlags,
-    },
-    mm::{
-        translated_byte_buffer, translated_ref, translated_refmut, translated_str, MapPermission,
-        VirtAddr,
-    },
+    fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    mm::{translated_byte_buffer, translated_refmut},
     task::{
-        current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
+        current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
     utils::string::c_ptr_to_string,
 };
-use core::{
-    arch::asm,
-    borrow::BorrowMut,
-    mem::{self, size_of},
-    ptr,
-};
+use core::{borrow::BorrowMut, mem::size_of, ptr};
 
 #[allow(unused)]
 use super::errno::{EINVAL, EPERM, SUCCESS};
 
-use alloc::vec;
 use alloc::{string::String, sync::Arc, vec::Vec};
 use riscv::register::sstatus;
 
@@ -105,48 +92,32 @@ bitflags! {
 ///
 /// exit the current task and run the next task in task list
 pub fn sys_exit(exit_code: i32) -> ! {
-    trace!(
-        "kernel:pid[{}] sys_exit",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_exit", current_task().unwrap().pid.0);
 
     exit_current_and_run_next(exit_code);
     panic!("Unreachable in sys_exit!");
 }
 /// yield syscall
 pub fn sys_yield() -> isize {
-    trace!(
-        "kernel:pid[{}] sys_yield",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_yield", current_task().unwrap().pid.0);
     suspend_current_and_run_next();
     0
 }
 /// getpid syscall
 pub fn sys_getpid() -> isize {
-    trace!(
-        "kernel: sys_getpid pid:{}",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    //todo 仅用于初赛, 后面把加一去掉，主要因为目前还没有初始进程
+    trace!("kernel: sys_getpid pid:{}", current_task().unwrap().pid.0);
 
-    (current_task().unwrap().process.upgrade().unwrap().getpid()) as isize
+    (current_task().unwrap().pid.0) as isize
 }
 /// getppid syscall
 pub fn sys_getppid() -> isize {
-    trace!(
-        "kernel: sys_getppid pid:{}",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel: sys_getppid pid:{}", current_task().unwrap().pid.0);
     if let Some(parent) = &current_task()
         .unwrap()
-        .process
-        .upgrade()
-        .unwrap()
-        .inner_exclusive_access()
+        .inner_exclusive_access(file!(), line!())
         .parent
     {
-        parent.upgrade().unwrap().getpid() as isize
+        parent.upgrade().unwrap().pid.0 as isize
     } else {
         warn!("kwenel: getppid NOT IMPLEMENTED YET!!");
         1
@@ -168,7 +139,7 @@ pub fn sys_clone(
         tls,
         ctid
     );
-    let current_process = current_process();
+    let current_task = current_task().unwrap();
 
     let exit_signal = SignalFlags::from_bits(1 << ((flags & CSIGNAL) - 1)).unwrap();
     let clone_signals = CloneFlags::from_bits((flags & !CSIGNAL) as u32).unwrap();
@@ -180,18 +151,19 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
-            return current_process.fork() as isize;
+            return current_task.fork() as isize;
         } else {
-            return current_process.fork2(stack_ptr) as isize; //todo仅用于初赛
+            // return current_task.fork2(stack_ptr) as isize; //todo仅用于初赛
+            return current_task.fork() as isize; //todo
         }
     } else {
         println!("[sys_clone] create thread");
-        let new_thread = current_process.clone2(exit_signal, clone_signals, stack_ptr, tls);
+        let new_thread = current_task.clone2(exit_signal, clone_signals, stack_ptr, tls);
 
         // The thread ID of the main thread needs to be the same as the Process ID,
         // so we will exchange the thread whose thread ID is equal to Process ID with the thread whose thread ID is equal to 0,
         // but the system will not exchange it internally
-        let process_pid = current_process.getpid();
+        let process_pid = current_task.pid.0;
         let mut new_thread_ttid = new_thread.gettid();
         if new_thread_ttid == process_pid {
             new_thread_ttid = 0;
@@ -209,7 +181,7 @@ pub fn sys_clone(
             }
         }
         if clone_signals.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
-            let mut thread_inner = new_thread.inner_exclusive_access();
+            let mut thread_inner = new_thread.inner_exclusive_access(file!(), line!());
             thread_inner.clear_child_tid = ctid as usize;
         }
 
@@ -218,10 +190,7 @@ pub fn sys_clone(
 }
 /// exec syscall
 pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_execve",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_execve", current_task().unwrap().pid.0);
     unsafe {
         sstatus::set_sum();
     }
@@ -245,9 +214,9 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
         debug!("kernel: execve open app success : {}", path.as_str());
         let all_data = app_inode.read_all();
         debug!("kernel: execve read app success : {}", path.as_str());
-        let process = current_process();
+        let task = current_task().unwrap();
         let argc = args_vec.len();
-        process.exec(all_data.as_slice(), args_vec);
+        task.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {
@@ -263,28 +232,32 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
     trace!("kernel: sys_waitpid");
     let option = WaitOption::from_bits(option).unwrap();
     loop {
-        let process = current_process();
-        let mut inner = process.inner_exclusive_access();
+        let task = current_task().unwrap();
+        let mut inner = task.inner_exclusive_access(file!(), line!());
         if !inner
             .children
             .iter()
-            .any(|p| pid == -1 || pid as usize == p.getpid())
+            .any(|p| pid == -1 || pid as usize == p.pid.0)
         {
             return -1;
             // ---- release current PCB
         }
         let pair = inner.children.iter().enumerate().find(|(_, p)| {
             // ++++ temporarily access child PCB exclusively
-            p.inner_exclusive_access().is_zombie && (pid == -1 || pid as usize == p.getpid())
+            p.inner_exclusive_access(file!(), line!()).is_zombie
+                && (pid == -1 || pid as usize == p.pid.0)
             // ++++ release child PCB
         });
         if let Some((idx, _)) = pair {
             let child = inner.children.remove(idx);
             // confirm that child will be deallocated after being removed from children list
             assert_eq!(Arc::strong_count(&child), 1);
-            let found_pid = child.getpid();
+            let found_pid = child.pid.0;
             // ++++ temporarily access child PCB exclusively
-            let exit_code = child.inner_exclusive_access().exit_code;
+            let exit_code = child
+                .inner_exclusive_access(file!(), line!())
+                .exit_code
+                .unwrap();
             // ++++ release child PCB
             if !exit_code_ptr.is_null() {
                 *translated_refmut(inner.memory_set.token(), exit_code_ptr) = exit_code << 8;
@@ -293,7 +266,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
         } else {
             // drop ProcessControlBlock and ProcessControlBlock to avoid mulit-use
             drop(inner);
-            drop(process);
+            drop(task);
             if option.contains(WaitOption::WNOHANG) {
                 return 0;
             } else {
@@ -308,13 +281,10 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
 
 /// kill syscall
 pub fn sys_kill(pid: usize, signal: u32) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_kill",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_kill", current_task().unwrap().pid.0);
     if let Some(process) = pid2process(pid) {
         if let Some(flag) = SignalFlags::from_bits(signal as usize) {
-            process.inner_exclusive_access().signals |= flag;
+            process.inner_exclusive_access(file!(), line!()).signals |= flag;
             0
         } else {
             -1
@@ -330,10 +300,7 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
     let us = get_time_us();
     let mut v = translated_byte_buffer(current_user_token(), ts as *const u8, size_of::<TimeVal>());
     let mut ts = TimeVal {
@@ -355,12 +322,12 @@ pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!(
         "kernel:pid[{}] sys_task_info",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        current_task().unwrap().pid.0
     );
     let mut v =
         translated_byte_buffer(current_user_token(), ti as *const u8, size_of::<TaskInfo>());
     let task = current_task().unwrap();
-    let inner = task.inner_exclusive_access();
+    let inner = task.inner_exclusive_access(file!(), line!());
     let mut ti = TaskInfo {
         status: TaskStatus::Running,
         syscall_times: inner.syscall_times,
@@ -390,7 +357,7 @@ pub fn sys_mmap(
 ) -> isize {
     trace!(
         "kernel:pid[{}] sys_mmap start:{:#x} len:{} prot:{} flags:{} fd:{} off:{}",
-        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        current_task().unwrap().pid.0,
         start,
         len,
         prot,
@@ -402,27 +369,25 @@ pub fn sys_mmap(
         debug!("mmap: invalid arguments");
         return EPERM;
     }
-    let process = current_process();
-    let mut inner = process.inner_exclusive_access();
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
     inner.mmap(start, len, prot, flags, fd, off)
 }
 
 /// munmap syscall
 pub fn sys_munmap(start: usize, len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    current_process()
-        .inner_exclusive_access()
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+    current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
         .munmap(start, len)
 }
 
 /// change data segment size
 pub fn sys_brk(addr: usize) -> isize {
     // println!("[sys_brk] addr = {:#x}", addr);
-    let process = current_process();
-    let mut inner = process.inner_exclusive_access();
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
     if addr == 0 {
         inner.heap_end.0 as isize
     } else if addr < inner.heap_base.0 {
@@ -452,10 +417,7 @@ pub fn sys_brk(addr: usize) -> isize {
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_spawn",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_spawn", current_task().unwrap().pid.0);
     -1
     // let token = current_user_token();
     // let path = translated_str(token, path);
@@ -477,7 +439,7 @@ pub fn sys_spawn(_path: *const u8) -> isize {
 pub fn sys_set_priority(prio: isize) -> isize {
     trace!(
         "kernel:pid[{}] sys_set_priority",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        current_task().unwrap().pid.0
     );
     0
 }
@@ -485,17 +447,16 @@ pub fn sys_set_priority(prio: isize) -> isize {
 /// get current process times
 #[allow(unused)]
 pub fn sys_times(tms: *mut Tms) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
     let mut tms_k =
         translated_byte_buffer(current_user_token(), tms as *const u8, size_of::<Tms>());
-    let (tms_stime, tms_utime) = current_process()
-        .inner_exclusive_access()
+    let (tms_stime, tms_utime) = current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
         .get_process_clock_time();
-    let (tms_cstime, tms_cutime) = current_process()
-        .inner_exclusive_access()
+    let (tms_cstime, tms_cutime) = current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
         .get_children_process_clock_time();
     let mut sys_tms = Tms {
         tms_utime,

@@ -1,9 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::{
-    block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ},
-    config::PAGE_SIZE,
-};
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 use super::super_block::Fat32SB;
 

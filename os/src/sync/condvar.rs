@@ -31,7 +31,7 @@
 
 //     /// Signal a task waiting on the condition variable
 //     pub fn signal(&self) {
-//         let mut inner = self.inner.exclusive_access();
+//         let mut inner = self.inner.exclusive_access(file!(), line!());
 //         if let Some(task) = inner.wait_queue.pop_front() {
 //             wakeup_task(task);
 //         }
@@ -41,7 +41,7 @@
 //     pub fn wait(&self, mutex: Arc<dyn MutexSupport>) {
 //         trace!("kernel: Condvar::wait_with_mutex");
 //         mutex.unlock();
-//         let mut inner = self.inner.exclusive_access();
+//         let mut inner = self.inner.exclusive_access(file!(), line!());
 //         inner.wait_queue.push_back(current_task().unwrap());
 //         drop(inner);
 //         block_current_and_run_next();

@@ -106,7 +106,9 @@ pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
     let buffer = Arc::new(unsafe { UPSafeCell::new(PipeRingBuffer::new()) });
     let read_end = Arc::new(Pipe::read_end_with_buffer(buffer.clone()));
     let write_end = Arc::new(Pipe::write_end_with_buffer(buffer.clone()));
-    buffer.exclusive_access().set_write_end(&write_end);
+    buffer
+        .exclusive_access(file!(), line!())
+        .set_write_end(&write_end);
     (read_end, write_end)
 }
 
@@ -124,7 +126,7 @@ impl File for Pipe {
         let mut buf_iter = buf.into_iter();
         let mut already_read = 0usize;
         loop {
-            let mut ring_buffer = self.buffer.exclusive_access();
+            let mut ring_buffer = self.buffer.exclusive_access(file!(), line!());
             let loop_read = ring_buffer.available_read();
             if loop_read == 0 {
                 if ring_buffer.all_write_ends_closed() {
@@ -159,7 +161,7 @@ impl File for Pipe {
         let mut buf_iter = buf.into_iter();
         let mut already_write = 0usize;
         loop {
-            let mut ring_buffer = self.buffer.exclusive_access();
+            let mut ring_buffer = self.buffer.exclusive_access(file!(), line!());
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);

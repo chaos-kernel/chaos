@@ -5,7 +5,7 @@ use crate::trap::trap_return;
 /// task context structure containing some registers
 pub struct TaskContext {
     /// Ret position after task switching
-    ra: usize,
+    pub ra: usize,
     /// Stack pointer
     sp: usize,
     /// s0-11 register, callee saved

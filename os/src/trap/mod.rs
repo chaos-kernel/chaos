@@ -17,7 +17,7 @@ mod context;
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::syscall::syscall;
 use crate::task::{
-    check_signals_of_current, current_add_signal, current_process, current_trap_cx,
+    check_signals_of_current, current_add_signal, current_task, current_trap_cx,
     current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
     suspend_current_and_run_next, SignalFlags, INITPROC,
 };
@@ -73,8 +73,9 @@ pub fn trap_handler() -> ! {
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
             //进入内核态之前，计算用户态已运行的时间
-            current_process()
-                .inner_exclusive_access()
+            current_task()
+                .unwrap()
+                .inner_exclusive_access(file!(), line!())
                 .user_clock_time_end();
 
             // jump to next instruction anyway
@@ -95,7 +96,7 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::InstructionPageFault)
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
-            panic!(
+            error!(
                 "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
                 scause.cause(),
                 stval,
@@ -104,6 +105,7 @@ pub fn trap_handler() -> ! {
             current_add_signal(SignalFlags::SIGSEGV);
         }
         Trap::Exception(Exception::IllegalInstruction) => {
+            exit_current_and_run_next(-1);
             current_add_signal(SignalFlags::SIGILL);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
@@ -121,10 +123,13 @@ pub fn trap_handler() -> ! {
         }
     }
     //check signals
-    // if let Some((errno, msg)) = check_signals_of_current() {
-    //     trace!("[kernel] trap_handler: .. check signals {}", msg);
-    //     exit_current_and_run_next(errno);
-    // }
+    if let Some((errno, msg)) = check_signals_of_current() {
+        debug!("trap_handler: check signals ");
+        debug!("{}", msg);
+        println!("{}", msg);
+        // trace!("[kernel] trap_handler: .. check signals {}", msg);
+        exit_current_and_run_next(errno);
+    }
     trap_return();
 }
 
@@ -136,12 +141,22 @@ pub fn trap_return() -> ! {
     set_user_trap_entry();
 
     //从内核态返回后，计算内核态运行时间
-    current_process()
-        .inner_exclusive_access()
+    current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
         .user_clock_time_start();
 
     let trap_cx_user_va: usize = current_trap_cx_user_va().into();
     let user_satp = current_user_token();
+    // warn!(
+    //     "[kernel] user_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
+    //     trap_cx_user_va, user_satp
+    // );
+    // warn!(
+    //     "[kernel] user_entry, sepc = {:#x}, sp = {:#x}",
+    //     current_trap_cx().sepc,
+    //     current_trap_cx().x[10]
+    // );
     extern "C" {
         fn __alltraps();
         fn __restore();
@@ -172,8 +187,11 @@ pub fn trap_from_kernel() -> ! {
 pub fn initproc_entry() -> ! {
     debug!("entering initproc");
     set_user_trap_entry();
-    let trap_cx_user_va: usize = TRAP_CONTEXT_BASE;
-    let user_satp = INITPROC.inner_exclusive_access().memory_set.token();
+    let trap_cx_user_va: usize = current_trap_cx_user_va().into();
+    let user_satp = INITPROC
+        .inner_exclusive_access(file!(), line!())
+        .memory_set
+        .token();
     debug!(
         "[kernel] initproc_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
         trap_cx_user_va, user_satp
@@ -197,7 +215,7 @@ pub fn initproc_entry() -> ! {
 
 #[no_mangle]
 pub fn user_entry() -> ! {
-    debug!("entering user app");
+    info!("entering user app");
     set_user_trap_entry();
     let trap_cx_user_va: usize = current_trap_cx_user_va().into();
     let user_satp = current_user_token();

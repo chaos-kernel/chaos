@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::{
-    dentry::{self, Fat32Dentry, FileAttributes},
+    dentry::{Fat32Dentry, FileAttributes},
     file_system::Fat32FS,
 };
 

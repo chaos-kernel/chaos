@@ -32,7 +32,7 @@ impl Semaphore {
     /// up operation of semaphore
     pub fn up(&self) {
         trace!("kernel: Semaphore::up");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         inner.count += 1;
         if inner.count <= 0 {
             if let Some(task) = inner.wait_queue.pop_front() {
@@ -44,7 +44,7 @@ impl Semaphore {
     /// down operation of semaphore
     pub fn down(&self) {
         trace!("kernel: Semaphore::down");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         inner.count -= 1;
         if inner.count < 0 {
             inner.wait_queue.push_back(current_task().unwrap());

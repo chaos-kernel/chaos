@@ -5,7 +5,7 @@ use core::fmt;
 use alloc::string::{String, ToString};
 use log::{Level, LevelFilter, Log, Metadata, Record};
 
-use crate::task::{current_pid, current_process, current_task, current_tid};
+use crate::task::{current_pid, current_task, current_tid};
 
 /// Add escape sequence to print with color in Linux console
 macro_rules! with_color {

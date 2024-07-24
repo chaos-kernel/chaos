@@ -1,14 +1,12 @@
 use crate::board::CLOCK_FREQ;
 use crate::mm::{translated_ref, translated_refmut};
-use crate::task::{
-    current_process, current_task, current_user_token, suspend_current_and_run_next,
-};
+use crate::task::{current_task, current_user_token, suspend_current_and_run_next};
 use crate::timer::{get_time, NSEC_PER_SEC};
 /// sleep syscall
 pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
     trace!(
         "kernel:pid[{}] tid[{}] sys_sleep",
-        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        current_task().unwrap().pid.0,
         current_task().unwrap().tid
     );
     #[inline]
@@ -43,7 +41,7 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
@@ -55,7 +53,7 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //     } else {
 //         Some(Arc::new(SpinNoIrqLock::new()))
 //     };
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     if let Some(id) = process_inner
 //         .mutex_list
 //         .iter()
@@ -92,16 +90,16 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.need[tid][mutex_id] += 1;
 //     let deadlock_detect = process_inner.deadlock_detect;
 //     drop(process_inner);
@@ -111,9 +109,9 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //     }
 //     mutex.lock();
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     process_inner.available[mutex_id] -= 1;
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.allocation[tid][mutex_id] += 1;
 //     process_inner.need[tid][mutex_id] -= 1;
 //     0
@@ -126,22 +124,22 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let process_inner = process.inner_exclusive_access();
+//     let process_inner = process.inner_exclusive_access(file!(), line!());
 //     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
 //     drop(process_inner);
 //     drop(process);
 //     mutex.unlock();
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     process_inner.available[mutex_id] += 1;
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.allocation[tid][mutex_id] -= 1;
 //     0
 // }
@@ -153,14 +151,14 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     let id = if let Some(id) = process_inner
 //         .semaphore_list
 //         .iter()
@@ -200,22 +198,22 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let process_inner = process.inner_exclusive_access();
+//     let process_inner = process.inner_exclusive_access(file!(), line!());
 //     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
 //     drop(process_inner);
 //     drop(process);
 //     sem.up();
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     process_inner.available[sem_id] += 1;
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.allocation[tid][sem_id] -= 1;
 //     0
 // }
@@ -227,16 +225,16 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     let sem = Arc::clone(process_inner.semaphore_list[sem_id].as_ref().unwrap());
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.need[tid][sem_id] += 1;
 //     let deadlock_detect = process_inner.deadlock_detect;
 //     drop(process_inner);
@@ -246,9 +244,9 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //     }
 //     sem.down();
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     process_inner.available[sem_id] -= 1;
-//     let tid = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+//     let tid = current_task().unwrap().inner_exclusive_access(file!(), line!()).res.as_ref().unwrap().tid;
 //     process_inner.allocation[tid][sem_id] += 1;
 //     process_inner.need[tid][sem_id] -= 1;
 //     0
@@ -261,14 +259,14 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     let id = if let Some(id) = process_inner
 //         .condvar_list
 //         .iter()
@@ -294,14 +292,14 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let process_inner = process.inner_exclusive_access();
+//     let process_inner = process.inner_exclusive_access(file!(), line!());
 //     let condvar = Arc::clone(process_inner.condvar_list[condvar_id].as_ref().unwrap());
 //     drop(process_inner);
 //     condvar.signal();
@@ -315,14 +313,14 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         current_task().unwrap().process.upgrade().unwrap().getpid(),
 //         current_task()
 //             .unwrap()
-//             .inner_exclusive_access()
+//             .inner_exclusive_access(file!(), line!())
 //             .res
 //             .as_ref()
 //             .unwrap()
 //             .tid
 //     );
 //     let process = current_process();
-//     let process_inner = process.inner_exclusive_access();
+//     let process_inner = process.inner_exclusive_access(file!(), line!());
 //     let condvar = Arc::clone(process_inner.condvar_list[condvar_id].as_ref().unwrap());
 //     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
 //     drop(process_inner);
@@ -338,7 +336,7 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
 //         return -1;
 //     }
 //     let process = current_process();
-//     let mut process_inner = process.inner_exclusive_access();
+//     let mut process_inner = process.inner_exclusive_access(file!(), line!());
 //     process_inner.deadlock_detect = enabled == 1;
 //     0
 // }

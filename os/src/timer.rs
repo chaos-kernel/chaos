@@ -88,11 +88,8 @@ lazy_static! {
 
 /// Add a timer
 pub fn add_timer(expire_ms: usize, task: Arc<TaskControlBlock>) {
-    trace!(
-        "kernel:pid[{}] add_timer",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    let mut timers = TIMERS.exclusive_access();
+    trace!("kernel:pid[{}] add_timer", current_task().unwrap().pid.0);
+    let mut timers = TIMERS.exclusive_access(file!(), line!());
     timers.push(TimerCondVar { expire_ms, task });
 }
 
@@ -100,7 +97,7 @@ pub fn add_timer(expire_ms: usize, task: Arc<TaskControlBlock>) {
 pub fn remove_timer(task: Arc<TaskControlBlock>) {
     //trace!("kernel:pid[{}] remove_timer", current_task().unwrap().process.upgrade().unwrap().getpid());
     trace!("kernel: remove_timer");
-    let mut timers = TIMERS.exclusive_access();
+    let mut timers = TIMERS.exclusive_access(file!(), line!());
     let mut temp = BinaryHeap::<TimerCondVar>::new();
     for condvar in timers.drain() {
         if Arc::as_ptr(&task) != Arc::as_ptr(&condvar.task) {
@@ -114,12 +111,9 @@ pub fn remove_timer(task: Arc<TaskControlBlock>) {
 
 /// Check if the timer has expired
 pub fn check_timer() {
-    trace!(
-        "kernel:pid[{}] check_timer",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] check_timer", current_task().unwrap().pid.0);
     let current_ms = get_time_ms();
-    let mut timers = TIMERS.exclusive_access();
+    let mut timers = TIMERS.exclusive_access(file!(), line!());
     while let Some(timer) = timers.peek() {
         if timer.expire_ms <= current_ms {
             wakeup_task(Arc::clone(&timer.task));

@@ -31,5 +31,5 @@ pub fn init() {
     debug!("frame allocator initialize");
     frame_allocator::init_frame_allocator();
     debug!("kernel space initialize");
-    KERNEL_SPACE.exclusive_access().activate();
+    KERNEL_SPACE.exclusive_access(file!(), line!()).activate();
 }

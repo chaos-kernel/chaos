@@ -45,7 +45,7 @@ impl OSInode {
     /// read all data from the inode in memory
     pub fn read_all(&self) -> Vec<u8> {
         trace!("kernel: OSInode::read_all");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         inner.pos = 0;
         let mut buffer = [0u8; 512];
         let mut v: Vec<u8> = Vec::new();
@@ -61,12 +61,12 @@ impl OSInode {
     }
     /// get the status of the inode in memory
     pub fn fstat(&self) -> Stat {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().fstat()
     }
     /// find the inode in memory with 'name'
     pub fn find(&self, name: &str) -> Option<Arc<OSInode>> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         if let Some(inode) = inner.inode.clone().find(name) {
             Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
         } else {
@@ -75,7 +75,7 @@ impl OSInode {
     }
     /// create a inode in memory with 'name'
     pub fn create(&self, name: &str, stat: StatMode) -> Option<Arc<OSInode>> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         if let Some(inode) = inner.inode.clone().create(name, stat) {
             Some(Arc::new(OSInode::new(true, true, name.to_string(), inode)))
         } else {
@@ -84,7 +84,7 @@ impl OSInode {
     }
     /// link a inode in memory with 'old_name' and 'new_name'
     pub fn link(&self, old_name: &str, new_name: &str) -> Option<Arc<OSInode>> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         if let Some(inode) = inner.inode.clone().link(old_name, new_name) {
             Some(Arc::new(OSInode::new(
                 true,
@@ -98,32 +98,32 @@ impl OSInode {
     }
     /// unlink a inode in memory with 'name'
     pub fn unlink(&self, name: &str) -> bool {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().unlink(name)
     }
     /// list the file names in the inode in memory
     pub fn ls(&self) -> Vec<String> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().ls()
     }
     /// read the content in offset position of the inode in memory into 'buf'
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().read_at(offset, buf)
     }
     /// write the content in 'buf' into offset position of the inode in memory
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().write_at(offset, buf)
     }
     /// set the inode in memory length to zero, delloc all data blocks of the inode
     pub fn clear(&self) {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.inode.clone().clear();
     }
     /// get the name
     pub fn name(&self) -> Option<String> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         inner.name.clone().into()
     }
 }
@@ -286,7 +286,7 @@ impl File for OSInode {
     /// read file data into buffer
     fn read(&self, mut buf: UserBuffer) -> usize {
         trace!("kernel: OSInode::read");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         let mut total_read_size = 0usize;
         for slice in buf.buffers.iter_mut() {
             let read_size = inner.inode.clone().read_at(inner.pos, *slice);
@@ -301,7 +301,7 @@ impl File for OSInode {
     /// read all data from file
     fn read_all(&self) -> Vec<u8> {
         trace!("kernel: file::read_all");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         let mut buffer = [0u8; 512];
         let mut v: Vec<u8> = Vec::new();
         loop {
@@ -317,7 +317,7 @@ impl File for OSInode {
     /// write buffer data into file
     fn write(&self, buf: UserBuffer) -> usize {
         trace!("kernel: OSInode::write");
-        let mut inner = self.inner.exclusive_access();
+        let mut inner = self.inner.exclusive_access(file!(), line!());
         let mut total_write_size = 0usize;
         for slice in buf.buffers.iter() {
             let write_size = inner.inode.clone().write_at(inner.pos, *slice);
@@ -328,7 +328,7 @@ impl File for OSInode {
         total_write_size
     }
     fn fstat(&self) -> Option<Stat> {
-        let inner = self.inner.exclusive_access();
+        let inner = self.inner.exclusive_access(file!(), line!());
         Some(inner.inode.clone().fstat())
     }
 }

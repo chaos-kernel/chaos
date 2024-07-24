@@ -1,10 +1,8 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 use crate::config::KERNEL_SPACE_OFFSET;
+use crate::mm::KERNEL_SPACE;
 
-use super::{
-    frame_alloc, kernel_token, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr,
-    VirtPageNum, KERNEL_SPACE,
-};
+use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -103,7 +101,7 @@ impl PageTable {
         //to keep kernel part the same, we only first level of page table
         frame.ppn.get_pte_array()[kernel_root_vpn.indexes()[0]..].copy_from_slice(
             &KERNEL_SPACE
-                .exclusive_access()
+                .exclusive_access(file!(), line!())
                 .page_table
                 .root_ppn
                 .get_pte_array()[kernel_root_vpn.indexes()[0]..],
