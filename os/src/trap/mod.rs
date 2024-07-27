@@ -124,10 +124,7 @@ pub fn trap_handler() -> ! {
     }
     //check signals
     if let Some((errno, msg)) = check_signals_of_current() {
-        debug!("trap_handler: check signals ");
-        debug!("{}", msg);
-        println!("{}", msg);
-        // trace!("[kernel] trap_handler: .. check signals {}", msg);
+        trace!("[kernel] trap_handler: .. check signals {}", msg);
         exit_current_and_run_next(errno);
     }
     trap_return();
@@ -178,7 +175,6 @@ pub fn trap_return() -> ! {
 /// handle trap from kernel
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
-    use riscv::register::sepc;
     error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
     panic!("a trap {:?} from kernel!", scause::read().cause());
 }
@@ -223,11 +219,12 @@ pub fn user_entry() -> ! {
         "[kernel] user_entry, trap_cx_user_va = {:#x}, user_satp = {:#x}",
         trap_cx_user_va, user_satp
     );
-    debug!(
-        "[kernel] user_entry, sepc = {:#x}, sp = {:#x}",
-        current_trap_cx().sepc,
-        current_trap_cx().x[10]
-    );
+    // debug!(
+    //     "[kernel] user_entry, at: {:#x}, sepc = {:#x}, sp = {:#x}",
+    //     current_task().unwrap().trap_cx_user_va().0,
+    //     current_trap_cx().sepc,
+    //     current_trap_cx().x[10]
+    // );
     extern "C" {
         fn __user_entry();
     }
