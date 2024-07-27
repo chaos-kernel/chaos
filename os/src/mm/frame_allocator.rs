@@ -73,13 +73,13 @@ impl FrameAllocator for StackFrameAllocator {
         //     self.current, self.end
         // );
         if let Some(ppn) = self.recycled.pop() {
-            // debug!(" alloc a new page: recycled ppn={:#x}", ppn);
+            debug!(" alloc a new page: recycled ppn={:#x}", ppn);
             Some(ppn.into())
         } else if self.current == self.end {
             error!("FrameAllocator out of memory!");
             None
         } else {
-            // debug!("alloc a new page: new ppn={:#x}", self.current);
+            debug!("alloc a new page: new ppn={:#x}", self.current);
             self.current += 1;
             Some((self.current - 1).into())
         }
@@ -159,6 +159,7 @@ pub fn frame_alloc_contiguous(num: usize) -> (Vec<FrameTracker>, PhysPageNum) {
 
 /// Deallocate a physical page frame with a given ppn
 pub fn frame_dealloc(ppn: PhysPageNum) {
+    debug!("dealloc a page: ppn={:#x}", ppn.0);
     FRAME_ALLOCATOR
         .exclusive_access(file!(), line!())
         .dealloc(ppn);

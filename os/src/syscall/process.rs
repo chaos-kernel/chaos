@@ -3,7 +3,7 @@ use crate::{
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
     mm::{translated_byte_buffer, translated_refmut},
     task::{
-        current_task, current_user_token, exit_current_and_run_next, pid2process,
+        current_task, current_user_token, exit_current_and_run_next, pid2process, remove_task,
         suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
@@ -15,7 +15,7 @@ use core::{borrow::BorrowMut, mem::size_of, ptr};
 use super::errno::{EINVAL, EPERM, SUCCESS};
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use riscv::register::sstatus;
+use riscv::register::{satp, sstatus};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -251,7 +251,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
         if let Some((idx, _)) = pair {
             let child = inner.children.remove(idx);
             // confirm that child will be deallocated after being removed from children list
-            assert_eq!(Arc::strong_count(&child), 1);
+            assert_eq!(Arc::strong_count(&child), 2);
             let found_pid = child.pid.0;
             // ++++ temporarily access child PCB exclusively
             let exit_code = child
@@ -260,7 +260,29 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
                 .unwrap();
             // ++++ release child PCB
             if !exit_code_ptr.is_null() {
-                *translated_refmut(inner.memory_set.token(), exit_code_ptr) = exit_code << 8;
+                for mem in inner.memory_set.areas.iter() {
+                    let start = mem.vpn_range.get_start().0;
+                    let end = mem.vpn_range.get_end().0;
+                    let permission = mem.map_perm;
+                    debug!(
+                        "kernel:pid[{}] sys_waitpid: memory area [{:#x}, {:#x}] perm: {:?} page table: {:#x?}",
+                        task.pid.0, start, end, permission, inner.memory_set.token()
+                    );
+                }
+                debug!("page table: {:#x?}", satp::read().bits());
+                debug!(
+                    "kernel:pid[{}] sys_waitpid: write exit code {} to {:x?}",
+                    task.pid.0, exit_code, exit_code_ptr
+                );
+
+                debug!("sstatus: {:#x?}", sstatus::read().bits());
+                unsafe { sstatus::set_sum() };
+
+                unsafe {
+                    *exit_code_ptr = exit_code;
+                }
+
+                unsafe { sstatus::clear_sum() };
             }
             return found_pid as isize;
         } else {

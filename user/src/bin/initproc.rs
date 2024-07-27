@@ -4,20 +4,22 @@
 extern crate user_lib;
 
 use user_lib::{exec, fork, wait, yield_, println};
-const ALL_TASKS: [&str; 1] = [
-    "gettimeofday\0",
-    // "clone\0",
+const ALL_TASKS: [&str;1] = [
+    // "gettimeofday\0",
+    // "waitpid\0",
+    // "getpid\0",
     // "read\0",
     // "write\0",
+    // "execve\0",
+    // "fork\0",
     // "dup2\0",
-    // "times\0",
+    "times\0",
     // "uname\0",
     // "wait\0",
+    // "clone\0",
     
-    // "waitpid\0",
     // "brk\0",
-    // "getpid\0",
-    // "fork\0",
+    
     // "close\0",
     // "dup\0",
     // "exit\0",
@@ -27,7 +29,7 @@ const ALL_TASKS: [&str; 1] = [
     // "open\0",
     // "openat\0",
     // "getcwd\0",
-    // "execve\0",
+    
     // "mkdir_\0",
     // "chdir\0",
     // "fstat\0",
@@ -47,9 +49,7 @@ fn main() -> i32 {
 
     for app in ALL_TASKS {
         app_num += 1;
-        let pid = fork();
-        println!("[initproc] now in = {}", pid);
-        if pid == 0 {
+        if fork() == 0 {
             // 在子进程中执行应用程序
             exec(app, &[core::ptr::null::<u8>()]);
         }

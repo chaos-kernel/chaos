@@ -23,7 +23,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use core::{mem, slice, task};
-use riscv::register::sstatus;
+use riscv::register::{mstatus, sstatus};
 
 /// Task control block structure
 pub struct TaskControlBlock {
@@ -621,6 +621,12 @@ impl TaskControlBlock {
         // );
 
         // 替换为新的地址空间
+        debug!(
+            "[kernel: exec] replace memory_set with new one, old: {:#x}, new: {:#x} 
+            will dealloc old memory_set here",
+            task_inner.memory_set.token(),
+            memory_set.token()
+        );
         task_inner.memory_set = memory_set; // todo dealloc page here
 
         // push arguments on user stack
@@ -659,11 +665,15 @@ impl TaskControlBlock {
         }
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
-        // Disable kernel to visit user space
-        unsafe {
-            sstatus::clear_sum(); //todo Use RAII
-        }
+        // // Disable kernel to visit user space
+        // unsafe {
+        //     sstatus::clear_sum(); //todo Use RAII
+        // }
 
+        unsafe {
+            warn!("entry: {:#x}", entry_point);
+        }
+        debug!("sstatus before: {:#x?}", sstatus::read().spp());
         // initialize trap_cx
         trace!("[kernel: exec] .. initialize trap_cx for new process");
         let mut trap_cx = TrapContext::app_init_context(

@@ -604,6 +604,12 @@ impl MapArea {
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
         page_table.map(vpn, ppn, pte_flags);
+        // debug!(
+        //     "map_one vpn: {:#x}, ppn: {:#x}, page_table: {:#x}",
+        //     vpn.0,
+        //     ppn.0,
+        //     page_table.token()
+        // );
         ppn
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
