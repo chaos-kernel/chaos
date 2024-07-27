@@ -22,7 +22,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
-use core::{mem, task};
+use core::{mem, slice, task};
 use riscv::register::sstatus;
 
 /// Task control block structure
@@ -346,11 +346,14 @@ impl TaskControlBlock {
     pub fn fork(self: &Arc<Self>) -> usize {
         trace!("[kernel]: sys_fork");
         let pid = pid_alloc();
+        warn!("fork: pid[{}]", pid.0);
         let trap_cx_ppn = self.trap_cx_ppn();
+
         let mut task_inner = self.inner_exclusive_access(file!(), line!());
         let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
         let mut memory_set = MemorySet::from_existed_user(&task_inner.memory_set);
+
         let tid = pid.0;
         let parent = Some(Arc::downgrade(self));
         // copy fd table
@@ -381,6 +384,7 @@ impl TaskControlBlock {
 
         //将初始进程的trap_cx映射到当前页表，确保可以在这个页表里写入
         //实现无栈协程之后就不用考虑进程之间互相映射了
+        // 注意这里只复制了pte，没有复制物理页帧
         let trap_cx_bottom_va: VirtAddr = trap_cx_bottom.into();
         let trap_cx_bottom_ppn = memory_set
             .translate(trap_cx_bottom_va.into())
@@ -404,7 +408,7 @@ impl TaskControlBlock {
         let child_task = Arc::new(TaskControlBlock {
             kstack,
             tid,
-            pid: PidHandle(pid.0),
+            pid,
             send_sigchld_when_exit: false,
             inner: unsafe {
                 UPSafeCell::new(TaskControlBlockInner {
@@ -443,6 +447,7 @@ impl TaskControlBlock {
             "copy trap_cx from {:#x} to {:#x}",
             src_ptr as usize, dst_ptr as usize
         );
+
         unsafe {
             core::ptr::copy(
                 src_ptr,
@@ -453,11 +458,12 @@ impl TaskControlBlock {
 
         // fork出的子进程应该返回0
         trap_cx.x[10] = 0;
-        insert_into_pid2process(pid.0, Arc::clone(&child_task));
+        let pid = child_task.pid.0.clone();
+        insert_into_pid2process(pid, Arc::clone(&child_task));
         // add this thread to scheduler
         add_task(child_task);
-        info!("fork: child pid[{}] add to scheduler", pid.0);
-        pid.0
+        info!("fork: child pid[{}] add to scheduler", pid);
+        pid
     }
 
     /// clone2
@@ -597,25 +603,25 @@ impl TaskControlBlock {
             ustack_top.into(),
             MapPermission::R | MapPermission::W | MapPermission::U,
         );
-        // alloc trap_cx
-        let user_trap_va: VirtAddr = trap_cx_bottom_from_tid(self.pid.0).into();
-        let user_trap_ppn = task_inner
-            .memory_set
-            .translate(user_trap_va.floor())
-            .unwrap()
-            .ppn();
-        info!(
-            "[kernel: exec] map trap_cx in new memory_set trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
-            user_trap_va.0, user_trap_ppn.0, memory_set.page_table.token()
-        );
-        memory_set.page_table.map(
-            user_trap_va.floor(),
-            user_trap_ppn,
-            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
-        );
+
+        // let user_trap_va: VirtAddr = trap_cx_bottom_from_tid(self.pid.0).into();
+        // let user_trap_ppn = task_inner
+        //     .memory_set
+        //     .translate(user_trap_va.floor())
+        //     .unwrap()
+        //     .ppn();
+        // info!(
+        //     "[kernel: exec] map trap_cx in new memory_set trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
+        //     user_trap_va.0, user_trap_ppn.0, memory_set.page_table.token()
+        // );
+        // memory_set.page_table.map(
+        //     user_trap_va.floor(),
+        //     user_trap_ppn,
+        //     PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        // );
 
         // 替换为新的地址空间
-        task_inner.memory_set = memory_set;
+        task_inner.memory_set = memory_set; // todo dealloc page here
 
         // push arguments on user stack
         trace!("[kernel: exec] .. push arguments on user stack");
@@ -669,6 +675,31 @@ impl TaskControlBlock {
         );
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
+
+        // 获取 *mut TrapContext 的指针
+        let trap_cx_ptr: *mut TrapContext = &mut trap_cx;
+
+        // 计算 TrapContext 的大小
+        let size_of_trap_context = core::mem::size_of::<TrapContext>();
+
+        // 将 *mut TrapContext 转换为 &[u8]
+        let trap_cx_bytes: &[u8] =
+            unsafe { slice::from_raw_parts(trap_cx_ptr as *const u8, size_of_trap_context) };
+
+        // alloc trap_cx
+        // 为新进程重新分配中断上下文，原来的地址空间被覆盖掉之后，所有页都会被回收
+        let trap_cx_bottom = trap_cx_bottom_from_tid(self.pid.0);
+        let trap_cx_top = trap_cx_bottom + PAGE_SIZE;
+        debug!(
+            "alloc trap_cx again: trap_cx_bottom={:#x} trap_cx_top={:#x}",
+            trap_cx_bottom, trap_cx_top
+        );
+        task_inner.memory_set.insert_framed_area_with_data(
+            trap_cx_bottom.into(),
+            trap_cx_top.into(),
+            MapPermission::R | MapPermission::W,
+            trap_cx_bytes,
+        );
 
         // 重新设置被调度后的跳转地址以切换地址空间
         task_inner.task_cx = TaskContext::goto_user_entry(self.kstack.get_top());

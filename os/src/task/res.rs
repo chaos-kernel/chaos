@@ -96,7 +96,6 @@ pub fn kstack_alloc() -> KernelStack {
     let kstack_id = KSTACK_ALLOCATOR.exclusive_access(file!(), line!()).alloc();
     let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
 
-    __breakpoint();
     KERNEL_SPACE
         .exclusive_access(file!(), line!())
         .insert_framed_area(
