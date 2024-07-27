@@ -68,7 +68,10 @@ impl FrameAllocator for StackFrameAllocator {
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
-        //debug!("alloc a new page: current={:#x} end={:#x}", self.current, self.end);
+        // debug!(
+        //     "alloc a new page: current={:#x} end={:#x}",
+        //     self.current, self.end
+        // );
         if let Some(ppn) = self.recycled.pop() {
             // debug!(" alloc a new page: recycled ppn={:#x}", ppn);
             Some(ppn.into())
@@ -97,6 +100,7 @@ impl FrameAllocator for StackFrameAllocator {
         (ret, root_ppn.into())
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
+        // debug!("dealloc a page: ppn={:#x}", ppn.0);
         let ppn = ppn.0;
         // validity check
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {

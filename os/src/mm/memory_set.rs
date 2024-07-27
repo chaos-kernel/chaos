@@ -625,6 +625,13 @@ impl MapArea {
         }
     }
     pub fn unmap(&mut self, page_table: &mut PageTable) {
+        warn!(
+            "unmap area, vpn: {:#x} - {:#x}, perm: {:?}, page_table: {:#x}",
+            self.vpn_range.get_start().0,
+            self.vpn_range.get_end().0,
+            self.map_perm,
+            page_table.token()
+        );
         for vpn in self.vpn_range {
             self.unmap_one(page_table, vpn);
         }

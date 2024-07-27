@@ -1,9 +1,12 @@
 //! Allocator for pid, task user resource, kernel stack using a simple recycle strategy.
 
-use crate::config::{KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::config::{
+    __breakpoint, KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAP_CONTEXT_BASE, USER_STACK_SIZE,
+};
 use crate::mm::PTEFlags;
 use crate::mm::{MapPermission, PageTable, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
+use crate::trap::TrapContext;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
@@ -69,7 +72,7 @@ pub fn pid_alloc() -> PidHandle {
 
 impl Drop for PidHandle {
     fn drop(&mut self) {
-        // trace!("drop pid {}", self.0);
+        trace!("drop pid {}", self.0);
         PID_ALLOCATOR
             .exclusive_access(file!(), line!())
             .dealloc(self.0);
@@ -88,8 +91,12 @@ pub struct KernelStack(pub usize);
 
 /// Allocate a kernel stack for a task
 pub fn kstack_alloc() -> KernelStack {
+    trace!("kstack_alloc");
+
     let kstack_id = KSTACK_ALLOCATOR.exclusive_access(file!(), line!()).alloc();
     let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
+
+    __breakpoint();
     KERNEL_SPACE
         .exclusive_access(file!(), line!())
         .insert_framed_area(
@@ -97,6 +104,7 @@ pub fn kstack_alloc() -> KernelStack {
             kstack_top.into(),
             MapPermission::R | MapPermission::W,
         );
+
     KernelStack(kstack_id)
 }
 

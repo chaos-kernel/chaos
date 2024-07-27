@@ -121,7 +121,6 @@ pub fn exit_current_and_run_next(exit_code: i32) {
             }
         }
         remove_from_pid2process(pid);
-        let mut task_inner = task.inner_exclusive_access(file!(), line!());
         // mark this process as a zombie process
         task_inner.is_zombie = true;
         // record exit code of main process
@@ -174,8 +173,8 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         task_inner.fd_table.clear();
         // remove all threads
         task_inner.threads.clear();
+        drop(task_inner);
     }
-    drop(task_inner);
     // we do not have to save task context
     let mut _unused = TaskContext::zero_init();
     schedule(&mut _unused as *mut _);
