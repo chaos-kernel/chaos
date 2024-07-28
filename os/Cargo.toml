@@ -16,4 +16,4 @@ xmas-elf = "0.7.0"
 spin = "0.7.0"
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
 num_enum = { version = "0.5", default-features = false }
-ext4_rs = "1.1.0"
+ext4_rs = { path = "libs/ext4_rs" }

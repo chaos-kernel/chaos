@@ -9,8 +9,8 @@ mod utils;
 use prelude::*;
 use utils::*;
 
-mod ext4_defs;
-mod ext4_impls;
+pub mod ext4_defs;
+pub mod ext4_impls;
 
 mod fuse_interface;
 mod simple_interface;
