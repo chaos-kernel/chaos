@@ -11,7 +11,6 @@ use spin::Mutex;
 use crate::drivers::BLOCK_DEVICE;
 
 pub mod dentry;
-mod ext4;
 mod fat32;
 pub mod file;
 pub mod flags;
@@ -26,22 +25,19 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref ROOT_INODE: Arc<Inode> = {
+    pub static ref ROOT_INODE: Arc<dyn Inode> = {
         let fat32fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        let fat32inode = Fat32FS::root_inode(&fat32fs);
-        let root_inode = Inode::new(1, InodeType::Directory, Box::new(fat32inode));
-        let fs = FileSystem::new(fs::FileSystemType::VFAT, root_inode);
-        FS_MANAGER.lock().mount(fs, "/");
+        FS_MANAGER.lock().mount(fat32fs, "/");
         FS_MANAGER.lock().rootfs().root_inode()
     };
 }
 
 /// Open a file
-pub fn open_file(inode: &Arc<Inode>, name: &str, flags: OpenFlags) -> Option<Arc<Dentry>> {
+pub fn open_file(inode: Arc<dyn Inode>, name: &str, flags: OpenFlags) -> Option<Arc<Dentry>> {
     // TODO: read_write
     // let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
-        if let Some(dentry) = inode.lookup(name) {
+        if let Some(dentry) = inode.clone().lookup(name) {
             // clear size
             dentry.inode().clear();
             Some(dentry)

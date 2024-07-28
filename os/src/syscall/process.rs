@@ -228,7 +228,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
     }
     let process = current_process();
     let work_dir = process.inner_exclusive_access().work_dir.clone();
-    if let Some(dentry) = open_file(&work_dir.inode(), path.as_str(), OpenFlags::RDONLY) {
+    if let Some(dentry) = open_file(work_dir.inode(), path.as_str(), OpenFlags::RDONLY) {
         let inode = dentry.inode();
         let all_data = inode.read_all();
         let argc = args_vec.len();

@@ -218,7 +218,7 @@ pub fn add_initproc() {
 
 /// Run all files in the root directory
 pub fn add_file(file: &str) {
-    let dentry = open_file(&ROOT_INODE, file, OpenFlags::RDONLY).unwrap();
+    let dentry = open_file(ROOT_INODE.clone(), file, OpenFlags::RDONLY).unwrap();
     let v = dentry.inode().read_all();
     let _pcb = ProcessControlBlock::new(v.as_slice());
 }

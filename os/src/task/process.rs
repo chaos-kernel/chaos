@@ -21,7 +21,7 @@ use super::{
 use crate::{
     fs::{
         dentry::Dentry,
-        file::File,
+        file::{cast_file_to_inode, File},
         inode::Inode,
         stdio::{Stdin, Stdout},
         ROOT_INODE,
@@ -132,7 +132,7 @@ pub struct ProcessControlBlockInner {
     /// exit code
     pub exit_code:          i32,
     /// file descriptor table
-    pub fd_table:           Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table:           Vec<Option<Arc<dyn File>>>,
     /// signal flags
     pub signals:            SignalFlags,
     /// tasks(also known as threads)
@@ -243,7 +243,7 @@ impl ProcessControlBlockInner {
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();
         let file = self.fd_table[fd].clone().unwrap();
-        let inode = Arc::downcast::<Inode>(file).unwrap();
+        let inode = cast_file_to_inode(file).unwrap();
         let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
             (Vec::new(), len)
         } else {
@@ -422,7 +422,7 @@ impl ProcessControlBlock {
         // alloc a pid
         let pid = pid_alloc();
         // copy fd table
-        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        let mut new_fd_table: Vec<Option<Arc<dyn File>>> = Vec::new();
         for fd in parent.fd_table.iter() {
             if let Some(file) = fd {
                 new_fd_table.push(Some(file.clone()));
@@ -568,7 +568,7 @@ impl ProcessControlBlock {
         // alloc a pid
         let pid = pid_alloc();
         // copy fd table
-        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        let mut new_fd_table: Vec<Option<Arc<dyn File>>> = Vec::new();
         for fd in parent.fd_table.iter() {
             if let Some(file) = fd {
                 new_fd_table.push(Some(file.clone()));

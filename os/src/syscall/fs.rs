@@ -4,7 +4,7 @@ use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 use crate::{
     fs::{
         dentry,
-        file::File,
+        file::{cast_file_to_inode, cast_inode_to_file, File},
         flags::OpenFlags,
         inode::{Inode, Stat},
         open_file,
@@ -83,14 +83,15 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let path = translated_str(token, path);
     let curdir = process.inner_exclusive_access().work_dir.clone();
     if let Some(dentry) = open_file(
-        &curdir.inode(),
+        curdir.inode(),
         path.as_str(),
         OpenFlags::from_bits(flags).unwrap(),
     ) {
         let inode = dentry.inode();
         let mut inner = process.inner_exclusive_access();
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(inode);
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
         ENOENT
@@ -118,14 +119,14 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     // if !dir.is_dir() {
     //     return -1;
     // }
-    // 实验性转换
-    let inode = Arc::downcast::<Inode>(dir).unwrap();
+    let inode = cast_file_to_inode(dir).unwrap();
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(dentry) = open_file(&inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+    if let Some(dentry) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
         let fd = inner.alloc_fd();
         let inode = dentry.inode();
-        inner.fd_table[fd] = Some(inode);
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
         ENOENT
@@ -320,7 +321,7 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let mut inner = task.inner_exclusive_access();
     let dir = inner.work_dir.clone();
     let inode = dir.inode();
-    let dir = open_file(&inode, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
+    let dir = open_file(inode, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
     inner.work_dir = dir.unwrap();
     0
 }
@@ -347,17 +348,22 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
         if !dir.is_dir() {
             return ENOTDIR;
         }
-        inode = Arc::downcast::<Inode>(dir).unwrap();
+        inode = cast_file_to_inode(dir).unwrap();
     }
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(_) = open_file(&inode, &path, OpenFlags::RDONLY) {
+    if let Some(_) = open_file(inode.clone(), &path, OpenFlags::RDONLY) {
         return -1;
     }
-    if let Some(dentry) = open_file(&inode, &path, OpenFlags::DIRECTORY | OpenFlags::CREATE) {
+    if let Some(dentry) = open_file(
+        inode.clone(),
+        &path,
+        OpenFlags::DIRECTORY | OpenFlags::CREATE,
+    ) {
         let fd = inner.alloc_fd();
         let inode = dentry.inode();
-        inner.fd_table[fd] = Some(inode);
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
         EACCES //TODO: to be confirmed
@@ -373,7 +379,7 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     let inner = process.inner_exclusive_access();
     let inode;
     if dirfd == AT_FDCWD {
-        inode = ROOT_INODE.as_ref();
+        inode = ROOT_INODE.clone();
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
@@ -386,8 +392,7 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
         if !dir.is_dir() {
             return ENOTDIR;
         }
-        debug!("test");
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const Inode) };
+        inode = cast_file_to_inode(dir).unwrap();
     }
     let token = inner.memory_set.token();
     let mut v = translated_byte_buffer(token, buf, len);

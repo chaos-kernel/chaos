@@ -17,8 +17,10 @@ use crate::{
     block::block_dev::BlockDevice,
     fs::{
         dentry::Dentry,
-        inode::{Inode, InodeOps, InodeType},
+        file::File,
+        inode::{Inode, InodeType, Stat, StatMode},
     },
+    mm::UserBuffer,
 };
 
 pub struct Fat32Inode {
@@ -26,12 +28,12 @@ pub struct Fat32Inode {
     pub dentry:        Option<Arc<Fat32Dentry>>,
     pub start_cluster: usize,
     pub bdev:          Arc<dyn BlockDevice>,
-    pub fs:            Arc<Mutex<Fat32FS>>,
+    pub fs:            Arc<Fat32FS>,
 }
 
-impl InodeOps for Fat32Inode {
-    fn lookup(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>> {
-        let fs = self.fs.lock();
+impl Inode for Fat32Inode {
+    fn lookup(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
+        let fs = self.fs.as_ref();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
@@ -51,19 +53,18 @@ impl InodeOps for Fat32Inode {
                     bdev: Arc::clone(&self.bdev),
                     dentry: Some(Arc::new(dentry)),
                 };
-                let inode = Inode::new(0, InodeType::Regular, Box::new(fat32inode));
-                let dentry = Dentry::new(name, Arc::new(inode), None);
+                let dentry = Dentry::new(name, Arc::new(fat32inode), None);
                 return Some(Arc::new(dentry));
             }
         }
         None
     }
 
-    fn create(&self, inode: &Inode, name: &str, type_: InodeType) -> Option<Arc<Dentry>> {
-        if self.clone().lookup(inode, name).is_some() {
+    fn create(self: Arc<Self>, name: &str, type_: InodeType) -> Option<Arc<Dentry>> {
+        if self.clone().lookup(name).is_some() {
             return None;
         }
-        let fs = self.fs.lock();
+        let fs = self.fs.as_ref();
         let attr = match type_ {
             InodeType::Regular => FileAttributes::ARCHIVE,
             InodeType::Directory => FileAttributes::DIRECTORY,
@@ -85,18 +86,17 @@ impl InodeOps for Fat32Inode {
             bdev: Arc::clone(&self.bdev),
             dentry: Some(Arc::new(dentry)),
         };
-        let inode = Inode::new(0, InodeType::Regular, Box::new(fat32inode));
-        let dentry = Dentry::new(name, Arc::new(inode), None);
+        let dentry = Dentry::new(name, Arc::new(fat32inode), None);
         Some(Arc::new(dentry))
     }
 
-    fn link(&self, inode: &Inode, name: &str, target: Arc<Dentry>) -> bool {
+    fn link(self: Arc<Self>, name: &str, target: Arc<Dentry>) -> bool {
         warn!("FAT32 does not support link");
         false
     }
 
-    fn unlink(&self, inode: &Inode, name: &str) -> bool {
-        let fs = self.fs.lock();
+    fn unlink(self: Arc<Self>, name: &str) -> bool {
+        let fs = self.fs.as_ref();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
         while let Some(dentry) = fs.get_dentry(&mut sector_id, &mut offset) {
@@ -108,8 +108,8 @@ impl InodeOps for Fat32Inode {
         false
     }
 
-    fn ls(&self, inode: &Inode) -> Vec<String> {
-        let fs = self.fs.lock();
+    fn ls(&self) -> Vec<String> {
+        let fs = self.fs.as_ref();
         let mut v = Vec::new();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
         let mut offset = 0;
@@ -119,8 +119,8 @@ impl InodeOps for Fat32Inode {
         v
     }
 
-    fn read_at(&self, inode: &Inode, offset: usize, buf: &mut [u8]) -> usize {
-        let fs = self.fs.lock();
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        let fs = self.fs.as_ref();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);
         let mut read_size = 0;
@@ -148,9 +148,9 @@ impl InodeOps for Fat32Inode {
         read_size
     }
 
-    fn write_at(&self, inode: &Inode, offset: usize, buf: &[u8]) -> usize {
+    fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
         self.increase_size(offset + buf.len());
-        let fs = self.fs.lock();
+        let fs = self.fs.as_ref();
         let cluster_id = self.start_cluster;
         let cluster_chain = fs.cluster_chain(cluster_id);
         let mut write_size = 0;
@@ -178,24 +178,90 @@ impl InodeOps for Fat32Inode {
         write_size
     }
 
-    fn clear(&self, inode: &Inode) {
+    fn clear(&self) {
         self.set_file_size(0);
     }
 
-    fn rename(&self, inode: &Inode, old_name: &str, new_name: &str) -> bool {
+    fn rename(self: Arc<Self>, old_name: &str, new_name: &str) -> bool {
         todo!("FAT32 rename");
     }
 
-    fn mkdir(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>> {
+    fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
         todo!("FAT32 mkdir");
     }
 
-    fn rmdir(&self, inode: &Inode, name: &str) -> bool {
+    fn rmdir(self: Arc<Self>, name: &str) -> bool {
         todo!("FAT32 rmdir");
     }
+}
 
-    fn sync(&self, inode: &Inode) {
-        // todo!("FAT32 sync");
+impl File for Fat32Inode {
+    fn readable(&self) -> bool {
+        // TODO:
+        true
+    }
+
+    fn writable(&self) -> bool {
+        // TODO:
+        true
+    }
+
+    fn read(&self, mut buf: UserBuffer) -> usize {
+        let mut total_read_size = 0;
+        for slice in buf.buffers.iter_mut() {
+            let read_size = self.read_at(total_read_size, slice);
+            if read_size == 0 {
+                break;
+            }
+            total_read_size += read_size;
+        }
+        total_read_size
+    }
+
+    fn read_all(&self) -> Vec<u8> {
+        let mut buffer = [0u8; 512];
+        let mut v: Vec<u8> = Vec::new();
+        let mut total_read_size = 0;
+        loop {
+            let len = self.read_at(total_read_size, &mut buffer);
+            if len == 0 {
+                break;
+            }
+            total_read_size += len;
+            v.extend_from_slice(&buffer[..len]);
+        }
+        v
+    }
+
+    fn write(&self, buf: UserBuffer) -> usize {
+        let mut total_write_size = 0;
+        for slice in buf.buffers.iter() {
+            let write_size = self.write_at(total_write_size, slice);
+            if write_size == 0 {
+                break;
+            }
+            total_write_size += write_size;
+        }
+        total_write_size
+    }
+
+    fn fstat(&self) -> Option<Stat> {
+        let st_mode = match self.type_ {
+            Fat32InodeType::File => StatMode::FILE.bits(),
+            Fat32InodeType::Dir => StatMode::DIR.bits(),
+            _ => StatMode::NULL.bits(),
+        };
+        Some(Stat::new(
+            0,
+            0,
+            st_mode,
+            1,
+            0,
+            self.dentry.as_ref().unwrap().file_size() as i64,
+            0,
+            0,
+            0,
+        ))
     }
 }
 
@@ -221,7 +287,7 @@ impl Fat32Inode {
             return;
         }
         self.set_file_size(size);
-        let fs = self.fs.lock();
+        let fs = self.fs.as_ref();
         let cluster_chain = fs.cluster_chain(self.start_cluster);
         if cluster_chain.len() * CLUSTER_SIZE >= size {
             return;

@@ -1,23 +1,13 @@
 use alloc::{collections::BTreeMap, sync::Arc};
 
+use spin::Mutex;
+
 use super::{file::File, inode::Inode, path::Path};
+use crate::sync::UPSafeCell;
 
-pub struct FileSystem {
-    type_:      FileSystemType,
-    root_inode: Arc<Inode>,
-}
-
-impl FileSystem {
-    pub fn new(type_: FileSystemType, root_inode: Inode) -> Self {
-        Self {
-            type_,
-            root_inode: Arc::new(root_inode),
-        }
-    }
-
-    pub fn root_inode(&self) -> Arc<Inode> {
-        self.root_inode.clone()
-    }
+pub trait FileSystem: Send + Sync {
+    fn fs_type(&self) -> FileSystemType;
+    fn root_inode(self: Arc<Self>) -> Arc<dyn Inode>;
 }
 
 /* File System Type */
@@ -48,7 +38,7 @@ impl FileSystemType {
 /* File System Manager */
 
 pub struct FileSystemManager {
-    pub mounted_fs: BTreeMap<Path, Arc<FileSystem>>,
+    pub mounted_fs: BTreeMap<Path, Arc<dyn FileSystem>>,
 }
 
 impl FileSystemManager {
@@ -58,9 +48,9 @@ impl FileSystemManager {
         }
     }
 
-    pub fn mount(&mut self, fs: FileSystem, path: &str) {
+    pub fn mount(&mut self, fs: Arc<dyn FileSystem>, path: &str) {
         let path = Path::new(path);
-        self.mounted_fs.insert(path, Arc::new(fs));
+        self.mounted_fs.insert(path, fs);
     }
 
     pub fn unmount(&mut self, path: &str) {
@@ -68,7 +58,7 @@ impl FileSystemManager {
         self.mounted_fs.remove(&path);
     }
 
-    pub fn rootfs(&self) -> Arc<FileSystem> {
+    pub fn rootfs(&self) -> Arc<dyn FileSystem> {
         self.mounted_fs.get(&Path::new("/")).unwrap().clone()
     }
 }

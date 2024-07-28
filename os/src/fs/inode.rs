@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use core::any::Any;
 
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -6,119 +7,47 @@ use spin::Mutex;
 use super::{dentry::Dentry, file::File};
 use crate::{block::BLOCK_SZ, mm::UserBuffer, timer::TimeSpec};
 
-pub struct Inode {
-    ino:   u64,
-    type_: InodeType,
-    size:  u64,
-    links: u32,
-    ops:   Box<dyn InodeOps>,
-    stat:  InodeStat,
-}
+/* Inode Operators */
 
-impl Inode {
-    /// new
-    pub fn new(ino: u64, type_: InodeType, ops: Box<dyn InodeOps>) -> Self {
-        Self {
-            ino,
-            type_,
-            size: 0,
-            links: 1,
-            ops,
-            stat: InodeStat::Synced,
-        }
-    }
-    /// loopup an inode in the directory
-    pub fn lookup(self: &Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
-        self.ops.lookup(&self, name)
-    }
-    /// create an inode in the directory
-    pub fn create(&self, name: &str, type_: InodeType) -> Option<Arc<Dentry>> {
-        self.ops.create(self, name, type_)
-    }
-    /// unlink an inode in the directory
-    pub fn unlink(&self, name: &str) -> bool {
-        self.ops.unlink(self, name)
-    }
-    /// link an inode in the directory
-    pub fn link(&self, name: &str, dentry: Arc<Dentry>) -> bool {
-        self.ops.link(self, name, dentry)
-    }
-    /// rename an inode in the directory
-    pub fn rename(&self, old_name: &str, new_name: &str) -> bool {
-        self.ops.rename(self, old_name, new_name)
-    }
-    /// make a directory in the directory
-    pub fn mkdir(&self, name: &str) -> Option<Arc<Dentry>> {
-        self.ops.mkdir(self, name)
-    }
-    /// remove a directory in the directory
-    pub fn rmdir(&self, name: &str) -> bool {
-        self.ops.rmdir(self, name)
-    }
+pub trait Inode: Any + Send + Sync {
+    /// lookup an inode in the directory with the name (just name not path)
+    fn lookup(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>>;
+    /// create an inode in the directory with the name and type
+    fn create(self: Arc<Self>, name: &str, type_: InodeType) -> Option<Arc<Dentry>>;
+    /// unlink an inode in the directory with the name (just name not path)
+    fn unlink(self: Arc<Self>, name: &str) -> bool;
+    /// link an inode in the directory with the name (just name not path)
+    fn link(self: Arc<Self>, name: &str, target: Arc<Dentry>) -> bool;
+    /// rename an inode in the directory with the old name and new name
+    fn rename(self: Arc<Self>, old_name: &str, new_name: &str) -> bool;
+    /// make a directory in the directory with the name
+    fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>>;
+    /// remove a directory in the directory with the name
+    fn rmdir(self: Arc<Self>, name: &str) -> bool;
     /// list all inodes in the directory
-    pub fn ls(&self) -> Vec<String> {
-        self.ops.ls(self)
-    }
+    fn ls(&self) -> Vec<String>;
     /// clear the inode
-    pub fn clear(&self) {
-        self.ops.clear(self)
-    }
-    /// sync the inode to disk
-    pub fn sync(&self) {
-        self.ops.sync(self)
-    }
-    /// read all data
-    pub fn read_all(&self) -> Vec<u8> {
+    fn clear(&self);
+    /// read at the offset of the inode
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize;
+    /// write at the offset of the inode
+    fn write_at(&self, offset: usize, buf: &[u8]) -> usize;
+    /// read all data from the inode in memory
+    fn read_all(&self) -> Vec<u8> {
+        trace!("kernel: OSInode::read_all");
+        let mut pos = 0;
         let mut buffer = [0u8; 512];
-        let mut read_size = 0;
         let mut v: Vec<u8> = Vec::new();
         loop {
-            let len = self.ops.read_at(self, read_size, &mut buffer);
+            let len = self.read_at(pos, &mut buffer);
             if len == 0 {
                 break;
             }
-            read_size += len;
+            pos += len;
             v.extend_from_slice(&buffer[..len]);
         }
         v
     }
-}
-
-impl Drop for Inode {
-    fn drop(&mut self) {
-        if self.stat == InodeStat::Dirty {
-            self.sync();
-        }
-    }
-}
-
-/* Inode Operators */
-
-pub trait InodeOps: Send + Sync {
-    /// lookup an inode in the directory with the name (just name not path)
-    fn lookup(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>>;
-    /// create an inode in the directory with the name and type
-    fn create(&self, inode: &Inode, name: &str, type_: InodeType) -> Option<Arc<Dentry>>;
-    /// unlink an inode in the directory with the name (just name not path)
-    fn unlink(&self, inode: &Inode, name: &str) -> bool;
-    /// link an inode in the directory with the name (just name not path)
-    fn link(&self, inode: &Inode, name: &str, target: Arc<Dentry>) -> bool;
-    /// rename an inode in the directory with the old name and new name
-    fn rename(&self, inode: &Inode, old_name: &str, new_name: &str) -> bool;
-    /// make a directory in the directory with the name
-    fn mkdir(&self, inode: &Inode, name: &str) -> Option<Arc<Dentry>>;
-    /// remove a directory in the directory with the name
-    fn rmdir(&self, inode: &Inode, name: &str) -> bool;
-    /// list all inodes in the directory
-    fn ls(&self, inode: &Inode) -> Vec<String>;
-    /// clear the inode
-    fn clear(&self, inode: &Inode);
-    /// read at the offset of the inode
-    fn read_at(&self, inode: &Inode, offset: usize, buf: &mut [u8]) -> usize;
-    /// write at the offset of the inode
-    fn write_at(&self, inode: &Inode, offset: usize, buf: &[u8]) -> usize;
-    /// sync the inode to disk
-    fn sync(&self, inode: &Inode);
 }
 
 /* Inode Types */
@@ -143,8 +72,9 @@ pub enum InodeStat {
 
 /* Inode Manager */
 
+/*
 pub struct InodeManager {
-    inodes: BTreeMap<u64, Arc<Inode>>,
+    inodes: BTreeMap<u64, Arc<dyn Inode>>,
 }
 
 impl InodeManager {
@@ -174,6 +104,8 @@ impl InodeManager {
 lazy_static! {
     pub static ref INODE_MANAGER: Mutex<InodeManager> = todo!();
 }
+
+*/
 
 /* Inode Stat */
 
@@ -275,7 +207,7 @@ bitflags! {
 
 /* Impl File for Inode */
 
-impl File for Inode {
+impl File for dyn Inode {
     fn readable(&self) -> bool {
         // TODO:
         true
@@ -289,7 +221,7 @@ impl File for Inode {
     fn read(&self, mut buf: UserBuffer) -> usize {
         let mut total_read_size = 0;
         for slice in buf.buffers.iter_mut() {
-            let read_size = self.ops.read_at(self, total_read_size, slice);
+            let read_size = self.read_at(total_read_size, slice);
             if read_size == 0 {
                 break;
             }
@@ -303,7 +235,7 @@ impl File for Inode {
         let mut v: Vec<u8> = Vec::new();
         let mut total_read_size = 0;
         loop {
-            let len = self.ops.read_at(self, total_read_size, &mut buffer);
+            let len = self.read_at(total_read_size, &mut buffer);
             if len == 0 {
                 break;
             }
@@ -316,7 +248,7 @@ impl File for Inode {
     fn write(&self, buf: UserBuffer) -> usize {
         let mut total_write_size = 0;
         for slice in buf.buffers.iter() {
-            let write_size = self.ops.write_at(self, total_write_size, slice);
+            let write_size = self.write_at(total_write_size, slice);
             if write_size == 0 {
                 break;
             }
@@ -326,16 +258,6 @@ impl File for Inode {
     }
 
     fn fstat(&self) -> Option<Stat> {
-        Some(Stat::new(
-            0,
-            self.ino,
-            0,
-            self.links,
-            0,
-            self.size as i64,
-            0,
-            0,
-            0,
-        ))
+        todo!()
     }
 }

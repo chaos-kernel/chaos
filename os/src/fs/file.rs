@@ -1,8 +1,8 @@
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::any::Any;
 
-use super::inode::Stat;
-use crate::mm::UserBuffer;
+use super::inode::{Inode, Stat};
+use crate::{fs::fat32::inode::Fat32Inode, mm::UserBuffer};
 
 /// trait File for all file types
 pub trait File: Any + Send + Sync {
@@ -24,6 +24,39 @@ pub trait File: Any + Send + Sync {
             stat.is_dir()
         } else {
             true
+        }
+    }
+}
+
+// TODO: 优化这个函数
+pub fn cast_file_to_inode(file: Arc<dyn File>) -> Option<Arc<dyn Inode>> {
+    unsafe {
+        let file_ptr = Arc::into_raw(file);
+        let file_ref = &*(file_ptr as *const dyn Any);
+        if file_ref.is::<Fat32Inode>() {
+            let inode_ptr = file_ptr as *const Fat32Inode;
+            let inode = Arc::from_raw(inode_ptr);
+            Some(inode)
+        } else {
+            // 如果转换失败，我们需要重新创建原始的 Arc 以避免内存泄漏
+            let _ = Arc::from_raw(file_ptr);
+            None
+        }
+    }
+}
+
+pub fn cast_inode_to_file(inode: Arc<dyn Inode>) -> Option<Arc<dyn File>> {
+    unsafe {
+        let inode_ptr = Arc::into_raw(inode);
+        let inode_ref = &*(inode_ptr as *const dyn Any);
+        if inode_ref.is::<Fat32Inode>() {
+            let file_ptr = inode_ptr as *const Fat32Inode;
+            let file = Arc::from_raw(file_ptr);
+            Some(file)
+        } else {
+            // 如果转换失败，我们需要重新创建原始的 Arc 以避免内存泄漏
+            let _ = Arc::from_raw(inode_ptr);
+            None
         }
     }
 }
