@@ -1,34 +1,20 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{borrow::BorrowMut, mem::size_of, ptr};
-<<<<<<< HEAD
 
 use riscv::register::{satp, sstatus};
-=======
->>>>>>> main
 
 #[allow(unused)]
 use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
-<<<<<<< HEAD
-    fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    fs::{defs::OpenFlags, dentry, open_file, ROOT_INODE},
     mm::{translated_byte_buffer, translated_refmut},
+    syscall::errno::{ECHILD, ENOENT, ESRCH},
     task::{
-=======
-    fs::{defs::OpenFlags, open_file},
-    mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str},
-    syscall::errno::{ECHILD, ENOENT, ENOSYS, ESRCH},
-    task::{
-        current_process,
->>>>>>> main
         current_task,
         current_user_token,
         exit_current_and_run_next,
         pid2process,
-<<<<<<< HEAD
-        remove_task,
-=======
->>>>>>> main
         suspend_current_and_run_next,
         CloneFlags,
         SignalFlags,
@@ -36,10 +22,7 @@ use crate::{
         CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
-<<<<<<< HEAD
     utils::string::c_ptr_to_string,
-=======
->>>>>>> main
 };
 
 #[repr(C)]
@@ -178,16 +161,10 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
-<<<<<<< HEAD
             return current_task.fork() as isize;
         } else {
             // return current_task.fork2(stack_ptr) as isize; //todo仅用于初赛
             return current_task.fork() as isize; //todo
-=======
-            current_process.fork() as isize
-        } else {
-            current_process.fork2(stack_ptr) as isize //todo仅用于初赛
->>>>>>> main
         }
     } else {
         println!("[sys_clone] create thread");
@@ -236,22 +213,19 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
-<<<<<<< HEAD
     unsafe {
         sstatus::clear_sum();
     }
-    if let Some(app_inode) = open_file(ROOT_INODE.as_ref(), path.as_str(), OpenFlags::RDONLY) {
-        debug!("kernel: execve open app success : {}", path.as_str());
-        let all_data = app_inode.read_all();
-        debug!("kernel: execve read app success : {}", path.as_str());
-        let task = current_task().unwrap();
-=======
-    let process = current_process();
-    let work_dir = process.inner_exclusive_access().work_dir.clone();
+    let task = current_task().unwrap();
+    let work_dir = task
+        .inner_exclusive_access(file!(), line!())
+        .work_dir
+        .clone();
     if let Some(dentry) = open_file(work_dir.inode(), path.as_str(), OpenFlags::O_RDONLY) {
+        debug!("kernel: execve open app success : {}", path.as_str());
         let inode = dentry.inode();
         let all_data = inode.read_all();
->>>>>>> main
+        debug!("kernel: execve read app success : {}", path.as_str());
         let argc = args_vec.len();
         task.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later
@@ -476,16 +450,8 @@ pub fn sys_brk(addr: usize) -> isize {
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
-<<<<<<< HEAD
     trace!("kernel:pid[{}] sys_spawn", current_task().unwrap().pid.0);
     -1
-=======
-    trace!(
-        "kernel:pid[{}] sys_spawn",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    ENOSYS
->>>>>>> main
     // let token = current_user_token();
     // let path = translated_str(token, path);
     // if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
@@ -508,19 +474,7 @@ pub fn sys_set_priority(prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().pid.0
     );
-<<<<<<< HEAD
     0
-=======
-    if prio < 2 {
-        return EINVAL;
-    }
-    let prio = prio as usize;
-    let task = current_task().unwrap();
-    let mut inner = task.inner_exclusive_access();
-    inner.priority = prio;
-    inner.pass = BIG_STRIDE / prio;
-    prio as isize
->>>>>>> main
 }
 
 /// get current process times

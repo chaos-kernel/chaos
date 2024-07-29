@@ -3,10 +3,6 @@ use alloc::{string::String, vec, vec::Vec};
 
 use bitflags::*;
 
-use alloc::{string::String, vec, vec::Vec};
-
-use bitflags::*;
-
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use crate::{config::KERNEL_SPACE_OFFSET, mm::KERNEL_SPACE};
 

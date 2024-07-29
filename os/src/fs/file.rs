@@ -1,7 +1,10 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::any::Any;
 
-use super::inode::Stat;
+use super::{
+    fat32::inode::Fat32Inode,
+    inode::{Inode, Stat},
+};
 use crate::mm::UserBuffer;
 
 /// trait File for all file types

@@ -41,13 +41,12 @@ pub use processor::{
 pub use res::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
 pub use signal::SignalFlags;
 use switch::__switch;
-use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 use self::manager::add_block_task;
 use crate::{
     board::QEMUExit,
-    fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    fs::{defs::OpenFlags, open_file, ROOT_INODE},
     sbi::shutdown,
     timer::remove_timer,
 };
@@ -220,16 +219,16 @@ pub fn add_initproc() {
 }
 
 /// Run all files in the root directory
-pub fn add_file(file: &str) {
-    // 引入初始进程后已弃用
-    debug!("kernel: open file Inode: {}", file);
-    let inode = open_file(ROOT_INODE.as_ref(), &file, OpenFlags::RDONLY).unwrap();
-    debug!("kernel: read from Inode: {}", file);
-    let v = inode.read_all();
-    debug!("kernel: create PCB: {}", file);
-    let _tcb = TaskControlBlock::init_task(v.as_slice());
-    debug!("PCB created: {}", file);
-}
+// pub fn add_file(file: &str) {
+//     // 引入初始进程后已弃用
+//     debug!("kernel: open file Inode: {}", file);
+//     let inode = open_file(ROOT_INODE.as_ref(), &file, OpenFlags::O_RDONLY).unwrap();
+//     debug!("kernel: read from Inode: {}", file);
+//     let v = inode.read_all();
+//     debug!("kernel: create PCB: {}", file);
+//     let _tcb = TaskControlBlock::init_task(v.as_slice());
+//     debug!("PCB created: {}", file);
+// }
 
 /// Check if the current task has any signal to handle
 pub fn check_signals_of_current() -> Option<(i32, &'static str)> {

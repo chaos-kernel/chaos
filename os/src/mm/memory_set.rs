@@ -1,7 +1,6 @@
 //! Address Space [`MemorySet`] management of Process
 
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use core::arch::asm;
 
 use lazy_static::*;

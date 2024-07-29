@@ -15,7 +15,7 @@ use crate::{
         errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR},
         Dirent,
     },
-    task::{current_process, current_task, current_user_token},
+    task::{current_task, current_user_token},
 };
 
 pub const AT_FDCWD: i32 = -100;
@@ -73,22 +73,22 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 /// openat sys
 pub fn sys_open(path: *const u8, flags: i32) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_open",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
-    let process = current_process();
+    trace!("kernel:pid[{}] sys_open", current_task().unwrap().pid.0);
+    let task = current_task().unwrap();
     let token = current_user_token();
     debug!("kernel: sys_open path: {:?}", path);
     let path = translated_str(token, path);
-    let curdir = process.inner_exclusive_access().work_dir.clone();
+    let curdir = task
+        .inner_exclusive_access(file!(), line!())
+        .work_dir
+        .clone();
     if let Some(dentry) = open_file(
         curdir.inode(),
         path.as_str(),
         OpenFlags::from_bits(flags).unwrap(),
     ) {
         let inode = dentry.inode();
-        let mut inner = process.inner_exclusive_access();
+        let mut inner = task.inner_exclusive_access(file!(), line!());
         let fd = inner.alloc_fd();
         let file = cast_inode_to_file(inode).unwrap();
         inner.fd_table[fd] = Some(file);
@@ -98,10 +98,7 @@ pub fn sys_open(path: *const u8, flags: i32) -> isize {
     }
 }
 pub fn sys_openat(dirfd: i32, path: *const u8, flags: i32) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_openat",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_openat", current_task().unwrap().pid.0);
     if dirfd == AT_FDCWD {
         return sys_open(path, flags);
     }
@@ -240,7 +237,11 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     let token = current_user_token();
     let old_name = translated_str(token, old_name);
     let new_name = translated_str(token, new_name);
-    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    let curdir = current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
+        .work_dir
+        .clone();
     let target = curdir.inode().lookup(old_name.as_str()).unwrap();
     if curdir.inode().link(&new_name, target) {
         0
@@ -254,7 +255,11 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
     trace!("kernel:pid[{}] sys_unlinkat", current_task().unwrap().pid.0);
     let token = current_user_token();
     let name = translated_str(token, name);
-    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    let curdir = current_task()
+        .unwrap()
+        .inner_exclusive_access(file!(), line!())
+        .work_dir
+        .clone();
     if curdir.inode().unlink(&name) {
         0
     } else {
@@ -419,10 +424,7 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
 }
 
 pub fn sys_umount2(_target: *const u8, _flags: i32) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_umount2",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
+    trace!("kernel:pid[{}] sys_umount2", current_task().unwrap().pid.0);
     0
 }
 

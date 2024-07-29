@@ -17,9 +17,6 @@ use crate::{
     trap::TrapContext,
 };
 
-use super::{__switch, fetch_task, ProcessControlBlock, TaskContext, TaskControlBlock, TaskStatus};
-use crate::{sync::UPSafeCell, timer::get_time_ms, trap::TrapContext};
-
 /// Processor management structure
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,

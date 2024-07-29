@@ -1,45 +1,32 @@
 use alloc::vec::Vec;
-
-use ext4_rs::BLOCK_SIZE;
 use core::ptr::NonNull;
 
+use ext4_rs::BLOCK_SIZE;
 use lazy_static::*;
 use spin::Mutex;
-// use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
-
-use super::BlockDevice;
-use crate::{
-    block::{self, BLOCK_SZ},
-    mm::{
-        frame_alloc,
-        frame_dealloc,
-        kernel_token,
-        FrameTracker,
-        PageTable,
-        PhysAddr,
-        PhysPageNum,
-        StepByOne,
-        VirtAddr,
-    },
-    sync::UPSafeCell,
-};
-use virtio_drivers::device::blk::VirtIOBlk;
 use virtio_drivers::{
+    device::blk::VirtIOBlk,
     transport::mmio::{MmioTransport, VirtIOHeader},
     BufferDirection,
     Hal,
 };
 
+// use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 use super::BlockDevice;
 use crate::{
+    block::{self, BLOCK_SZ},
     config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
     mm::{
+        frame_alloc,
         frame_alloc_contiguous,
         frame_dealloc,
+        kernel_token,
         FrameTracker,
         KernelAddr,
+        PageTable,
         PhysAddr,
         PhysPageNum,
+        StepByOne,
         VirtAddr,
         KERNEL_SPACE,
     },
@@ -105,8 +92,8 @@ impl ext4_rs::BlockDevice for VirtIOBlock {
             let block_offset = (offset + read_size) % BLOCK_SZ;
             let read_len = core::cmp::min(BLOCK_SZ - block_offset, BLOCK_SIZE - v.len());
             self.0
-                .exclusive_access()
-                .read_block(block_id, &mut buf)
+                .lock()
+                .read_blocks(block_id, &mut buf)
                 .expect("Error when reading VirtIOBlk");
             v.extend_from_slice(&buf[block_offset..block_offset + read_len]);
             read_size += read_len;
@@ -123,14 +110,14 @@ impl ext4_rs::BlockDevice for VirtIOBlock {
             let mut buf = [0u8; BLOCK_SZ];
             let copy_size = core::cmp::min(data.len() - write_size, BLOCK_SZ);
             self.0
-                .exclusive_access()
-                .read_block(block_id, &mut buf)
+                .lock()
+                .read_blocks(block_id, &mut buf)
                 .expect("Error when reading VirtIOBlk");
             buf[block_offset..block_offset + copy_size]
                 .copy_from_slice(&data[write_size..write_size + copy_size]);
             self.0
-                .exclusive_access()
-                .write_block(block_id, &buf)
+                .lock()
+                .write_blocks(block_id, &buf)
                 .expect("Error when writing VirtIOBlk");
             write_size += copy_size;
         }

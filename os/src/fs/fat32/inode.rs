@@ -10,10 +10,6 @@ use super::{
     fs::Fat32FS,
     CLUSTER_SIZE,
 };
-use super::{
-    dentry::{Fat32Dentry, FileAttributes},
-    file_system::Fat32FS,
-};
 use crate::{
     block::block_dev::BlockDevice,
     fs::{

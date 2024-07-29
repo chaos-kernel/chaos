@@ -30,10 +30,11 @@ use crate::{
         USER_STACK_SIZE,
     },
     fs::{
-        file::File,
-        inode::{OSInode, ROOT_INODE},
-        Stdin,
-        Stdout,
+        dentry::Dentry,
+        file::{cast_file_to_inode, File},
+        inode::Inode,
+        stdio::{Stdin, Stdout},
+        ROOT_INODE,
     },
     mm::{MapPermission, MemorySet, PTEFlags, PhysPageNum, VirtAddr, KERNEL_SPACE},
     sync::UPSafeCell,
@@ -79,7 +80,7 @@ pub struct TaskControlBlockInner {
     ///
     pub clear_child_tid:  usize,
     /// working directory
-    pub work_dir:         Arc<OSInode>,
+    pub work_dir:         Arc<Dentry>,
     /// father task control block
     pub parent:           Option<Weak<TaskControlBlock>>,
     /// children task control block
@@ -91,7 +92,7 @@ pub struct TaskControlBlockInner {
     /// exit code
     pub exit_code:        Option<i32>,
     /// file descriptor table
-    pub fd_table:         Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table:         Vec<Option<Arc<dyn File>>>,
     /// clock time stop watch
     pub clock_stop_watch: usize,
     /// user clock time
@@ -237,7 +238,7 @@ impl TaskControlBlock {
         };
         // let kstack = kstack_alloc();
         let kstack_top = kstack.get_top();
-        let work_dir = ROOT_INODE.clone();
+        let work_dir = Arc::new(Dentry::new("/", ROOT_INODE.clone()));
         let task = Arc::new(Self {
             kstack,
             tid: tid,
@@ -321,7 +322,7 @@ impl TaskControlBlock {
         // copy fd table
         let fd_table = if flag.contains(CloneFlags::CLONE_FILES) {
             // todo: 实现clone trait，这样就可以直接clone父进程的，解耦合
-            let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+            let mut new_fd_table: Vec<Option<Arc<dyn File>>> = Vec::new();
             for fd in task_inner.fd_table.iter() {
                 if let Some(file) = fd {
                     new_fd_table.push(Some(file.clone()));
@@ -331,7 +332,7 @@ impl TaskControlBlock {
             }
             new_fd_table
         } else {
-            let new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = vec![
+            let new_fd_table: Vec<Option<Arc<dyn File>>> = vec![
                 // 0 -> stdin
                 Some(Arc::new(Stdin)),
                 // 1 -> stdout
@@ -383,7 +384,7 @@ impl TaskControlBlock {
         let tid = pid.0;
         let parent = Some(Arc::downgrade(self));
         // copy fd table
-        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        let mut new_fd_table: Vec<Option<Arc<dyn File>>> = Vec::new();
         for fd in task_inner.fd_table.iter() {
             if let Some(file) = fd {
                 new_fd_table.push(Some(file.clone()));
@@ -979,12 +980,11 @@ impl TaskControlBlockInner {
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();
         let file = self.fd_table[fd].clone().unwrap();
-        let file = unsafe { &*(file.as_ref() as *const dyn File as *const OSInode) };
+        let inode = cast_file_to_inode(file).unwrap();
         let (context, length) = if flags.contains(Flags::MAP_ANONYMOUS) {
             (Vec::new(), len)
         } else {
-            debug!("mmap: file name: {}", file.name().unwrap());
-            let context = file.read_all();
+            let context = inode.read_all();
 
             let file_len = context.len();
             let length = len.min(file_len - offset);

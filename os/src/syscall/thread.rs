@@ -1,7 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
 
-use alloc::{sync::Arc, vec::Vec};
-
 use crate::{
     mm::kernel_token,
     task::{add_task, current_task, kstack_alloc, TaskControlBlock},
