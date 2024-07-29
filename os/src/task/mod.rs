@@ -23,6 +23,7 @@ use self::manager::add_block_task;
 use crate::{
     board::QEMUExit,
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
+    sbi::shutdown,
     timer::remove_timer,
 };
 use alloc::{sync::Arc, vec::Vec};
@@ -109,15 +110,19 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         let pid = task.pid.0;
         if pid == IDLE_PID {
             println!(
-                "[kernel] Idle process exit with exit_code {} ...",
+                "[kernel] Init process exit with exit_code {} , system is shutting down...",
                 exit_code
             );
             if exit_code != 0 {
+                debug!("kernel: qemu exit failure");
                 //crate::sbi::shutdown(255); //255 == -1 for err hint
-                crate::board::QEMU_EXIT_HANDLE.exit_failure();
+                // crate::board::QEMU_EXIT_HANDLE.exit_failure();
+                shutdown();
             } else {
                 //crate::sbi::shutdown(0); //0 for success hint
-                crate::board::QEMU_EXIT_HANDLE.exit_success();
+                debug!("kernel: qemu exit success");
+                // crate::board::QEMU_EXIT_HANDLE.exit_success();
+                shutdown();
             }
         }
         remove_from_pid2process(pid);

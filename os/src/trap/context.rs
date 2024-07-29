@@ -35,6 +35,8 @@ impl TrapContext {
         let mut sstatus = sstatus::read();
         // set CPU privilege to User after trapping back
         sstatus.set_spp(SPP::User);
+        debug!("sstatus: {:x?}", sstatus);
+
         let mut cx = Self {
             x: [0; 32],
             sstatus,

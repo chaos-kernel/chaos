@@ -81,8 +81,8 @@ impl Drop for PidHandle {
 
 /// Return (bottom, top) of a kernel stack in kernel space.
 pub fn kernel_stack_position(kstack_id: usize) -> (usize, usize) {
-    let top = MEMORY_END + (kstack_id + 1) * (KERNEL_STACK_SIZE + PAGE_SIZE);
-    let bottom = top - KERNEL_STACK_SIZE;
+    let bottom = MEMORY_END + kstack_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    let top = bottom + KERNEL_STACK_SIZE;
     (bottom, top)
 }
 
@@ -111,6 +111,11 @@ impl Drop for KernelStack {
     fn drop(&mut self) {
         let (kernel_stack_bottom, _) = kernel_stack_position(self.0);
         let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();
+        warn!(
+            "dealloc kernel stack: bottom={:#x} top={:#x}",
+            kernel_stack_bottom,
+            kernel_stack_bottom + KERNEL_STACK_SIZE
+        );
         KERNEL_SPACE
             .exclusive_access(file!(), line!())
             .remove_area_with_start_vpn(kernel_stack_bottom_va.into());

@@ -98,6 +98,12 @@ impl PageTable {
         let frame = frame_alloc().unwrap();
         let kernel_root_vpn: VirtPageNum = KERNEL_SPACE_OFFSET.into();
 
+        debug!(
+            "new_process:kernel start vpn level 1 index {:#x}, start vpn {:#x}",
+            kernel_root_vpn.indexes()[0],
+            kernel_root_vpn.0
+        );
+
         //to keep kernel part the same, we only first level of page table
         frame.ppn.get_pte_array()[kernel_root_vpn.indexes()[0]..].copy_from_slice(
             &KERNEL_SPACE

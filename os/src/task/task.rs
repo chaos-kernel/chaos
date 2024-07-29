@@ -12,7 +12,7 @@ use crate::fs::{Stdin, Stdout};
 use crate::mm::{MapPermission, MemorySet, PTEFlags, VirtAddr, KERNEL_SPACE};
 use crate::syscall::errno::EPERM;
 use crate::task::manager::insert_into_pid2process;
-use crate::task::res::trap_cx_bottom_from_tid;
+use crate::task::res::{kernel_stack_position, trap_cx_bottom_from_tid};
 use crate::task::{add_task, pid2process, pid_alloc};
 use crate::timer::get_time;
 use crate::trap::{trap_handler, TrapContext};
@@ -23,6 +23,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use core::{mem, slice, task};
+use riscv::register::sstatus::set_mxr;
 use riscv::register::{mstatus, sstatus};
 
 /// Task control block structure
@@ -267,6 +268,12 @@ impl TaskControlBlock {
         );
         // add initproc
         add_task(task.clone());
+
+        let test_va: &mut usize =
+            VirtAddr::from(kernel_stack_position(task.pid.0).0 as usize).get_mut();
+        warn!("test_va: {:#x}", kernel_stack_position(task.pid.0).0);
+        warn!("*test_va: {:#x}", *test_va);
+
         task
     }
 
@@ -463,6 +470,7 @@ impl TaskControlBlock {
         // add this thread to scheduler
         add_task(child_task);
         info!("fork: child pid[{}] add to scheduler", pid);
+
         pid
     }
 
@@ -713,6 +721,11 @@ impl TaskControlBlock {
 
         // 重新设置被调度后的跳转地址以切换地址空间
         task_inner.task_cx = TaskContext::goto_user_entry(self.kstack.get_top());
+
+        // let entry = VirtAddr::from(0x1000 as usize).get_mut() as *mut i32;
+        // unsafe {
+        //     warn!("entry inst:{:#x?}", *entry);
+        // }
 
         *self.get_trap_cx() = trap_cx;
     }

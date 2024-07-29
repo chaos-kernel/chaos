@@ -7,7 +7,7 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
-use crate::mm::VirtAddr;
+use crate::mm::{VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
@@ -82,6 +82,15 @@ pub fn run_tasks() {
             // release processor manually
             drop(processor);
             info!("switch task to pid now");
+
+            for mem in KERNEL_SPACE.exclusive_access(file!(), line!()).areas.iter() {
+                warn!(
+                    "kernel space: {:#x} -> {:#x}",
+                    mem.vpn_range.get_start().0,
+                    mem.vpn_range.get_end().0,
+                );
+            }
+
             unsafe {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
