@@ -104,7 +104,7 @@ impl Inode for Ext4Inode {
             None,
         ) {
             read_size += ret_v.len();
-            buf.copy_from_slice(&ret_v);
+            buf[..ret_v.len()].copy_from_slice(&ret_v);
         }
         read_size
     }
