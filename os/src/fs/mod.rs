@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use defs::OpenFlags;
 use dentry::Dentry;
+use ext4::fs::Ext4FS;
 use fat32::fs::Fat32FS;
 use fs::FileSystemManager;
 use inode::{Inode, InodeType};
@@ -12,7 +13,7 @@ use crate::drivers::BLOCK_DEVICE;
 
 pub mod defs;
 pub mod dentry;
-mod ext4;
+pub mod ext4;
 mod fat32;
 pub mod file;
 mod fs;
@@ -27,8 +28,8 @@ lazy_static! {
 
 lazy_static! {
     pub static ref ROOT_INODE: Arc<dyn Inode> = {
-        let fat32fs = Fat32FS::load(BLOCK_DEVICE.clone());
-        FS_MANAGER.lock().mount(fat32fs, "/");
+        let ext4fs = Arc::new(Ext4FS::new(BLOCK_DEVICE.clone()));
+        FS_MANAGER.lock().mount(ext4fs, "/");
         FS_MANAGER.lock().rootfs().root_inode()
     };
 }

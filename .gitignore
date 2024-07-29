@@ -1,4 +1,5 @@
 .*/*
+sdcard-riscv.img.gz
 !.github/*
 .vscode/
 .idea/*

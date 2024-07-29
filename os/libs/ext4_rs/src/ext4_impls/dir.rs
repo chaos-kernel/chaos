@@ -21,6 +21,8 @@ impl Ext4 {
     ) -> Result<usize> {
         // load parent inode
         let parent = self.get_inode_ref(parent_inode);
+        debug!("name: {}", name);
+        debug!("inode ino: {}, type: {:?}", parent_inode, parent.inode.file_type());
         assert!(parent.inode.is_dir());
 
         // start from the first logical block

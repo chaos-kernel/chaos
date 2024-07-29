@@ -28,6 +28,8 @@ fmt:
 	@cd os; cargo fmt;
 
 sdcard-riscv.img:
+	@echo "Downloading sdcard-riscv.img.gz..."
+	@wget https://github.com/oscomp/testsuits-for-oskernel/releases/download/2024-final-rv/sdcard-riscv.img.gz
 	@echo "Extracting sdcard-riscv.img.gz..."
 	@gzip -dk sdcard-riscv.img.gz
 
