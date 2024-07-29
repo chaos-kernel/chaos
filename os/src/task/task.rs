@@ -258,7 +258,7 @@ impl TaskControlBlock {
                     parent: None,
                     children: Vec::new(),
                     threads: Vec::new(),
-                    user_stack_top: ustack_top, // todo
+                    user_stack_top: ustack_top - 8, // todo
                     fd_table: vec![
                         // 0 -> stdin
                         Some(Arc::new(Stdin)),
@@ -293,11 +293,6 @@ impl TaskControlBlock {
         );
         // add initproc
         add_task(task.clone());
-
-        let test_va: &mut usize =
-            VirtAddr::from(kernel_stack_position(task.pid.0).0 as usize).get_mut();
-        warn!("test_va: {:#x}", kernel_stack_position(task.pid.0).0);
-        warn!("*test_va: {:#x}", *test_va);
 
         task
     }
@@ -616,12 +611,12 @@ impl TaskControlBlock {
         // since memory_set has been changed
         trace!("[kernel: exec] .. alloc user resource for main thread again");
         let mut task_inner = self.inner_exclusive_access(file!(), line!());
-        task_inner.user_stack_top = ustack_top;
+        task_inner.user_stack_top = ustack_top - 8;
 
         // 为新地址空间分配用户栈和trap_cx
         //trap_cx由于虚拟地址按照pid划分，所以要把映射复制过来
         let ustack_top = task_inner.user_stack_top;
-        let ustack_bottom = ustack_top - USER_STACK_SIZE;
+        let ustack_bottom = ustack_top - USER_STACK_SIZE + 8;
         debug!(
             "[kernel: exec] alloc user stack ustack_bottom={:#x} ustack_top={:#x}",
             ustack_bottom, ustack_top
@@ -655,11 +650,23 @@ impl TaskControlBlock {
             task_inner.memory_set.token(),
             memory_set.token()
         );
-        task_inner.memory_set = memory_set; // todo dealloc page here
 
         // push arguments on user stack
         trace!("[kernel: exec] .. push arguments on user stack");
         let mut user_sp = task_inner.user_stack_top;
+
+        // 做一个临时映射，将参数复制到用户栈
+        let ppn = memory_set
+            .page_table
+            .translate_va(VirtAddr::from(user_sp).floor().into())
+            .unwrap()
+            .floor();
+
+        task_inner.memory_set.page_table.map(
+            VirtAddr::from(user_sp).floor(),
+            ppn,
+            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        );
 
         // Enable kernel to visit user space
         unsafe {
@@ -670,6 +677,7 @@ impl TaskControlBlock {
         let mut argv = vec![0; args.len()];
 
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        debug!("push args to user stack");
         let argv_base = user_sp;
         for i in 0..args.len() {
             unsafe {
@@ -681,6 +689,7 @@ impl TaskControlBlock {
         }
 
         // Copy each arg to the newly allocated stack
+        debug!("copy args to user stack");
         for i in 0..args.len() {
             // Here we leave one byte to store a '\0' as a terminator
             user_sp -= args[i].len() + 1;
@@ -698,9 +707,9 @@ impl TaskControlBlock {
         //     sstatus::clear_sum(); //todo Use RAII
         // }
 
-        unsafe {
-            warn!("entry: {:#x}", entry_point);
-        }
+        task_inner.memory_set = memory_set; // todo dealloc page here
+
+        warn!("entry: {:#x}", entry_point);
         debug!("sstatus before: {:#x?}", sstatus::read().spp());
         // initialize trap_cx
         trace!("[kernel: exec] .. initialize trap_cx for new process");
