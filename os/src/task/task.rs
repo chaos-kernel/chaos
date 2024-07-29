@@ -1,30 +1,53 @@
 //! Types related to task management & Functions for completely changing TCB
 
-use super::process::Flags;
-use super::res::RecycleAllocator;
-use super::{kstack_alloc, CloneFlags, KernelStack, PidHandle, SignalFlags, TaskContext};
-use crate::config::{
-    __breakpoint, BIG_STRIDE, MAX_SYSCALL_NUM, PAGE_SIZE, TRAP_CONTEXT_TRAMPOLINE, USER_STACK_SIZE,
+use alloc::{
+    string::String,
+    sync::{Arc, Weak},
+    vec,
+    vec::Vec,
 };
-use crate::fs::file::File;
-use crate::fs::inode::{OSInode, ROOT_INODE};
-use crate::fs::{Stdin, Stdout};
-use crate::mm::{MapPermission, MemorySet, PTEFlags, VirtAddr, KERNEL_SPACE};
-use crate::syscall::errno::EPERM;
-use crate::task::manager::insert_into_pid2process;
-use crate::task::res::{kernel_stack_position, trap_cx_bottom_from_tid};
-use crate::task::{add_task, pid2process, pid_alloc};
-use crate::timer::get_time;
-use crate::trap::{trap_handler, TrapContext};
-use crate::{mm::PhysPageNum, sync::UPSafeCell};
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use alloc::vec;
-use alloc::vec::Vec;
-use core::cell::RefMut;
-use core::{mem, slice, task};
-use riscv::register::sstatus::set_mxr;
-use riscv::register::{mstatus, sstatus};
+use core::{cell::RefMut, mem, slice, task};
+
+use riscv::register::{mstatus, sstatus, sstatus::set_mxr};
+
+use super::{
+    kstack_alloc,
+    process::Flags,
+    res::RecycleAllocator,
+    CloneFlags,
+    KernelStack,
+    PidHandle,
+    SignalFlags,
+    TaskContext,
+};
+use crate::{
+    config::{
+        __breakpoint,
+        BIG_STRIDE,
+        MAX_SYSCALL_NUM,
+        PAGE_SIZE,
+        TRAP_CONTEXT_TRAMPOLINE,
+        USER_STACK_SIZE,
+    },
+    fs::{
+        file::File,
+        inode::{OSInode, ROOT_INODE},
+        Stdin,
+        Stdout,
+    },
+    mm::{MapPermission, MemorySet, PTEFlags, PhysPageNum, VirtAddr, KERNEL_SPACE},
+    sync::UPSafeCell,
+    syscall::errno::EPERM,
+    task::{
+        add_task,
+        manager::insert_into_pid2process,
+        pid2process,
+        pid_alloc,
+        res::{kernel_stack_position, trap_cx_bottom_from_tid},
+    },
+    timer::get_time,
+    trap::{trap_handler, TrapContext},
+};
 
 /// Task control block structure
 pub struct TaskControlBlock {
@@ -42,55 +65,53 @@ pub struct TaskControlBlock {
 }
 pub struct TaskControlBlockInner {
     /// memory set(address space)
-    pub memory_set: MemorySet,
+    pub memory_set:       MemorySet,
     /// The physical page number of the frame where the trap context is placed
-    pub trap_cx_ppn: PhysPageNum,
+    pub trap_cx_ppn:      PhysPageNum,
     /// Save task context
-    pub task_cx: TaskContext,
+    pub task_cx:          TaskContext,
     /// Maintain the execution status of the current process
-    pub task_status: TaskStatus,
+    pub task_status:      TaskStatus,
     /// syscall times of tasks
-    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times:    [u32; MAX_SYSCALL_NUM],
     /// the time task was first run
-    pub first_time: Option<usize>, // todo: 封装为一个单独的TaskTimer结构体
+    pub first_time:       Option<usize>, // todo: 封装为一个单独的TaskTimer结构体
     ///
-    pub clear_child_tid: usize,
+    pub clear_child_tid:  usize,
     /// working directory
-    pub work_dir: Arc<OSInode>,
+    pub work_dir:         Arc<OSInode>,
     /// father task control block
-    pub parent: Option<Weak<TaskControlBlock>>,
+    pub parent:           Option<Weak<TaskControlBlock>>,
     /// children task control block
-    pub children: Vec<Arc<TaskControlBlock>>,
+    pub children:         Vec<Arc<TaskControlBlock>>,
     /// thread group
-    pub threads: Vec<Option<Arc<TaskControlBlock>>>,
+    pub threads:          Vec<Option<Arc<TaskControlBlock>>>,
     /// user stack
-    pub user_stack_top: usize,
+    pub user_stack_top:   usize,
     /// exit code
-    pub exit_code: Option<i32>,
+    pub exit_code:        Option<i32>,
     /// file descriptor table
-    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table:         Vec<Option<Arc<dyn File + Send + Sync>>>,
     /// clock time stop watch
     pub clock_stop_watch: usize,
     /// user clock time
-    pub user_clock: usize,
+    pub user_clock:       usize,
     /// kernel clock time
-    pub kernel_clock: usize,
+    pub kernel_clock:     usize,
     /// Record the usage of heap_area in MemorySet
-    pub heap_base: VirtAddr,
+    pub heap_base:        VirtAddr,
     ///
-    pub heap_end: VirtAddr,
+    pub heap_end:         VirtAddr,
     /// is zombie?
-    pub is_zombie: bool,
+    pub is_zombie:        bool,
     /// signal flags
-    pub signals: SignalFlags,
+    pub signals:          SignalFlags,
 }
 
 impl TaskControlBlock {
     /// Get the mutable reference of the inner TCB
     pub fn inner_exclusive_access(
-        &self,
-        file: &'static str,
-        line: u32,
+        &self, file: &'static str, line: u32,
     ) -> RefMut<'_, TaskControlBlockInner> {
         self.inner.exclusive_access(file, line)
     }
@@ -186,9 +207,12 @@ impl TaskControlBlock {
             // 在一定区域中获取可变引用，保证离开时自动释放
             let current_pagetable = &mut KERNEL_SPACE.exclusive_access(file!(), line!()).page_table;
             debug!(
-                    "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
-                    trap_cx_bottom_va.0, trap_cx_bottom_ppn.0, current_pagetable.token()
-                );
+                "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: \
+                 {:#x}, page_table: {:#x}",
+                trap_cx_bottom_va.0,
+                trap_cx_bottom_ppn.0,
+                current_pagetable.token()
+            );
             current_pagetable.map(
                 trap_cx_bottom_va.floor(),
                 trap_cx_bottom_ppn,
@@ -279,13 +303,8 @@ impl TaskControlBlock {
 
     ///
     pub fn clone_t(
-        self: &Arc<Self>,
-        flag: CloneFlags,
-        stack: usize,
-        sig: SignalFlags,
-        ptid: usize,
-        tls: usize,
-        ctid: usize,
+        self: &Arc<Self>, flag: CloneFlags, stack: usize, sig: SignalFlags, ptid: usize,
+        tls: usize, ctid: usize,
     ) -> Option<Arc<TaskControlBlock>> {
         warn!(
             "clone: flag:{:?}, sig:{:?}, stack:{:#x}, ptid:{:#x}, tls:{:#x}, ctid:{:#x}",
@@ -402,9 +421,12 @@ impl TaskControlBlock {
             // 在一定区域中获取可变引用，保证离开时自动释放
             let current_pagetable = &mut task_inner.memory_set.page_table;
             debug!(
-                    "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: {:#x}, page_table: {:#x}",
-                    trap_cx_bottom_va.0, trap_cx_bottom_ppn.0, current_pagetable.token()
-                );
+                "map trap_cx in current pagetable trap_cx_bottom: {:#x}, trap_cx_bottom_ppn: \
+                 {:#x}, page_table: {:#x}",
+                trap_cx_bottom_va.0,
+                trap_cx_bottom_ppn.0,
+                current_pagetable.token()
+            );
             current_pagetable.map(
                 trap_cx_bottom_va.floor(),
                 trap_cx_bottom_ppn,
@@ -476,10 +498,7 @@ impl TaskControlBlock {
 
     /// clone2
     pub fn clone2(
-        self: &Arc<Self>,
-        _exit_signals: SignalFlags,
-        _clone_signals: CloneFlags,
-        stack_ptr: usize,
+        self: &Arc<Self>, _exit_signals: SignalFlags, _clone_signals: CloneFlags, stack_ptr: usize,
         tls: usize,
     ) -> Arc<TaskControlBlock> {
         trace!("kernel: clone thread");
@@ -955,12 +974,7 @@ impl TaskControlBlockInner {
 
     /// mmap
     pub fn mmap(
-        &mut self,
-        start_addr: usize,
-        len: usize,
-        _prot: usize,
-        flags: usize,
-        fd: usize,
+        &mut self, start_addr: usize, len: usize, _prot: usize, flags: usize, fd: usize,
         offset: usize,
     ) -> isize {
         let flags = Flags::from_bits(flags as u32).unwrap();

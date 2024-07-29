@@ -19,6 +19,30 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use alloc::{sync::Arc, vec::Vec};
+
+pub use context::TaskContext;
+use lazy_static::*;
+use manager::{add_stopping_task, fetch_task};
+pub use manager::{add_task, pid2process, remove_from_pid2process, remove_task, wakeup_task};
+pub use process::{CloneFlags, CSIGNAL};
+pub use processor::{
+    current_kstack_top,
+    current_pid,
+    current_task,
+    current_tid,
+    current_trap_cx,
+    current_trap_cx_user_va,
+    current_user_token,
+    run_tasks,
+    schedule,
+    take_current_task,
+};
+pub use res::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
+pub use signal::SignalFlags;
+use switch::__switch;
+pub use task::{TaskControlBlock, TaskStatus};
+
 use self::manager::add_block_task;
 use crate::{
     board::QEMUExit,
@@ -26,22 +50,6 @@ use crate::{
     sbi::shutdown,
     timer::remove_timer,
 };
-use alloc::{sync::Arc, vec::Vec};
-use lazy_static::*;
-use manager::{add_stopping_task, fetch_task};
-pub use process::CloneFlags;
-pub use process::CSIGNAL;
-use switch::__switch;
-
-pub use context::TaskContext;
-pub use manager::{add_task, pid2process, remove_from_pid2process, remove_task, wakeup_task};
-pub use processor::{
-    current_kstack_top, current_pid, current_task, current_tid, current_trap_cx,
-    current_trap_cx_user_va, current_user_token, run_tasks, schedule, take_current_task,
-};
-pub use res::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
-pub use signal::SignalFlags;
-pub use task::{TaskControlBlock, TaskStatus};
 
 /// Make current task suspended and switch to the next task
 pub fn suspend_current_and_run_next() {

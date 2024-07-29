@@ -4,16 +4,18 @@
 //! the current running state of CPU is recorded,
 //! and the replacement and transfer of control flow of different applications are executed.
 
-use super::__switch;
-use super::{fetch_task, TaskStatus};
-use super::{TaskContext, TaskControlBlock};
-use crate::mm::{VirtAddr, KERNEL_SPACE};
-use crate::sync::UPSafeCell;
-use crate::timer::get_time_ms;
-use crate::trap::TrapContext;
 use alloc::sync::Arc;
+
 use lazy_static::*;
 use riscv::register::satp;
+
+use super::{__switch, fetch_task, TaskContext, TaskControlBlock, TaskStatus};
+use crate::{
+    mm::{VirtAddr, KERNEL_SPACE},
+    sync::UPSafeCell,
+    timer::get_time_ms,
+    trap::TrapContext,
+};
 
 /// Processor management structure
 pub struct Processor {
@@ -26,7 +28,7 @@ pub struct Processor {
 impl Processor {
     pub fn new() -> Self {
         Self {
-            current: None,
+            current:      None,
             idle_task_cx: TaskContext::zero_init(),
         }
     }

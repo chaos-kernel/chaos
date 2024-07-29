@@ -1,20 +1,31 @@
+use alloc::vec::Vec;
 use core::ptr::NonNull;
 
-use super::BlockDevice;
-use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE};
-
-use crate::mm::{
-    frame_alloc_contiguous, frame_dealloc, FrameTracker, KernelAddr, PhysAddr, PhysPageNum,
-    VirtAddr, KERNEL_SPACE,
-};
-use crate::sync::UPSafeCell;
-use alloc::vec::Vec;
 use lazy_static::*;
 use spin::Mutex;
 // use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 use virtio_drivers::device::blk::VirtIOBlk;
-use virtio_drivers::transport::mmio::{MmioTransport, VirtIOHeader};
-use virtio_drivers::{BufferDirection, Hal};
+use virtio_drivers::{
+    transport::mmio::{MmioTransport, VirtIOHeader},
+    BufferDirection,
+    Hal,
+};
+
+use super::BlockDevice;
+use crate::{
+    config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
+    mm::{
+        frame_alloc_contiguous,
+        frame_dealloc,
+        FrameTracker,
+        KernelAddr,
+        PhysAddr,
+        PhysPageNum,
+        VirtAddr,
+        KERNEL_SPACE,
+    },
+    sync::UPSafeCell,
+};
 
 #[allow(unused)]
 const VIRTIO0: usize = 0x10001000 + KERNEL_SPACE_OFFSET * PAGE_SIZE;
@@ -88,8 +99,7 @@ unsafe impl Hal for VirtioHal {
     /// Allocates and zeroes the given number of contiguous physical pages of DMA memory for VirtIO
     /// use.
     fn dma_alloc(
-        pages: usize,
-        _direction: BufferDirection,
+        pages: usize, _direction: BufferDirection,
     ) -> (virtio_drivers::PhysAddr, NonNull<u8>) {
         let (frames, root_ppn) = frame_alloc_contiguous(pages);
         let pa: PhysAddr = root_ppn.into();
@@ -99,9 +109,7 @@ unsafe impl Hal for VirtioHal {
     }
     /// Deallocates the given contiguous physical DMA memory pages.
     unsafe fn dma_dealloc(
-        paddr: virtio_drivers::PhysAddr,
-        _vaddr: NonNull<u8>,
-        pages: usize,
+        paddr: virtio_drivers::PhysAddr, _vaddr: NonNull<u8>, pages: usize,
     ) -> i32 {
         let pa = PhysAddr::from(paddr);
         let mut ppn_base: PhysPageNum = pa.into();
@@ -130,9 +138,7 @@ unsafe impl Hal for VirtioHal {
     /// Unshares the given memory range from the device and (if necessary) copies it back to the
     /// original buffer.
     unsafe fn unshare(
-        paddr: virtio_drivers::PhysAddr,
-        buffer: NonNull<[u8]>,
-        direction: BufferDirection,
+        paddr: virtio_drivers::PhysAddr, buffer: NonNull<[u8]>, direction: BufferDirection,
     ) {
         //todo!();
     }

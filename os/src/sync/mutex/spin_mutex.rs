@@ -1,22 +1,22 @@
-use core::cell::UnsafeCell;
-use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    cell::UnsafeCell,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    sync::atomic::{AtomicBool, Ordering},
+};
 
-use crate::sync::mutex::MutexSupport;
-
-use crate::utils::async_utils::SendWrapper;
+use crate::{sync::mutex::MutexSupport, utils::async_utils::SendWrapper};
 
 /// `SpinMutex` can include different `MutexSupport` type
 pub struct SpinMutex<T: ?Sized, S: MutexSupport> {
     // debug_cnt: UnsafeCell<usize>,
-    lock: AtomicBool,
+    lock:    AtomicBool,
     _marker: PhantomData<S>,
-    data: UnsafeCell<T>,
+    data:    UnsafeCell<T>,
 }
 
 struct MutexGuard<'a, T: ?Sized, S: MutexSupport> {
-    mutex: &'a SpinMutex<T, S>,
+    mutex:         &'a SpinMutex<T, S>,
     support_guard: S::GuardData,
 }
 
@@ -31,9 +31,9 @@ impl<'a, T, S: MutexSupport> SpinMutex<T, S> {
     /// Construct a SpinMutex
     pub const fn new(user_data: T) -> Self {
         SpinMutex {
-            lock: AtomicBool::new(false),
+            lock:    AtomicBool::new(false),
             _marker: PhantomData,
-            data: UnsafeCell::new(user_data),
+            data:    UnsafeCell::new(user_data),
             // debug_cnt: UnsafeCell::new(0),
         }
     }

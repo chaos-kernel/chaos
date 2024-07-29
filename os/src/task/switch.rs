@@ -1,6 +1,7 @@
 //!provides __switch asm function to switch between two task contexts  [`TaskContext`]
-use super::TaskContext;
 use core::arch::global_asm;
+
+use super::TaskContext;
 
 global_asm!(include_str!("switch.S"));
 

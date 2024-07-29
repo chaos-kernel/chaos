@@ -1,11 +1,12 @@
 //! Physical page frame allocator
 
-use super::{PhysAddr, PhysPageNum};
-use crate::sync::UPSafeCell;
-use crate::{config::MEMORY_END, mm::address::KernelAddr};
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
+
 use lazy_static::*;
+
+use super::{PhysAddr, PhysPageNum};
+use crate::{config::MEMORY_END, mm::address::KernelAddr, sync::UPSafeCell};
 
 /// tracker for physical page frame allocation and deallocation
 pub struct FrameTracker {
@@ -47,8 +48,8 @@ trait FrameAllocator {
 }
 
 pub struct StackFrameAllocator {
-    current: usize,
-    end: usize,
+    current:  usize,
+    end:      usize,
     recycled: Vec<usize>,
 }
 
@@ -62,8 +63,8 @@ impl StackFrameAllocator {
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
         Self {
-            current: 0,
-            end: 0,
+            current:  0,
+            end:      0,
             recycled: Vec::new(),
         }
     }

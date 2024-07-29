@@ -1,15 +1,20 @@
-use core::borrow::Borrow;
-use core::cmp::min;
-use core::mem::size_of;
-use core::ptr;
-
-use crate::fs::file::File;
-use crate::fs::inode::{OSInode, Stat, ROOT_INODE};
-use crate::fs::{link, make_pipe, open_file, unlink, OpenFlags};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
-use crate::syscall::Dirent;
-use crate::task::{current_task, current_user_token};
 use alloc::sync::Arc;
+use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
+
+use crate::{
+    fs::{
+        file::File,
+        inode::{OSInode, Stat, ROOT_INODE},
+        link,
+        make_pipe,
+        open_file,
+        unlink,
+        OpenFlags,
+    },
+    mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
+    syscall::Dirent,
+    task::{current_task, current_user_token},
+};
 
 pub const AT_FDCWD: i32 = -100;
 
@@ -396,11 +401,7 @@ pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
 }
 
 pub fn sys_mount(
-    source: *const u8,
-    target: *const u8,
-    fs: *const u8,
-    flags: u32,
-    data: *const u8,
+    source: *const u8, target: *const u8, fs: *const u8, flags: u32, data: *const u8,
 ) -> isize {
     trace!("kernel:pid[{}] sys_mount", current_task().unwrap().pid.0);
     0

@@ -14,20 +14,33 @@
 
 mod context;
 
-use crate::config::TRAP_CONTEXT_BASE;
-use crate::syscall::{self, syscall};
-use crate::task::{
-    check_signals_of_current, current_add_signal, current_task, current_trap_cx,
-    current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
-    suspend_current_and_run_next, SignalFlags, INITPROC,
-};
-use crate::timer::{check_timer, set_next_trigger};
 use core::arch::{asm, global_asm};
-use riscv::register::sepc;
+
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
-    sie, stval, stvec,
+    sepc,
+    sie,
+    stval,
+    stvec,
+};
+
+use crate::{
+    config::TRAP_CONTEXT_BASE,
+    syscall::{self, syscall},
+    task::{
+        check_signals_of_current,
+        current_add_signal,
+        current_task,
+        current_trap_cx,
+        current_trap_cx_user_va,
+        current_user_token,
+        exit_current_and_run_next,
+        suspend_current_and_run_next,
+        SignalFlags,
+        INITPROC,
+    },
+    timer::{check_timer, set_next_trigger},
 };
 
 global_asm!(include_str!("trap.S"));
@@ -99,7 +112,8 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
             error!(
-                "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+                "[kernel] trap_handler: {:?} in application, bad addr = {:#x}, bad instruction = \
+                 {:#x}, kernel killed it.",
                 scause.cause(),
                 stval,
                 current_trap_cx().sepc,
@@ -117,7 +131,8 @@ pub fn trap_handler() -> ! {
         }
         _ => {
             panic!(
-                "[kernel] trap_handler: unsupport trap {:?} , bad addr = {:#x}, bad instruction = {:#x}",
+                "[kernel] trap_handler: unsupport trap {:?} , bad addr = {:#x}, bad instruction = \
+                 {:#x}",
                 scause.cause(),
                 stval,
                 current_trap_cx().sepc,

@@ -1,9 +1,7 @@
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::cmp::min;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
-
-use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 use super::{
     dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes},
@@ -11,10 +9,11 @@ use super::{
     inode::{Fat32Inode, Fat32InodeType},
     super_block::{Fat32SB, Fat32SBLayout},
 };
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 pub struct Fat32FS {
-    pub sb: Fat32SB,
-    pub fat: Arc<FAT>,
+    pub sb:   Fat32SB,
+    pub fat:  Arc<FAT>,
     pub bdev: Arc<dyn BlockDevice>,
 }
 
@@ -163,11 +162,7 @@ impl Fat32FS {
     }
 
     pub fn insert_dentry(
-        &self,
-        cluster_id: usize,
-        name: String,
-        attr: FileAttributes,
-        file_size: u32,
+        &self, cluster_id: usize, name: String, attr: FileAttributes, file_size: u32,
         start_cluster: usize,
     ) -> Option<Fat32Dentry> {
         let mut sector_id = self.fat.cluster_id_to_sector_id(cluster_id).unwrap();

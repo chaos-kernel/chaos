@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
 
-use crate::mm::UserBuffer;
-
 use super::inode::Stat;
+use crate::mm::UserBuffer;
 
 /// trait File for all file types
 pub trait File {

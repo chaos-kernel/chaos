@@ -1,65 +1,73 @@
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::{borrow::BorrowMut, mem::size_of, ptr};
+
+use riscv::register::{satp, sstatus};
+
+#[allow(unused)]
+use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
     mm::{translated_byte_buffer, translated_refmut},
     task::{
-        current_task, current_user_token, exit_current_and_run_next, pid2process, remove_task,
-        suspend_current_and_run_next, CloneFlags, SignalFlags, TaskStatus, CSIGNAL,
+        current_task,
+        current_user_token,
+        exit_current_and_run_next,
+        pid2process,
+        remove_task,
+        suspend_current_and_run_next,
+        CloneFlags,
+        SignalFlags,
+        TaskStatus,
+        CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
     utils::string::c_ptr_to_string,
 };
-use core::{borrow::BorrowMut, mem::size_of, ptr};
-
-#[allow(unused)]
-use super::errno::{EINVAL, EPERM, SUCCESS};
-
-use alloc::{string::String, sync::Arc, vec::Vec};
-use riscv::register::{satp, sstatus};
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct TimeVal {
-    pub sec: usize,
+    pub sec:  usize,
     pub usec: usize,
 }
 
 #[repr(C)]
 pub struct Tms {
-    tms_utime: i64,
-    tms_stime: i64,
+    tms_utime:  i64,
+    tms_stime:  i64,
     tms_cutime: i64,
     tms_cstime: i64,
 }
 
 #[allow(dead_code)]
 pub struct Utsname {
-    sysname: [u8; 65],
-    nodename: [u8; 65],
-    release: [u8; 65],
-    version: [u8; 65],
-    machine: [u8; 65],
+    sysname:    [u8; 65],
+    nodename:   [u8; 65],
+    release:    [u8; 65],
+    version:    [u8; 65],
+    machine:    [u8; 65],
     domainname: [u8; 65],
 }
 /// Task information
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    status:        TaskStatus,
     /// The numbers of syscall called by task
     syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    time:          usize,
 }
 
 #[derive(Debug)]
 #[repr(C)]
 pub struct Dirent {
-    ino: u64,
-    off: i64,
-    len: u16,
+    ino:   u64,
+    off:   i64,
+    len:   u16,
     type_: u8,
-    name: [u8; 64],
+    name:  [u8; 64],
 }
 
 impl Dirent {
@@ -125,11 +133,7 @@ pub fn sys_getppid() -> isize {
 }
 /// fork child process syscall
 pub fn sys_clone(
-    flags: usize,
-    stack_ptr: usize,
-    ptid: *mut usize,
-    tls: usize,
-    ctid: *mut usize,
+    flags: usize, stack_ptr: usize, ptid: *mut usize, tls: usize, ctid: *mut usize,
 ) -> isize {
     trace!(
         "[sys_clone] flags {:?} stack_ptr {:x?} ptid {:x?} tls {:x?} ctid {:x?}",
@@ -145,8 +149,14 @@ pub fn sys_clone(
     let clone_signals = CloneFlags::from_bits((flags & !CSIGNAL) as u32).unwrap();
 
     trace!(
-        "[sys_clone] exit_signal = {:?}, clone_signals = {:?}, stack_ptr = {:#x}, ptid = {:#x}, tls = {:#x}, ctid = {:#x}",
-         exit_signal, clone_signals, stack_ptr, ptid as usize, tls, ctid as usize
+        "[sys_clone] exit_signal = {:?}, clone_signals = {:?}, stack_ptr = {:#x}, ptid = {:#x}, \
+         tls = {:#x}, ctid = {:#x}",
+        exit_signal,
+        clone_signals,
+        stack_ptr,
+        ptid as usize,
+        tls,
+        ctid as usize
     );
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
@@ -265,8 +275,13 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
                     let end = mem.vpn_range.get_end().0;
                     let permission = mem.map_perm;
                     debug!(
-                        "kernel:pid[{}] sys_waitpid: memory area [{:#x}, {:#x}] perm: {:?} page table: {:#x?}",
-                        task.pid.0, start, end, permission, inner.memory_set.token()
+                        "kernel:pid[{}] sys_waitpid: memory area [{:#x}, {:#x}] perm: {:?} page \
+                         table: {:#x?}",
+                        task.pid.0,
+                        start,
+                        end,
+                        permission,
+                        inner.memory_set.token()
                     );
                 }
                 debug!("page table: {:#x?}", satp::read().bits());
@@ -326,7 +341,7 @@ pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
     let us = get_time_us();
     let mut v = translated_byte_buffer(current_user_token(), ts as *const u8, size_of::<TimeVal>());
     let mut ts = TimeVal {
-        sec: us / 1_000_000,
+        sec:  us / 1_000_000,
         usec: us % 1_000_000,
     };
     unsafe {
@@ -351,9 +366,9 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     let mut ti = TaskInfo {
-        status: TaskStatus::Running,
+        status:        TaskStatus::Running,
         syscall_times: inner.syscall_times,
-        time: get_time_ms() - inner.first_time.unwrap(),
+        time:          get_time_ms() - inner.first_time.unwrap(),
     };
     unsafe {
         let mut p = ti.borrow_mut() as *mut TaskInfo as *mut u8;
@@ -370,12 +385,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 ///
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(
-    start: usize,
-    len: usize,
-    prot: usize,
-    flags: usize,
-    fd: usize,
-    off: usize,
+    start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize,
 ) -> isize {
     trace!(
         "kernel:pid[{}] sys_mmap start:{:#x} len:{} prot:{} flags:{} fd:{} off:{}",
@@ -502,11 +512,11 @@ pub fn sys_uname(uts: *mut Utsname) -> isize {
     let mut uts_k =
         translated_byte_buffer(current_user_token(), uts as *const u8, size_of::<Utsname>());
     let mut sys_uts = Utsname {
-        sysname: [0; 65],
-        nodename: [0; 65],
-        release: [0; 65],
-        version: [0; 65],
-        machine: [0; 65],
+        sysname:    [0; 65],
+        nodename:   [0; 65],
+        release:    [0; 65],
+        version:    [0; 65],
+        machine:    [0; 65],
         domainname: [0; 65],
     };
 

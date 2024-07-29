@@ -1,13 +1,12 @@
 use alloc::sync::Arc;
 
-use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
-
 use super::super_block::Fat32SB;
+use crate::block::{block_cache::get_block_cache, block_dev::BlockDevice, BLOCK_SZ};
 
 pub struct FAT {
     pub start_sector: usize,
-    pub sb: Arc<Fat32SB>,
-    pub bdev: Arc<dyn BlockDevice>,
+    pub sb:           Arc<Fat32SB>,
+    pub bdev:         Arc<dyn BlockDevice>,
 }
 
 impl FAT {

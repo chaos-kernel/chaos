@@ -6,15 +6,15 @@ use riscv::register::sstatus::{self, Sstatus, SPP};
 /// trap context structure containing sstatus, sepc and registers
 pub struct TrapContext {
     /// General-Purpose Register x0-31
-    pub x: [usize; 32],
+    pub x:            [usize; 32],
     /// Supervisor Status Register
-    pub sstatus: Sstatus,
+    pub sstatus:      Sstatus,
     /// Supervisor Exception Program Counter
-    pub sepc: usize,
+    pub sepc:         usize,
     /// Token of kernel address space
-    pub kernel_satp: usize,
+    pub kernel_satp:  usize,
     /// Kernel stack pointer of the current application
-    pub kernel_sp: usize,
+    pub kernel_sp:    usize,
     /// Virtual address of trap handler entry point in kernel
     pub trap_handler: usize,
 }
@@ -26,11 +26,7 @@ impl TrapContext {
     }
     /// init the trap context of an application
     pub fn app_init_context(
-        entry: usize,
-        sp: usize,
-        kernel_satp: usize,
-        kernel_sp: usize,
-        trap_handler: usize,
+        entry: usize, sp: usize, kernel_satp: usize, kernel_sp: usize, trap_handler: usize,
     ) -> Self {
         let mut sstatus = sstatus::read();
         // set CPU privilege to User after trapping back

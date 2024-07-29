@@ -1,22 +1,30 @@
 //! Allocator for pid, task user resource, kernel stack using a simple recycle strategy.
 
-use crate::config::{
-    __breakpoint, KERNEL_STACK_SIZE, MEMORY_END, PAGE_SIZE, TRAP_CONTEXT_BASE, USER_STACK_SIZE,
-};
-use crate::mm::PTEFlags;
-use crate::mm::{MapPermission, PageTable, PhysPageNum, VirtAddr, KERNEL_SPACE};
-use crate::sync::UPSafeCell;
-use crate::trap::TrapContext;
 use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+
 use lazy_static::*;
 use riscv::register::satp;
 
+use crate::{
+    config::{
+        __breakpoint,
+        KERNEL_STACK_SIZE,
+        MEMORY_END,
+        PAGE_SIZE,
+        TRAP_CONTEXT_BASE,
+        USER_STACK_SIZE,
+    },
+    mm::{MapPermission, PTEFlags, PageTable, PhysPageNum, VirtAddr, KERNEL_SPACE},
+    sync::UPSafeCell,
+    trap::TrapContext,
+};
+
 /// Allocator with a simple recycle strategy
 pub struct RecycleAllocator {
-    current: usize,
+    current:  usize,
     recycled: Vec<usize>,
 }
 
@@ -24,7 +32,7 @@ impl RecycleAllocator {
     /// Create a new allocator
     pub fn new() -> Self {
         RecycleAllocator {
-            current: 0,
+            current:  0,
             recycled: Vec::new(),
         }
     }
@@ -129,9 +137,7 @@ impl KernelStack {
     /// Push a variable of type T into the top of the KernelStack and return its raw pointer
     #[allow(unused)]
     pub fn push_on_top<T>(&self, value: T) -> *mut T
-    where
-        T: Sized,
-    {
+    where T: Sized {
         let kernel_stack_top = self.get_top();
         let ptr_mut = (kernel_stack_top - core::mem::size_of::<T>()) as *mut T;
         unsafe {

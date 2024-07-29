@@ -1,8 +1,5 @@
-use crate::mm::UserBuffer;
-use crate::sbi::console_getchar;
-use crate::task::suspend_current_and_run_next;
-
 use super::{file::File, inode::Stat};
+use crate::{mm::UserBuffer, sbi::console_getchar, task::suspend_current_and_run_next};
 
 /// stdin file for getting chars from console
 pub struct Stdin;

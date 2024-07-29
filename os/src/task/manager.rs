@@ -3,11 +3,15 @@
 //! It is only used to manage processes and schedule process based on ready queue.
 //! Other CPU process monitoring functions are in Processor.
 
+use alloc::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
+
+use lazy_static::*;
+
 use super::{TaskControlBlock, TaskStatus};
 use crate::sync::UPSafeCell;
-use alloc::collections::{BTreeMap, VecDeque};
-use alloc::sync::Arc;
-use lazy_static::*;
 ///A array of `TaskControlBlock` that is thread-safe
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
@@ -24,7 +28,7 @@ impl TaskManager {
         Self {
             ready_queue: VecDeque::new(),
             block_queue: VecDeque::new(),
-            stop_task: None,
+            stop_task:   None,
         }
     }
     /// Add process back to ready queue

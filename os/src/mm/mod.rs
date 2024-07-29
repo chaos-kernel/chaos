@@ -16,12 +16,17 @@ use address::VPNRange;
 pub use address::{KernelAddr, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 pub use frame_allocator::{frame_alloc, frame_alloc_contiguous, frame_dealloc, FrameTracker};
 pub use heap_allocator::init_heap;
-pub use memory_set::remap_test;
-pub use memory_set::{kernel_token, MapPermission, MemorySet, KERNEL_SPACE};
-pub use page_table::PTEFlags;
+pub use memory_set::{kernel_token, remap_test, MapPermission, MemorySet, KERNEL_SPACE};
 pub use page_table::{
-    translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable,
-    PageTableEntry, UserBuffer, UserBufferIterator,
+    translated_byte_buffer,
+    translated_ref,
+    translated_refmut,
+    translated_str,
+    PTEFlags,
+    PageTable,
+    PageTableEntry,
+    UserBuffer,
+    UserBufferIterator,
 };
 
 /// initiate heap allocator, frame allocator and kernel space

@@ -2,11 +2,12 @@
 
 mod virtio_blk;
 
+use alloc::sync::Arc;
+
+use lazy_static::*;
 pub use virtio_blk::VirtIOBlock;
 
 use crate::{block::block_dev::BlockDevice, board::BlockDeviceImpl};
-use alloc::sync::Arc;
-use lazy_static::*;
 
 lazy_static! {
     /// The global block device driver instance: BLOCK_DEVICE with BlockDevice trait
