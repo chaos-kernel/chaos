@@ -3,17 +3,19 @@ use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 
 use crate::{
     fs::{
-        file::File,
-        inode::{OSInode, Stat, ROOT_INODE},
-        link,
-        make_pipe,
+        defs::OpenFlags,
+        file::{cast_file_to_inode, cast_inode_to_file},
+        inode::Stat,
         open_file,
-        unlink,
-        OpenFlags,
+        pipe::make_pipe,
+        ROOT_INODE,
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
-    syscall::Dirent,
-    task::{current_task, current_user_token},
+    syscall::{
+        errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR},
+        Dirent,
+    },
+    task::{current_process, current_task, current_user_token},
 };
 
 pub const AT_FDCWD: i32 = -100;
@@ -29,18 +31,18 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         if !file.writable() {
-            return -1;
+            return EACCES;
         }
         let file = file.clone();
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
         file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
     } else {
-        -1
+        EBADF
     }
 }
 /// read syscall
@@ -54,43 +56,52 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         let file = file.clone();
         if !file.readable() {
-            return -1;
+            return EACCES;
         }
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
         trace!("kernel: sys_read .. file.read");
         file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
     } else {
-        -1
+        EBADF
     }
 }
 /// openat sys
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    trace!("kernel:pid[{}] sys_open", current_task().unwrap().pid.0);
-    let task = current_task().unwrap();
+pub fn sys_open(path: *const u8, flags: i32) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_open",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    let process = current_process();
     let token = current_user_token();
     debug!("kernel: sys_open path: {:?}", path);
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(
-        ROOT_INODE.as_ref(),
+    let curdir = process.inner_exclusive_access().work_dir.clone();
+    if let Some(dentry) = open_file(
+        curdir.inode(),
         path.as_str(),
         OpenFlags::from_bits(flags).unwrap(),
     ) {
-        let mut inner = task.inner_exclusive_access(file!(), line!());
+        let inode = dentry.inode();
+        let mut inner = process.inner_exclusive_access();
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(inode);
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
-        -1
+        ENOENT
     }
 }
-pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
-    trace!("kernel:pid[{}] sys_openat", current_task().unwrap().pid.0);
+pub fn sys_openat(dirfd: i32, path: *const u8, flags: i32) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_openat",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
     if dirfd == AT_FDCWD {
         return sys_open(path, flags);
     }
@@ -98,25 +109,27 @@ pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     if dirfd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[dirfd].is_none() {
-        return -1;
+        return EBADF;
     }
     let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
     // TODO: 好像无法判断是否是目录
     // if !dir.is_dir() {
     //     return -1;
     // }
-    let inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+    let inode = cast_file_to_inode(dir).unwrap();
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(inode) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
+    if let Some(dentry) = open_file(inode, path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(inode);
+        let inode = dentry.inode();
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
-        -1
+        ENOENT
     }
 }
 /// close syscall
@@ -129,10 +142,10 @@ pub fn sys_close(fd: usize) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     inner.fd_table[fd].take();
     0
@@ -158,10 +171,10 @@ pub fn sys_dup(fd: usize) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     let new_fd = inner.alloc_fd();
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
@@ -174,16 +187,16 @@ pub fn sys_dup3(fd: usize, new_fd: usize) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     while inner.fd_table.len() <= new_fd {
         inner.fd_table.push(None);
     }
     if inner.fd_table[new_fd].is_some() {
-        return -1;
+        return EBUSY;
     }
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
     new_fd as isize
@@ -195,16 +208,16 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
-        return -1;
+        return EBADF;
     }
     if inner.fd_table[fd].is_none() {
-        return -1;
+        return EBADF;
     }
     if let Some(file) = &inner.fd_table[fd] {
         let file = file.clone();
         let stat = file.fstat();
         if stat.is_none() {
-            return -1;
+            return EBADF;
         }
         let stat = stat.unwrap();
         let mut v =
@@ -227,10 +240,12 @@ pub fn sys_linkat(old_name: *const u8, new_name: *const u8) -> isize {
     let token = current_user_token();
     let old_name = translated_str(token, old_name);
     let new_name = translated_str(token, new_name);
-    if link(old_name.as_str(), new_name.as_str()).is_some() {
+    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    let target = curdir.inode().lookup(old_name.as_str()).unwrap();
+    if curdir.inode().link(&new_name, target) {
         0
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -239,17 +254,18 @@ pub fn sys_unlinkat(name: *const u8) -> isize {
     trace!("kernel:pid[{}] sys_unlinkat", current_task().unwrap().pid.0);
     let token = current_user_token();
     let name = translated_str(token, name);
-    if unlink(name.as_str()) {
+    let curdir = current_process().inner_exclusive_access().work_dir.clone();
+    if curdir.inode().unlink(&name) {
         0
     } else {
-        -1
+        ENOENT
     }
 }
 
 pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
     trace!("kernel:pid[{}] sys_getcwd", current_task().unwrap().pid.0);
     let token = current_user_token();
-    if let Some(path) = current_task()
+    if let path = current_task()
         .unwrap()
         .inner_exclusive_access(file!(), line!())
         .work_dir
@@ -268,7 +284,7 @@ pub fn sys_getcwd(buf: *mut u8, len: usize) -> isize {
         }
         buf as isize
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -279,7 +295,8 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     let dir = inner.work_dir.clone();
-    let dir = open_file(&dir, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
+    let inode = dir.inode();
+    let dir = open_file(inode, &path, OpenFlags::O_RDWR | OpenFlags::O_DIRECTORY);
     inner.work_dir = dir.unwrap();
     0
 }
@@ -290,32 +307,38 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
     let mut inner = task.inner_exclusive_access(file!(), line!());
     let inode;
     if dirfd == AT_FDCWD {
-        inode = ROOT_INODE.as_ref();
+        inode = ROOT_INODE.clone();
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
-            return -1;
+            return EBADF;
         }
         if inner.fd_table[dirfd].is_none() {
-            return -1;
+            return EBADF;
         }
         let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
         if !dir.is_dir() {
-            return -1;
+            return ENOTDIR;
         }
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+        inode = cast_file_to_inode(dir).unwrap();
     }
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(_) = open_file(inode, &path, OpenFlags::RDONLY) {
+    if let Some(_) = open_file(inode.clone(), &path, OpenFlags::O_RDONLY) {
         return -1;
     }
-    if let Some(chinode) = open_file(inode, &path, OpenFlags::DIRECTORY | OpenFlags::CREATE) {
+    if let Some(dentry) = open_file(
+        inode.clone(),
+        &path,
+        OpenFlags::O_DIRECTORY | OpenFlags::O_CREAT,
+    ) {
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(chinode);
+        let inode = dentry.inode();
+        let file = cast_inode_to_file(inode).unwrap();
+        inner.fd_table[fd] = Some(file);
         fd as isize
     } else {
-        -1
+        EACCES //TODO: to be confirmed
     }
 }
 
@@ -328,20 +351,20 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     let inner = task.inner_exclusive_access(file!(), line!());
     let inode;
     if dirfd == AT_FDCWD {
-        inode = ROOT_INODE.as_ref();
+        inode = ROOT_INODE.clone();
     } else {
         let dirfd = dirfd as usize;
         if dirfd >= inner.fd_table.len() {
-            return -1;
+            return EBADF;
         }
         if inner.fd_table[dirfd].is_none() {
-            return -1;
+            return EBADF;
         }
         let dir = inner.fd_table[dirfd].as_ref().unwrap().clone();
         if !dir.is_dir() {
-            return -1;
+            return ENOTDIR;
         }
-        inode = unsafe { &*(dir.as_ref() as *const dyn File as *const OSInode) };
+        inode = cast_file_to_inode(dir).unwrap();
     }
     let token = inner.memory_set.token();
     let mut v = translated_byte_buffer(token, buf, len);
@@ -395,13 +418,16 @@ pub fn sys_getdents64(dirfd: i32, buf: *mut u8, len: usize) -> isize {
     }
 }
 
-pub fn sys_umount2(target: *const u8, flags: i32) -> isize {
-    trace!("kernel:pid[{}] sys_umount2", current_task().unwrap().pid.0);
+pub fn sys_umount2(_target: *const u8, _flags: i32) -> isize {
+    trace!(
+        "kernel:pid[{}] sys_umount2",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
     0
 }
 
 pub fn sys_mount(
-    source: *const u8, target: *const u8, fs: *const u8, flags: u32, data: *const u8,
+    _source: *const u8, _target: *const u8, _fs: *const u8, _flags: u32, _data: *const u8,
 ) -> isize {
     trace!("kernel:pid[{}] sys_mount", current_task().unwrap().pid.0);
     0

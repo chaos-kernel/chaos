@@ -19,6 +19,7 @@ impl TaskContext {
             ra: 0,
             sp: 0,
             s:  [0; 12],
+            s:  [0; 12],
         }
     }
     /// Create a new task context with a trap return addr and a kernel stack pointer

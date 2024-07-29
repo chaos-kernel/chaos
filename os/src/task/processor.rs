@@ -17,6 +17,9 @@ use crate::{
     trap::TrapContext,
 };
 
+use super::{__switch, fetch_task, ProcessControlBlock, TaskContext, TaskControlBlock, TaskStatus};
+use crate::{sync::UPSafeCell, timer::get_time_ms, trap::TrapContext};
+
 /// Processor management structure
 pub struct Processor {
     current: Option<Arc<TaskControlBlock>>,
@@ -45,7 +48,7 @@ impl Processor {
 
     ///Get current task in cloning semanteme
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
-        self.current.as_ref().map(Arc::clone)
+        self.current.clone()
     }
 }
 
@@ -65,7 +68,7 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access(file!(), line!());
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
-            if task_inner.first_time == None {
+            if task_inner.first_time.is_none() {
                 task_inner.first_time = Some(get_time_ms());
             }
 

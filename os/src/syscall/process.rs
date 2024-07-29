@@ -1,20 +1,34 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{borrow::BorrowMut, mem::size_of, ptr};
+<<<<<<< HEAD
 
 use riscv::register::{satp, sstatus};
+=======
+>>>>>>> main
 
 #[allow(unused)]
 use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
+<<<<<<< HEAD
     fs::{inode::ROOT_INODE, open_file, OpenFlags},
     mm::{translated_byte_buffer, translated_refmut},
     task::{
+=======
+    fs::{defs::OpenFlags, open_file},
+    mm::{translated_byte_buffer, translated_ref, translated_refmut, translated_str},
+    syscall::errno::{ECHILD, ENOENT, ENOSYS, ESRCH},
+    task::{
+        current_process,
+>>>>>>> main
         current_task,
         current_user_token,
         exit_current_and_run_next,
         pid2process,
+<<<<<<< HEAD
         remove_task,
+=======
+>>>>>>> main
         suspend_current_and_run_next,
         CloneFlags,
         SignalFlags,
@@ -22,7 +36,10 @@ use crate::{
         CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
+<<<<<<< HEAD
     utils::string::c_ptr_to_string,
+=======
+>>>>>>> main
 };
 
 #[repr(C)]
@@ -128,7 +145,7 @@ pub fn sys_getppid() -> isize {
         parent.upgrade().unwrap().pid.0 as isize
     } else {
         warn!("kwenel: getppid NOT IMPLEMENTED YET!!");
-        1
+        ESRCH
     }
 }
 /// fork child process syscall
@@ -161,10 +178,16 @@ pub fn sys_clone(
     if !clone_signals.contains(CloneFlags::CLONE_THREAD) {
         // assert!(stack_ptr == 0);
         if stack_ptr == 0 {
+<<<<<<< HEAD
             return current_task.fork() as isize;
         } else {
             // return current_task.fork2(stack_ptr) as isize; //todo仅用于初赛
             return current_task.fork() as isize; //todo
+=======
+            current_process.fork() as isize
+        } else {
+            current_process.fork2(stack_ptr) as isize //todo仅用于初赛
+>>>>>>> main
         }
     } else {
         println!("[sys_clone] create thread");
@@ -180,22 +203,18 @@ pub fn sys_clone(
         }
 
         let token = current_user_token();
-        if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) {
-            if !ptid.is_null() {
-                *translated_refmut(token, ptid) = new_thread_ttid;
-            }
+        if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) && !ptid.is_null() {
+            *translated_refmut(token, ptid) = new_thread_ttid;
         }
-        if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) {
-            if !ctid.is_null() {
-                *translated_refmut(token, ctid) = new_thread_ttid;
-            }
+        if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) && !ctid.is_null() {
+            *translated_refmut(token, ctid) = new_thread_ttid;
         }
         if clone_signals.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
             let mut thread_inner = new_thread.inner_exclusive_access(file!(), line!());
             thread_inner.clear_child_tid = ctid as usize;
         }
 
-        return new_thread_ttid as isize;
+        new_thread_ttid as isize
     }
 }
 /// exec syscall
@@ -217,6 +236,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
+<<<<<<< HEAD
     unsafe {
         sstatus::clear_sum();
     }
@@ -225,12 +245,19 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
         let all_data = app_inode.read_all();
         debug!("kernel: execve read app success : {}", path.as_str());
         let task = current_task().unwrap();
+=======
+    let process = current_process();
+    let work_dir = process.inner_exclusive_access().work_dir.clone();
+    if let Some(dentry) = open_file(work_dir.inode(), path.as_str(), OpenFlags::O_RDONLY) {
+        let inode = dentry.inode();
+        let all_data = inode.read_all();
+>>>>>>> main
         let argc = args_vec.len();
         task.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {
-        -1
+        ENOENT
     }
 }
 
@@ -249,7 +276,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             .iter()
             .any(|p| pid == -1 || pid as usize == p.pid.0)
         {
-            return -1;
+            return ECHILD;
             // ---- release current PCB
         }
         let pair = inner.children.iter().enumerate().find(|(_, p)| {
@@ -324,10 +351,10 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
             process.inner_exclusive_access(file!(), line!()).signals |= flag;
             0
         } else {
-            -1
+            EINVAL
         }
     } else {
-        -1
+        ESRCH
     }
 }
 
@@ -399,7 +426,7 @@ pub fn sys_mmap(
     );
     if start as isize == -1 || len == 0 {
         debug!("mmap: invalid arguments");
-        return EPERM;
+        return EINVAL;
     }
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
@@ -449,8 +476,16 @@ pub fn sys_brk(addr: usize) -> isize {
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
+<<<<<<< HEAD
     trace!("kernel:pid[{}] sys_spawn", current_task().unwrap().pid.0);
     -1
+=======
+    trace!(
+        "kernel:pid[{}] sys_spawn",
+        current_task().unwrap().process.upgrade().unwrap().getpid()
+    );
+    ENOSYS
+>>>>>>> main
     // let token = current_user_token();
     // let path = translated_str(token, path);
     // if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
@@ -473,7 +508,19 @@ pub fn sys_set_priority(prio: isize) -> isize {
         "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().pid.0
     );
+<<<<<<< HEAD
     0
+=======
+    if prio < 2 {
+        return EINVAL;
+    }
+    let prio = prio as usize;
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.priority = prio;
+    inner.pass = BIG_STRIDE / prio;
+    prio as isize
+>>>>>>> main
 }
 
 /// get current process times

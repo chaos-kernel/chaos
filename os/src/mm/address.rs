@@ -2,6 +2,8 @@
 
 use core::fmt::{self, Debug, Formatter};
 
+use core::fmt::{self, Debug, Formatter};
+
 use super::PageTableEntry;
 use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, PAGE_SIZE_BITS, PAGE_TABLE_LEVEL};
 

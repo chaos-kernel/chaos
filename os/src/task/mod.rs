@@ -41,6 +41,7 @@ pub use processor::{
 pub use res::{kstack_alloc, pid_alloc, KernelStack, PidHandle, IDLE_PID};
 pub use signal::SignalFlags;
 use switch::__switch;
+use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 use self::manager::add_block_task;

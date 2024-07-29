@@ -1,9 +1,28 @@
 use alloc::vec::Vec;
+
+use ext4_rs::BLOCK_SIZE;
 use core::ptr::NonNull;
 
 use lazy_static::*;
 use spin::Mutex;
 // use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
+
+use super::BlockDevice;
+use crate::{
+    block::{self, BLOCK_SZ},
+    mm::{
+        frame_alloc,
+        frame_dealloc,
+        kernel_token,
+        FrameTracker,
+        PageTable,
+        PhysAddr,
+        PhysPageNum,
+        StepByOne,
+        VirtAddr,
+    },
+    sync::UPSafeCell,
+};
 use virtio_drivers::device::blk::VirtIOBlk;
 use virtio_drivers::{
     transport::mmio::{MmioTransport, VirtIOHeader},
@@ -72,6 +91,55 @@ impl BlockDevice for VirtIOBlock {
             .lock()
             .write_blocks(block_id, buf)
             .expect("Error when writing VirtIOBlk");
+    }
+}
+
+impl ext4_rs::BlockDevice for VirtIOBlock {
+    fn read_offset(&self, offset: usize) -> Vec<u8> {
+        // debug!("read_offset: offset = {:#x}", offset);
+        let mut buf = [0u8; BLOCK_SZ];
+        let mut v = Vec::new();
+        let mut read_size = 0;
+        while v.len() < BLOCK_SIZE {
+            let block_id = (offset + read_size) / BLOCK_SZ;
+            let block_offset = (offset + read_size) % BLOCK_SZ;
+            let read_len = core::cmp::min(BLOCK_SZ - block_offset, BLOCK_SIZE - v.len());
+            self.0
+                .exclusive_access()
+                .read_block(block_id, &mut buf)
+                .expect("Error when reading VirtIOBlk");
+            v.extend_from_slice(&buf[block_offset..block_offset + read_len]);
+            read_size += read_len;
+        }
+        v
+    }
+    fn write_offset(&self, offset: usize, data: &[u8]) {
+        // debug!("write_offset: offset = {:#x}", offset);
+        // debug!("data len = {:#x}", data.len());
+        let mut write_size = 0;
+        while write_size < data.len() {
+            let block_id = (offset + write_size) / BLOCK_SZ;
+            let block_offset = (offset + write_size) % BLOCK_SZ;
+            let mut buf = [0u8; BLOCK_SZ];
+            let copy_size = core::cmp::min(data.len() - write_size, BLOCK_SZ);
+            self.0
+                .exclusive_access()
+                .read_block(block_id, &mut buf)
+                .expect("Error when reading VirtIOBlk");
+            buf[block_offset..block_offset + copy_size]
+                .copy_from_slice(&data[write_size..write_size + copy_size]);
+            self.0
+                .exclusive_access()
+                .write_block(block_id, &buf)
+                .expect("Error when writing VirtIOBlk");
+            write_size += copy_size;
+        }
+    }
+}
+
+impl Default for VirtIOBlock {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

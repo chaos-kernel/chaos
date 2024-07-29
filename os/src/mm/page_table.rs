@@ -3,6 +3,10 @@ use alloc::{string::String, vec, vec::Vec};
 
 use bitflags::*;
 
+use alloc::{string::String, vec, vec::Vec};
+
+use bitflags::*;
+
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use crate::{config::KERNEL_SPACE_OFFSET, mm::KERNEL_SPACE};
 
@@ -72,6 +76,12 @@ pub struct PageTable {
 }
 
 /// Assume that it won't oom when creating/mapping.
+impl Default for PageTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PageTable {
     /// Create a new page table
     pub fn new() -> Self {

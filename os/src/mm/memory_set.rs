@@ -1,6 +1,7 @@
 //! Address Space [`MemorySet`] management of Process
 
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use core::arch::asm;
 
 use lazy_static::*;
@@ -127,15 +128,9 @@ impl MemorySet {
     }
     /// check if exist areas conflict with given virtial address
     pub fn is_conflict_with_va(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
-        if let Some(_) = self
-            .areas
+        self.areas
             .iter()
-            .find(|area| area.is_conflict_with(start_va, end_va))
-        {
-            true
-        } else {
-            false
-        }
+            .any(|area| area.is_conflict_with(start_va, end_va))
     }
     /// remove an area with start and end virtual address
     pub fn remove_area_with_va(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
