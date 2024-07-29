@@ -29,7 +29,6 @@ fn main() -> i32 {
         let mut exit_code: i32 = 0;
         let pid = wait(&mut exit_code);
         if pid == -1 {
-            println!("[initproc] running child process");
             yield_();
             continue;
         }

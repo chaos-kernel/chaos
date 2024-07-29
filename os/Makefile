@@ -73,8 +73,7 @@ run-inner:
 		-M 128m \
 		-machine virt \
 		-nographic \
-		-bios $(BOOTLOADER) \
-		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-kernel $(KERNEL_BIN) \
 		-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
@@ -86,8 +85,8 @@ debug: build
 
 
 gdbserver: build
-	@qemu-system-riscv64 -M 128m -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
-	-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
+	@qemu-system-riscv64 -smp 2 -M 128m -machine virt -nographic  -kernel $(KERNEL_BIN) \
+	-drive file=../$(FS_IMG),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
 	-s -S
 

@@ -29,7 +29,7 @@ impl Inode for Ext4Inode {
         let attr = self
             .fs
             .ext4
-            .exclusive_access()
+            .exclusive_access(file!(), line!())
             .fuse_lookup(self.ino, name)
             .ok()?;
         let inode = Ext4Inode {
@@ -43,7 +43,7 @@ impl Inode for Ext4Inode {
     fn unlink(self: Arc<Self>, name: &str) -> bool {
         self.fs
             .ext4
-            .exclusive_access()
+            .exclusive_access(file!(), line!())
             .fuse_unlink(self.ino, name)
             .is_ok()
     }
@@ -59,7 +59,7 @@ impl Inode for Ext4Inode {
     fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
         self.fs
             .ext4
-            .exclusive_access()
+            .exclusive_access(file!(), line!())
             .fuse_mkdir(
                 self.ino,
                 name,
@@ -70,7 +70,7 @@ impl Inode for Ext4Inode {
         let dir = self
             .fs
             .ext4
-            .exclusive_access()
+            .exclusive_access(file!(), line!())
             .fuse_lookup(self.ino, name)
             .ok()?;
         let inode = Ext4Inode {
@@ -84,7 +84,7 @@ impl Inode for Ext4Inode {
     fn rmdir(self: Arc<Self>, name: &str) -> bool {
         self.fs
             .ext4
-            .exclusive_access()
+            .exclusive_access(file!(), line!())
             .fuse_rmdir(self.ino, name)
             .is_ok()
     }
@@ -95,7 +95,7 @@ impl Inode for Ext4Inode {
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let mut read_size = 0;
-        if let Ok(ret_v) = self.fs.ext4.exclusive_access().fuse_read(
+        if let Ok(ret_v) = self.fs.ext4.exclusive_access(file!(), line!()).fuse_read(
             self.ino,
             0,
             offset as i64,
@@ -110,12 +110,15 @@ impl Inode for Ext4Inode {
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
-        if let Ok(write_size) =
-            self.fs
-                .ext4
-                .exclusive_access()
-                .fuse_write(self.ino, 0, offset as i64, buf, 0, 0, None)
-        {
+        if let Ok(write_size) = self.fs.ext4.exclusive_access(file!(), line!()).fuse_write(
+            self.ino,
+            0,
+            offset as i64,
+            buf,
+            0,
+            0,
+            None,
+        ) {
             write_size
         } else {
             0

@@ -1,8 +1,11 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::any::Any;
 
-use super::inode::{Inode, Stat};
-use crate::{fs::fat32::inode::Fat32Inode, mm::UserBuffer};
+use super::{
+    fat32::inode::Fat32Inode,
+    inode::{Inode, Stat},
+};
+use crate::mm::UserBuffer;
 
 /// trait File for all file types
 pub trait File: Any + Send + Sync {

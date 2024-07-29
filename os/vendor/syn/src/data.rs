@@ -1,14 +1,15 @@
-use super::*;
-use crate::punctuated::Punctuated;
+use crate::attr::Attribute;
+use crate::expr::Expr;
+use crate::ident::Ident;
+use crate::punctuated::{self, Punctuated};
+use crate::restriction::{FieldMutability, Visibility};
+use crate::token;
+use crate::ty::Type;
 
 ast_struct! {
     /// An enum variant.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or `"full"`
-    /// feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct Variant {
-        /// Attributes tagged on the variant.
         pub attrs: Vec<Attribute>,
 
         /// Name of the variant.
@@ -25,15 +26,12 @@ ast_struct! {
 ast_enum_of_structs! {
     /// Data stored within an enum variant or struct.
     ///
-    /// *This type is available only if Syn is built with the `"derive"` or `"full"`
-    /// feature.*
-    ///
     /// # Syntax tree enum
     ///
     /// This type is a [syntax tree enum].
     ///
-    /// [syntax tree enum]: Expr#syntax-tree-enums
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
+    /// [syntax tree enum]: crate::expr::Expr#syntax-tree-enums
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub enum Fields {
         /// Named fields of a struct or struct variant such as `Point { x: f64,
         /// y: f64 }`.
@@ -50,10 +48,7 @@ ast_enum_of_structs! {
 ast_struct! {
     /// Named fields of a struct or struct variant such as `Point { x: f64,
     /// y: f64 }`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or
-    /// `"full"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct FieldsNamed {
         pub brace_token: token::Brace,
         pub named: Punctuated<Field, Token![,]>,
@@ -62,10 +57,7 @@ ast_struct! {
 
 ast_struct! {
     /// Unnamed fields of a tuple struct or tuple variant such as `Some(T)`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or
-    /// `"full"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct FieldsUnnamed {
         pub paren_token: token::Paren,
         pub unnamed: Punctuated<Field, Token![,]>,
@@ -147,16 +139,13 @@ impl<'a> IntoIterator for &'a mut Fields {
 
 ast_struct! {
     /// A field of a struct or enum variant.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or `"full"`
-    /// feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "full", feature = "derive"))))]
     pub struct Field {
-        /// Attributes tagged on the field.
         pub attrs: Vec<Attribute>,
 
-        /// Visibility of the field.
         pub vis: Visibility,
+
+        pub mutability: FieldMutability,
 
         /// Name of the field, if any.
         ///
@@ -165,85 +154,27 @@ ast_struct! {
 
         pub colon_token: Option<Token![:]>,
 
-        /// Type of the field.
         pub ty: Type,
     }
 }
 
-ast_enum_of_structs! {
-    /// The visibility level of an item: inherited or `pub` or
-    /// `pub(restricted)`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or `"full"`
-    /// feature.*
-    ///
-    /// # Syntax tree enum
-    ///
-    /// This type is a [syntax tree enum].
-    ///
-    /// [syntax tree enum]: Expr#syntax-tree-enums
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
-    pub enum Visibility {
-        /// A public visibility level: `pub`.
-        Public(VisPublic),
-
-        /// A crate-level visibility: `crate`.
-        Crate(VisCrate),
-
-        /// A visibility level restricted to some path: `pub(self)` or
-        /// `pub(super)` or `pub(crate)` or `pub(in some::module)`.
-        Restricted(VisRestricted),
-
-        /// An inherited visibility, which usually means private.
-        Inherited,
-    }
-}
-
-ast_struct! {
-    /// A public visibility level: `pub`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or
-    /// `"full"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
-    pub struct VisPublic {
-        pub pub_token: Token![pub],
-    }
-}
-
-ast_struct! {
-    /// A crate-level visibility: `crate`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or
-    /// `"full"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
-    pub struct VisCrate {
-        pub crate_token: Token![crate],
-    }
-}
-
-ast_struct! {
-    /// A visibility level restricted to some path: `pub(self)` or
-    /// `pub(super)` or `pub(crate)` or `pub(in some::module)`.
-    ///
-    /// *This type is available only if Syn is built with the `"derive"` or
-    /// `"full"` feature.*
-    #[cfg_attr(doc_cfg, doc(cfg(any(feature = "full", feature = "derive"))))]
-    pub struct VisRestricted {
-        pub pub_token: Token![pub],
-        pub paren_token: token::Paren,
-        pub in_token: Option<Token![in]>,
-        pub path: Box<Path>,
-    }
-}
-
 #[cfg(feature = "parsing")]
-pub mod parsing {
-    use super::*;
-    use crate::ext::IdentExt;
-    use crate::parse::discouraged::Speculative;
-    use crate::parse::{Parse, ParseStream, Result};
+pub(crate) mod parsing {
+    use crate::attr::Attribute;
+    use crate::data::{Field, Fields, FieldsNamed, FieldsUnnamed, Variant};
+    use crate::error::Result;
+    use crate::expr::Expr;
+    use crate::ext::IdentExt as _;
+    use crate::ident::Ident;
+    #[cfg(not(feature = "full"))]
+    use crate::parse::discouraged::Speculative as _;
+    use crate::parse::{Parse, ParseStream};
+    use crate::restriction::{FieldMutability, Visibility};
+    use crate::token;
+    use crate::ty::Type;
+    use crate::verbatim;
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     impl Parse for Variant {
         fn parse(input: ParseStream) -> Result<Self> {
             let attrs = input.call(Attribute::parse_outer)?;
@@ -258,7 +189,20 @@ pub mod parsing {
             };
             let discriminant = if input.peek(Token![=]) {
                 let eq_token: Token![=] = input.parse()?;
+                #[cfg(feature = "full")]
                 let discriminant: Expr = input.parse()?;
+                #[cfg(not(feature = "full"))]
+                let discriminant = {
+                    let begin = input.fork();
+                    let ahead = input.fork();
+                    let mut discriminant: Result<Expr> = ahead.parse();
+                    if discriminant.is_ok() {
+                        input.advance_to(&ahead);
+                    } else if scan_lenient_discriminant(input).is_ok() {
+                        discriminant = Ok(Expr::Verbatim(verbatim::between(&begin, input)));
+                    }
+                    discriminant?
+                };
                 Some((eq_token, discriminant))
             } else {
                 None
@@ -272,155 +216,168 @@ pub mod parsing {
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg(not(feature = "full"))]
+    pub(crate) fn scan_lenient_discriminant(input: ParseStream) -> Result<()> {
+        use crate::expr::Member;
+        use crate::lifetime::Lifetime;
+        use crate::lit::Lit;
+        use crate::lit::LitFloat;
+        use crate::op::{BinOp, UnOp};
+        use crate::path::{self, AngleBracketedGenericArguments};
+        use proc_macro2::Delimiter::{self, Brace, Bracket, Parenthesis};
+
+        let consume = |delimiter: Delimiter| {
+            Result::unwrap(input.step(|cursor| match cursor.group(delimiter) {
+                Some((_inside, _span, rest)) => Ok((true, rest)),
+                None => Ok((false, *cursor)),
+            }))
+        };
+
+        macro_rules! consume {
+            [$token:tt] => {
+                input.parse::<Option<Token![$token]>>().unwrap().is_some()
+            };
+        }
+
+        let mut initial = true;
+        let mut depth = 0usize;
+        loop {
+            if initial {
+                if consume![&] {
+                    input.parse::<Option<Token![mut]>>()?;
+                } else if consume![if] || consume![match] || consume![while] {
+                    depth += 1;
+                } else if input.parse::<Option<Lit>>()?.is_some()
+                    || (consume(Brace) || consume(Bracket) || consume(Parenthesis))
+                    || (consume![async] || consume![const] || consume![loop] || consume![unsafe])
+                        && (consume(Brace) || break)
+                {
+                    initial = false;
+                } else if consume![let] {
+                    while !consume![=] {
+                        if !((consume![|] || consume![ref] || consume![mut] || consume![@])
+                            || (consume![!] || input.parse::<Option<Lit>>()?.is_some())
+                            || (consume![..=] || consume![..] || consume![&] || consume![_])
+                            || (consume(Brace) || consume(Bracket) || consume(Parenthesis)))
+                        {
+                            path::parsing::qpath(input, true)?;
+                        }
+                    }
+                } else if input.parse::<Option<Lifetime>>()?.is_some() && !consume![:] {
+                    break;
+                } else if input.parse::<UnOp>().is_err() {
+                    path::parsing::qpath(input, true)?;
+                    initial = consume![!] || depth == 0 && input.peek(token::Brace);
+                }
+            } else if input.is_empty() || input.peek(Token![,]) {
+                return Ok(());
+            } else if depth > 0 && consume(Brace) {
+                if consume![else] && !consume(Brace) {
+                    initial = consume![if] || break;
+                } else {
+                    depth -= 1;
+                }
+            } else if input.parse::<BinOp>().is_ok() || (consume![..] | consume![=]) {
+                initial = true;
+            } else if consume![.] {
+                if input.parse::<Option<LitFloat>>()?.is_none()
+                    && (input.parse::<Member>()?.is_named() && consume![::])
+                {
+                    AngleBracketedGenericArguments::do_parse(None, input)?;
+                }
+            } else if consume![as] {
+                input.parse::<Type>()?;
+            } else if !(consume(Brace) || consume(Bracket) || consume(Parenthesis)) {
+                break;
+            }
+        }
+
+        Err(input.error("unsupported expression"))
+    }
+
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     impl Parse for FieldsNamed {
         fn parse(input: ParseStream) -> Result<Self> {
             let content;
             Ok(FieldsNamed {
                 brace_token: braced!(content in input),
-                named: content.parse_terminated(Field::parse_named)?,
+                named: content.parse_terminated(Field::parse_named, Token![,])?,
             })
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     impl Parse for FieldsUnnamed {
         fn parse(input: ParseStream) -> Result<Self> {
             let content;
             Ok(FieldsUnnamed {
                 paren_token: parenthesized!(content in input),
-                unnamed: content.parse_terminated(Field::parse_unnamed)?,
+                unnamed: content.parse_terminated(Field::parse_unnamed, Token![,])?,
             })
         }
     }
 
     impl Field {
         /// Parses a named (braced struct) field.
-        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
         pub fn parse_named(input: ParseStream) -> Result<Self> {
+            let attrs = input.call(Attribute::parse_outer)?;
+            let vis: Visibility = input.parse()?;
+
+            let unnamed_field = cfg!(feature = "full") && input.peek(Token![_]);
+            let ident = if unnamed_field {
+                input.call(Ident::parse_any)
+            } else {
+                input.parse()
+            }?;
+
+            let colon_token: Token![:] = input.parse()?;
+
+            let ty: Type = if unnamed_field
+                && (input.peek(Token![struct])
+                    || input.peek(Token![union]) && input.peek2(token::Brace))
+            {
+                let begin = input.fork();
+                input.call(Ident::parse_any)?;
+                input.parse::<FieldsNamed>()?;
+                Type::Verbatim(verbatim::between(&begin, input))
+            } else {
+                input.parse()?
+            };
+
             Ok(Field {
-                attrs: input.call(Attribute::parse_outer)?,
-                vis: input.parse()?,
-                ident: Some(if input.peek(Token![_]) {
-                    input.call(Ident::parse_any)
-                } else {
-                    input.parse()
-                }?),
-                colon_token: Some(input.parse()?),
-                ty: input.parse()?,
+                attrs,
+                vis,
+                mutability: FieldMutability::None,
+                ident: Some(ident),
+                colon_token: Some(colon_token),
+                ty,
             })
         }
 
         /// Parses an unnamed (tuple struct) field.
-        #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
+        #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
         pub fn parse_unnamed(input: ParseStream) -> Result<Self> {
             Ok(Field {
                 attrs: input.call(Attribute::parse_outer)?,
                 vis: input.parse()?,
+                mutability: FieldMutability::None,
                 ident: None,
                 colon_token: None,
                 ty: input.parse()?,
             })
         }
     }
-
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "parsing")))]
-    impl Parse for Visibility {
-        fn parse(input: ParseStream) -> Result<Self> {
-            // Recognize an empty None-delimited group, as produced by a $:vis
-            // matcher that matched no tokens.
-            if input.peek(token::Group) {
-                let ahead = input.fork();
-                let group = crate::group::parse_group(&ahead)?;
-                if group.content.is_empty() {
-                    input.advance_to(&ahead);
-                    return Ok(Visibility::Inherited);
-                }
-            }
-
-            if input.peek(Token![pub]) {
-                Self::parse_pub(input)
-            } else if input.peek(Token![crate]) {
-                Self::parse_crate(input)
-            } else {
-                Ok(Visibility::Inherited)
-            }
-        }
-    }
-
-    impl Visibility {
-        fn parse_pub(input: ParseStream) -> Result<Self> {
-            let pub_token = input.parse::<Token![pub]>()?;
-
-            if input.peek(token::Paren) {
-                let ahead = input.fork();
-
-                let content;
-                let paren_token = parenthesized!(content in ahead);
-                if content.peek(Token![crate])
-                    || content.peek(Token![self])
-                    || content.peek(Token![super])
-                {
-                    let path = content.call(Ident::parse_any)?;
-
-                    // Ensure there are no additional tokens within `content`.
-                    // Without explicitly checking, we may misinterpret a tuple
-                    // field as a restricted visibility, causing a parse error.
-                    // e.g. `pub (crate::A, crate::B)` (Issue #720).
-                    if content.is_empty() {
-                        input.advance_to(&ahead);
-                        return Ok(Visibility::Restricted(VisRestricted {
-                            pub_token,
-                            paren_token,
-                            in_token: None,
-                            path: Box::new(Path::from(path)),
-                        }));
-                    }
-                } else if content.peek(Token![in]) {
-                    let in_token: Token![in] = content.parse()?;
-                    let path = content.call(Path::parse_mod_style)?;
-
-                    input.advance_to(&ahead);
-                    return Ok(Visibility::Restricted(VisRestricted {
-                        pub_token,
-                        paren_token,
-                        in_token: Some(in_token),
-                        path: Box::new(path),
-                    }));
-                }
-            }
-
-            Ok(Visibility::Public(VisPublic { pub_token }))
-        }
-
-        fn parse_crate(input: ParseStream) -> Result<Self> {
-            if input.peek2(Token![::]) {
-                Ok(Visibility::Inherited)
-            } else {
-                Ok(Visibility::Crate(VisCrate {
-                    crate_token: input.parse()?,
-                }))
-            }
-        }
-
-        #[cfg(feature = "full")]
-        pub(crate) fn is_some(&self) -> bool {
-            match self {
-                Visibility::Inherited => false,
-                _ => true,
-            }
-        }
-    }
 }
 
 #[cfg(feature = "printing")]
 mod printing {
-    use super::*;
+    use crate::data::{Field, FieldsNamed, FieldsUnnamed, Variant};
     use crate::print::TokensOrDefault;
     use proc_macro2::TokenStream;
     use quote::{ToTokens, TokenStreamExt};
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl ToTokens for Variant {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             tokens.append_all(&self.attrs);
@@ -433,7 +390,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl ToTokens for FieldsNamed {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.brace_token.surround(tokens, |tokens| {
@@ -442,7 +399,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl ToTokens for FieldsUnnamed {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             self.paren_token.surround(tokens, |tokens| {
@@ -451,7 +408,7 @@ mod printing {
         }
     }
 
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl ToTokens for Field {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             tokens.append_all(&self.attrs);
@@ -461,33 +418,6 @@ mod printing {
                 TokensOrDefault(&self.colon_token).to_tokens(tokens);
             }
             self.ty.to_tokens(tokens);
-        }
-    }
-
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
-    impl ToTokens for VisPublic {
-        fn to_tokens(&self, tokens: &mut TokenStream) {
-            self.pub_token.to_tokens(tokens);
-        }
-    }
-
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
-    impl ToTokens for VisCrate {
-        fn to_tokens(&self, tokens: &mut TokenStream) {
-            self.crate_token.to_tokens(tokens);
-        }
-    }
-
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "printing")))]
-    impl ToTokens for VisRestricted {
-        fn to_tokens(&self, tokens: &mut TokenStream) {
-            self.pub_token.to_tokens(tokens);
-            self.paren_token.surround(tokens, |tokens| {
-                // TODO: If we have a path which is not "self" or "super" or
-                // "crate", automatically add the "in" token.
-                self.in_token.to_tokens(tokens);
-                self.path.to_tokens(tokens);
-            });
         }
     }
 }

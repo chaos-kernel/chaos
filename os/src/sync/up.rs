@@ -28,8 +28,16 @@ impl<T> UPSafeCell<T> {
             inner: RefCell::new(value),
         }
     }
-    /// Panic if the data has been borrowed.
-    pub fn exclusive_access(&self) -> RefMut<'_, T> {
-        self.inner.borrow_mut()
+    /// Panic if the data has been borrowed, and log the caller's location.
+    pub fn exclusive_access(&self, file: &'static str, line: u32) -> RefMut<'_, T> {
+        match self.inner.try_borrow_mut() {
+            Ok(borrow) => borrow,
+            Err(_) => {
+                panic!(
+                    "exclusive_access called while data is borrowed at {}:{}",
+                    file, line
+                );
+            }
+        }
     }
 }

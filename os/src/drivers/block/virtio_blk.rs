@@ -1,49 +1,82 @@
 use alloc::vec::Vec;
+use core::ptr::NonNull;
 
 use ext4_rs::BLOCK_SIZE;
 use lazy_static::*;
-use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
+use spin::Mutex;
+use virtio_drivers::{
+    device::blk::VirtIOBlk,
+    transport::mmio::{MmioTransport, VirtIOHeader},
+    BufferDirection,
+    Hal,
+};
 
+// use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 use super::BlockDevice;
 use crate::{
     block::{self, BLOCK_SZ},
+    config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
     mm::{
         frame_alloc,
+        frame_alloc_contiguous,
         frame_dealloc,
         kernel_token,
         FrameTracker,
+        KernelAddr,
         PageTable,
         PhysAddr,
         PhysPageNum,
         StepByOne,
         VirtAddr,
+        KERNEL_SPACE,
     },
     sync::UPSafeCell,
 };
 
 #[allow(unused)]
-const VIRTIO0: usize = 0x10001000;
+const VIRTIO0: usize = 0x10001000 + KERNEL_SPACE_OFFSET * PAGE_SIZE;
 /// VirtIOBlock device driver strcuture for virtio_blk device
-pub struct VirtIOBlock(UPSafeCell<VirtIOBlk<'static, VirtioHal>>);
+pub struct VirtIOBlock(Mutex<VirtIOBlk<VirtioHal, MmioTransport>>);
 
 lazy_static! {
     /// The global io data queue for virtio_blk device
     static ref QUEUE_FRAMES: UPSafeCell<Vec<FrameTracker>> = unsafe { UPSafeCell::new(Vec::new()) };
 }
 
+unsafe impl Send for VirtIOBlock {}
+unsafe impl Sync for VirtIOBlock {}
+
 impl BlockDevice for VirtIOBlock {
     /// Read a block from the virtio_blk device
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
-        self.0
-            .exclusive_access()
-            .read_block(block_id, buf)
-            .expect("Error when reading VirtIOBlk");
+        let mut res = self.0.lock().read_blocks(block_id, buf);
+        if res.is_err() {
+            error!("Error when reading VirtIOBlk, block_id {}", block_id);
+            let mut times = 0 as usize;
+            while res.is_err() {
+                warn!("read_block: retrying block_id: {:}", block_id);
+                res = self.0.lock().read_blocks(block_id, buf);
+                times += 1;
+                if times > 10 {
+                    panic!("read_block {}: failed after 10 retries", block_id);
+                }
+            }
+            warn!(
+                "read_block: block_id: {:} success after {:} retries",
+                block_id, times
+            );
+            // debug!("buf: {:#x?}", buf);
+            res.unwrap()
+        } else {
+            res.unwrap()
+        }
     }
     ///
     fn write_block(&self, block_id: usize, buf: &[u8]) {
+        debug!("write_block: block_id: {:}", block_id);
         self.0
-            .exclusive_access()
-            .write_block(block_id, buf)
+            .lock()
+            .write_blocks(block_id, buf)
             .expect("Error when writing VirtIOBlk");
     }
 }
@@ -59,8 +92,8 @@ impl ext4_rs::BlockDevice for VirtIOBlock {
             let block_offset = (offset + read_size) % BLOCK_SZ;
             let read_len = core::cmp::min(BLOCK_SZ - block_offset, BLOCK_SIZE - v.len());
             self.0
-                .exclusive_access()
-                .read_block(block_id, &mut buf)
+                .lock()
+                .read_blocks(block_id, &mut buf)
                 .expect("Error when reading VirtIOBlk");
             v.extend_from_slice(&buf[block_offset..block_offset + read_len]);
             read_size += read_len;
@@ -77,14 +110,14 @@ impl ext4_rs::BlockDevice for VirtIOBlock {
             let mut buf = [0u8; BLOCK_SZ];
             let copy_size = core::cmp::min(data.len() - write_size, BLOCK_SZ);
             self.0
-                .exclusive_access()
-                .read_block(block_id, &mut buf)
+                .lock()
+                .read_blocks(block_id, &mut buf)
                 .expect("Error when reading VirtIOBlk");
             buf[block_offset..block_offset + copy_size]
                 .copy_from_slice(&data[write_size..write_size + copy_size]);
             self.0
-                .exclusive_access()
-                .write_block(block_id, &buf)
+                .lock()
+                .write_blocks(block_id, &buf)
                 .expect("Error when writing VirtIOBlk");
             write_size += copy_size;
         }
@@ -102,49 +135,66 @@ impl VirtIOBlock {
     /// Create a new VirtIOBlock driver with VIRTIO0 base_addr for virtio_blk device
     pub fn new() -> Self {
         unsafe {
-            Self(UPSafeCell::new(
-                VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)).unwrap(),
-            ))
+            let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
+            let blk = Self(Mutex::new(
+                VirtIOBlk::<VirtioHal, MmioTransport>::new(
+                    MmioTransport::new(header.into()).unwrap(),
+                )
+                .unwrap(),
+            ));
+            debug!("VirtIOBlock created");
+            blk
         }
     }
 }
 
 pub struct VirtioHal;
 
-impl Hal for VirtioHal {
-    /// allocate memory for virtio_blk device's io data queue
-    fn dma_alloc(pages: usize) -> usize {
-        let mut ppn_base = PhysPageNum(0);
-        for i in 0..pages {
-            let frame = frame_alloc().unwrap();
-            if i == 0 {
-                ppn_base = frame.ppn;
-            }
-            assert_eq!(frame.ppn.0, ppn_base.0 + i);
-            QUEUE_FRAMES.exclusive_access().push(frame);
-        }
-        let pa: PhysAddr = ppn_base.into();
-        pa.0
+unsafe impl Hal for VirtioHal {
+    /// Allocates and zeroes the given number of contiguous physical pages of DMA memory for VirtIO
+    /// use.
+    fn dma_alloc(
+        pages: usize, _direction: BufferDirection,
+    ) -> (virtio_drivers::PhysAddr, NonNull<u8>) {
+        let (frames, root_ppn) = frame_alloc_contiguous(pages);
+        let pa: PhysAddr = root_ppn.into();
+        (pa.0, unsafe {
+            NonNull::new_unchecked(KernelAddr::from(pa).0 as *mut u8)
+        })
     }
-    /// free memory for virtio_blk device's io data queue
-    fn dma_dealloc(pa: usize, pages: usize) -> i32 {
-        let pa = PhysAddr::from(pa);
+    /// Deallocates the given contiguous physical DMA memory pages.
+    unsafe fn dma_dealloc(
+        paddr: virtio_drivers::PhysAddr, _vaddr: NonNull<u8>, pages: usize,
+    ) -> i32 {
+        let pa = PhysAddr::from(paddr);
         let mut ppn_base: PhysPageNum = pa.into();
         for _ in 0..pages {
             frame_dealloc(ppn_base);
-            ppn_base.step();
+            ppn_base.0 += 1;
         }
         0
     }
-    /// translate physical address to virtual address for virtio_blk device
-    fn phys_to_virt(addr: usize) -> usize {
-        addr
+    /// Converts a physical address used for MMIO to a virtual address which the driver can access.
+    unsafe fn mmio_phys_to_virt(paddr: virtio_drivers::PhysAddr, size: usize) -> NonNull<u8> {
+        NonNull::new_unchecked(KernelAddr::from(PhysAddr::from(paddr)).0 as *mut u8)
     }
-    /// translate virtual address to physical address for virtio_blk device
-    fn virt_to_phys(vaddr: usize) -> usize {
-        PageTable::from_token(kernel_token())
-            .translate_va(VirtAddr::from(vaddr))
-            .unwrap()
-            .0
+    /// Shares the given memory range with the device, and returns the physical address that the
+    /// device can use to access it.
+    unsafe fn share(buffer: NonNull<[u8]>, direction: BufferDirection) -> virtio_drivers::PhysAddr {
+        unsafe {
+            KERNEL_SPACE
+                .exclusive_access(file!(), line!())
+                .page_table
+                .translate_va(VirtAddr::from(buffer.as_ptr() as *const usize as usize))
+                .unwrap()
+                .0
+        }
+    }
+    /// Unshares the given memory range from the device and (if necessary) copies it back to the
+    /// original buffer.
+    unsafe fn unshare(
+        paddr: virtio_drivers::PhysAddr, buffer: NonNull<[u8]>, direction: BufferDirection,
+    ) {
+        //todo!();
     }
 }

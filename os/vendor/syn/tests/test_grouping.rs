@@ -1,18 +1,19 @@
+#![allow(clippy::uninlined_format_args)]
+
 #[macro_use]
 mod macros;
 
 use proc_macro2::{Delimiter, Group, Literal, Punct, Spacing, TokenStream, TokenTree};
-use std::iter::FromIterator;
 use syn::Expr;
 
 #[test]
 fn test_grouping() {
-    let tokens: TokenStream = TokenStream::from_iter(vec![
+    let tokens: TokenStream = TokenStream::from_iter([
         TokenTree::Literal(Literal::i32_suffixed(1)),
         TokenTree::Punct(Punct::new('+', Spacing::Alone)),
         TokenTree::Group(Group::new(
             Delimiter::None,
-            TokenStream::from_iter(vec![
+            TokenStream::from_iter([
                 TokenTree::Literal(Literal::i32_suffixed(2)),
                 TokenTree::Punct(Punct::new('+', Spacing::Alone)),
                 TokenTree::Literal(Literal::i32_suffixed(3)),
@@ -29,20 +30,20 @@ fn test_grouping() {
         left: Expr::Lit {
             lit: 1i32,
         },
-        op: Add,
+        op: BinOp::Add,
         right: Expr::Binary {
             left: Expr::Group {
                 expr: Expr::Binary {
                     left: Expr::Lit {
                         lit: 2i32,
                     },
-                    op: Add,
+                    op: BinOp::Add,
                     right: Expr::Lit {
                         lit: 3i32,
                     },
                 },
             },
-            op: Mul,
+            op: BinOp::Mul,
             right: Expr::Lit {
                 lit: 4i32,
             },

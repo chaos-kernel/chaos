@@ -25,8 +25,9 @@
 #![allow(dead_code)]
 #![feature(trait_upcasting)]
 #![feature(ascii_char)]
+#![feature(negative_impls)]
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 
 use board::QEMUExit;
 
@@ -57,8 +58,12 @@ pub mod syscall;
 pub mod task;
 pub mod timer;
 pub mod trap;
+pub mod utils;
 
-global_asm!(include_str!("entry.asm"));
+use config::KERNEL_SPACE_OFFSET;
+use riscv::register::satp;
+
+global_asm!(include_str!("entry.S"));
 global_asm!(include_str!("link_initproc.S"));
 
 fn clear_bss() {
@@ -72,6 +77,7 @@ fn clear_bss() {
     }
 }
 
+#[no_mangle]
 fn show_logo() {
     println!(
         r#"
@@ -87,40 +93,15 @@ Y88b. .d88P 888  888 Y8b..d88 Y88b. .d88P Y88b  d88P
     );
 }
 
-const ALL_TASKS: [&str; 32] = [
-    "read",
-    "clone",
-    "write",
-    "dup2",
-    "times",
-    "uname",
-    "wait",
-    "gettimeofday",
-    "waitpid",
-    "brk",
-    "getpid",
-    "fork",
-    "close",
-    "dup",
-    "exit",
-    "sleep",
-    "yield",
-    "getppid",
-    "open",
-    "openat",
-    "getcwd",
-    "execve",
-    "mkdir_",
-    "chdir",
-    "fstat",
-    "mmap",
-    "munmap",
-    "pipe",
-    "mount",
-    "umount",
-    "getdents",
-    "unlink",
-];
+#[no_mangle]
+pub fn fake_main() {
+    unsafe {
+        asm!("add sp, sp, {}", in(reg) KERNEL_SPACE_OFFSET << 12);
+        asm!("la t0, rust_main");
+        asm!("add t0, t0, {}", in(reg) KERNEL_SPACE_OFFSET << 12);
+        asm!("jalr zero, 0(t0)");
+    }
+}
 
 #[no_mangle]
 /// the rust entry-point of os
@@ -129,18 +110,25 @@ pub fn rust_main() -> ! {
     clear_bss();
     println!("[kernel] Hello, world!");
     logging::init();
+    info!("logging init done");
+    let satp = satp::read();
+    info!(" satp: {:#x}", satp.bits());
     mm::init();
+    info!("mm init done");
     mm::remap_test();
+    info!("mm remap test done");
     trap::init();
+    info!("trap init done");
     trap::enable_timer_interrupt();
+    info!("timer interrupt enabled");
     timer::set_next_trigger();
-    // for file in ROOT_INODE.ls() {
-    //     println!("{}", file);
-    // }
+    info!("timer set next trigger done");
     // for file in ALL_TASKS.iter() {
     //     task::add_file(file);
     //     task::run_tasks();
     // }
+    info!("init file system");
+    fs::init();
     info!("adding initproc");
     task::add_initproc();
     info!("running tasks");

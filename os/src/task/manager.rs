@@ -4,13 +4,13 @@
 //! Other CPU process monitoring functions are in Processor.
 
 use alloc::{
-    collections::{BTreeMap, VecDeque},
+    collections::{btree_map::BTreeMap, vec_deque::VecDeque},
     sync::Arc,
 };
 
 use lazy_static::*;
 
-use super::{ProcessControlBlock, TaskControlBlock, TaskStatus};
+use super::{TaskControlBlock, TaskStatus};
 use crate::sync::UPSafeCell;
 ///A array of `TaskControlBlock` that is thread-safe
 pub struct TaskManager {
@@ -44,15 +44,15 @@ impl TaskManager {
         if self.ready_queue.is_empty() {
             return None;
         }
-        let mut min_idx = 0;
-        for (idx, _) in self.ready_queue.iter().enumerate() {
-            let stride_now = self.ready_queue[idx].inner_exclusive_access().stride;
-            let stride_min = self.ready_queue[min_idx].inner_exclusive_access().stride;
-            if stride_now < stride_min {
-                min_idx = idx;
-            }
-        }
-        self.ready_queue.swap(0, min_idx);
+        // let mut min_idx = 0;
+        // for (idx, _) in self.ready_queue.iter().enumerate() {
+        //     let stride_now = self.ready_queue[idx].inner_exclusive_access(file!(), line!()).stride;
+        //     let stride_min = self.ready_queue[min_idx].inner_exclusive_access(file!(), line!()).stride;
+        //     if stride_now < stride_min {
+        //         min_idx = idx;
+        //     }
+        // }
+        // self.ready_queue.swap(0, min_idx);
         self.ready_queue.pop_front()
     }
     pub fn remove(&mut self, task: Arc<TaskControlBlock>) {
@@ -79,26 +79,28 @@ lazy_static! {
     pub static ref TASK_MANAGER: UPSafeCell<TaskManager> =
         unsafe { UPSafeCell::new(TaskManager::new()) };
     /// PID2PCB instance (map of pid to pcb)
-    pub static ref PID2PCB: UPSafeCell<BTreeMap<usize, Arc<ProcessControlBlock>>> =
+    pub static ref PID2PCB: UPSafeCell<BTreeMap<usize, Arc<TaskControlBlock>>> =
         unsafe { UPSafeCell::new(BTreeMap::new()) };
 }
 
 /// Add a task to ready queue
 pub fn add_task(task: Arc<TaskControlBlock>) {
     //trace!("kernel: TaskManager::add_task");
-    TASK_MANAGER.exclusive_access().add(task);
+    TASK_MANAGER.exclusive_access(file!(), line!()).add(task);
 }
 
 /// Add a task to block queue
 pub fn add_block_task(task: Arc<TaskControlBlock>) {
     //trace!("kernel: TaskManager::add_block_task");
-    TASK_MANAGER.exclusive_access().add_block(task);
+    TASK_MANAGER
+        .exclusive_access(file!(), line!())
+        .add_block(task);
 }
 
 /// Wake up a task
 pub fn wakeup_task(task: Arc<TaskControlBlock>) {
     trace!("kernel: TaskManager::wakeup_task");
-    let mut task_inner = task.inner_exclusive_access();
+    let mut task_inner = task.inner_exclusive_access(file!(), line!());
     task_inner.task_status = TaskStatus::Ready;
     drop(task_inner);
     add_task(task);
@@ -107,34 +109,36 @@ pub fn wakeup_task(task: Arc<TaskControlBlock>) {
 /// Remove a task from the ready queue
 pub fn remove_task(task: Arc<TaskControlBlock>) {
     //trace!("kernel: TaskManager::remove_task");
-    TASK_MANAGER.exclusive_access().remove(task);
+    TASK_MANAGER.exclusive_access(file!(), line!()).remove(task);
 }
 
 /// Fetch a task out of the ready queue
 pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
     //trace!("kernel: TaskManager::fetch_task");
-    TASK_MANAGER.exclusive_access().fetch()
+    TASK_MANAGER.exclusive_access(file!(), line!()).fetch()
 }
 
 /// Set a task to stop-wait status, waiting for its kernel stack out of use.
 pub fn add_stopping_task(task: Arc<TaskControlBlock>) {
-    TASK_MANAGER.exclusive_access().add_stop(task);
+    TASK_MANAGER
+        .exclusive_access(file!(), line!())
+        .add_stop(task);
 }
 
 /// Get process by pid
-pub fn pid2process(pid: usize) -> Option<Arc<ProcessControlBlock>> {
-    let map = PID2PCB.exclusive_access();
-    map.get(&pid).cloned()
+pub fn pid2process(pid: usize) -> Option<Arc<TaskControlBlock>> {
+    let map = PID2PCB.exclusive_access(file!(), line!());
+    map.get(&pid).map(Arc::clone)
 }
 
 /// Insert item(pid, pcb) into PID2PCB map (called by do_fork AND ProcessControlBlock::new)
-pub fn insert_into_pid2process(pid: usize, process: Arc<ProcessControlBlock>) {
-    PID2PCB.exclusive_access().insert(pid, process);
+pub fn insert_into_pid2process(pid: usize, task: Arc<TaskControlBlock>) {
+    PID2PCB.exclusive_access(file!(), line!()).insert(pid, task);
 }
 
 /// Remove item(pid, _some_pcb) from PDI2PCB map (called by exit_current_and_run_next)
 pub fn remove_from_pid2process(pid: usize) {
-    let mut map = PID2PCB.exclusive_access();
+    let mut map = PID2PCB.exclusive_access(file!(), line!());
     if map.remove(&pid).is_none() {
         panic!("cannot find pid {} in pid2task!", pid);
     }
@@ -143,8 +147,8 @@ pub fn remove_from_pid2process(pid: usize) {
 #[allow(unused)]
 pub fn unblock_task(task: Arc<TaskControlBlock>) {
     // println!("[unblock_task] unblock thread");
-    let mut task_manager = TASK_MANAGER.exclusive_access();
-    task.inner_exclusive_access().task_status = TaskStatus::Ready;
+    let mut task_manager = TASK_MANAGER.exclusive_access(file!(), line!());
+    task.inner_exclusive_access(file!(), line!()).task_status = TaskStatus::Ready;
     if let Some((idx, t)) = task_manager
         .block_queue
         .iter()

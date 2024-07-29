@@ -4,6 +4,7 @@ use alloc::{string::String, vec, vec::Vec};
 use bitflags::*;
 
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use crate::{config::KERNEL_SPACE_OFFSET, mm::KERNEL_SPACE};
 
 bitflags! {
     /// page table entry flags
@@ -80,7 +81,9 @@ impl Default for PageTable {
 impl PageTable {
     /// Create a new page table
     pub fn new() -> Self {
+        info!("create a new page table");
         let frame = frame_alloc().unwrap();
+        info!("create a new page table success");
         PageTable {
             root_ppn: frame.ppn,
             frames:   vec![frame],
@@ -93,7 +96,34 @@ impl PageTable {
             frames:   Vec::new(),
         }
     }
+    /// create a new page table for a new process, keep the kernel part of the page table the same
+    pub fn new_process() -> Self {
+        info!("create a new page table for a new process!");
+        let frame = frame_alloc().unwrap();
+        let kernel_root_vpn: VirtPageNum = KERNEL_SPACE_OFFSET.into();
+
+        debug!(
+            "new_process:kernel start vpn level 1 index {:#x}, start vpn {:#x}",
+            kernel_root_vpn.indexes()[0],
+            kernel_root_vpn.0
+        );
+
+        //to keep kernel part the same, we only first level of page table
+        frame.ppn.get_pte_array()[kernel_root_vpn.indexes()[0]..].copy_from_slice(
+            &KERNEL_SPACE
+                .exclusive_access(file!(), line!())
+                .page_table
+                .root_ppn
+                .get_pte_array()[kernel_root_vpn.indexes()[0]..],
+        );
+
+        PageTable {
+            root_ppn: frame.ppn,
+            frames:   vec![frame],
+        }
+    }
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        //debug!("find_pte_create: vpn = {:?}", vpn);
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -106,6 +136,10 @@ impl PageTable {
             if !pte.is_valid() {
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                // debug!(
+                //     "find_pte_create: invalid pte at level {}, pte = {:#b}, index = {:#x}",
+                //     i, pte.bits, idx
+                // );
                 self.frames.push(frame);
             }
             ppn = pte.ppn();
@@ -113,6 +147,7 @@ impl PageTable {
         result
     }
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        //debug!("find_pte: vpn = {:?}", vpn);
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
@@ -123,6 +158,10 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
+                // debug!(
+                //     "find_pte: invalid pte at level {}, pte = {:#b}, index = {:#x}",
+                //     i, pte.bits, idx
+                // );
                 return None;
             }
             ppn = pte.ppn();
@@ -134,7 +173,7 @@ impl PageTable {
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
-        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V | PTEFlags::D | PTEFlags::A);
     }
     /// remove the map between virtual page number and physical page number
     #[allow(unused)]
@@ -191,10 +230,7 @@ pub fn translated_str(token: usize, ptr: *const u8) -> String {
     let mut string = String::new();
     let mut va = ptr as usize;
     loop {
-        let ch: u8 = *(page_table
-            .translate_va(VirtAddr::from(va))
-            .unwrap()
-            .get_mut());
+        let ch: u8 = *VirtAddr::from(va).get_mut();
         if ch == 0 {
             break;
         }

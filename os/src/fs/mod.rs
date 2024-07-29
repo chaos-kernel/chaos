@@ -34,6 +34,10 @@ lazy_static! {
     };
 }
 
+pub fn init() {
+    let _root = ROOT_INODE.clone();
+}
+
 /// Open a file
 pub fn open_file(inode: Arc<dyn Inode>, name: &str, flags: OpenFlags) -> Option<Arc<Dentry>> {
     // TODO: read_write

@@ -3,7 +3,7 @@
 use core::fmt::{self, Debug, Formatter};
 
 use super::PageTableEntry;
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{KERNEL_SPACE_OFFSET, PAGE_SIZE, PAGE_SIZE_BITS, PAGE_TABLE_LEVEL};
 
 const PA_WIDTH_SV39: usize = 56;
 const VA_WIDTH_SV39: usize = 39;
@@ -29,6 +29,11 @@ pub struct PhysPageNum(pub usize);
 #[repr(C)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtPageNum(pub usize);
+
+/// kernel address
+#[repr(C)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct KernelAddr(pub usize);
 
 /// Debugging
 
@@ -57,26 +62,74 @@ impl Debug for PhysPageNum {
 /// T -> usize: T.0
 /// usize -> T: usize.into()
 
+impl From<usize> for KernelAddr {
+    fn from(v: usize) -> Self {
+        Self(v)
+    }
+}
+impl From<PhysAddr> for KernelAddr {
+    fn from(pa: PhysAddr) -> Self {
+        Self(pa.0 + (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS))
+    }
+}
+
+impl From<KernelAddr> for PhysAddr {
+    fn from(ka: KernelAddr) -> Self {
+        Self(ka.0 - (KERNEL_SPACE_OFFSET << PAGE_SIZE_BITS))
+    }
+}
+
+impl From<KernelAddr> for VirtAddr {
+    fn from(ka: KernelAddr) -> Self {
+        Self(ka.0)
+    }
+}
+
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        // Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> PA_WIDTH_SV39) as isize;
+        assert!(tmp == 0 || tmp == -1);
+        Self(v)
     }
 }
 impl From<usize> for PhysPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PPN_WIDTH_SV39) - 1))
+        // Self(v & ((1 << PPN_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> PPN_WIDTH_SV39) as isize;
+        assert!(tmp == 0 || tmp == -1);
+        Self(v)
+    }
+}
+impl From<KernelAddr> for PhysPageNum {
+    fn from(ka: KernelAddr) -> Self {
+        let pa = PhysAddr::from(ka);
+        pa.floor()
     }
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        // Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        let tmp = (v as isize >> VA_WIDTH_SV39) as isize;
+        // 检查传入地址是否合法（SV39标准
+        assert!(tmp == 0 || tmp == -1, "invalid va: {:#x}", v);
+        Self(v)
     }
 }
 impl From<usize> for VirtPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VPN_WIDTH_SV39) - 1))
+        // Self(v & ((1 << VPN_WIDTH_SV39) - 1))
+        let tmp = v >> (VPN_WIDTH_SV39 - 1);
+        // 检查传入页号是否合法（SV39标准
+        assert!(
+            tmp == 0 || tmp == (1 << (52 - VPN_WIDTH_SV39 + 1)) - 1,
+            "Assertion failed: tmp = {:#x}",
+            tmp
+        );
+        Self(v)
     }
 }
+
 impl From<PhysAddr> for usize {
     fn from(v: PhysAddr) -> Self {
         v.0
@@ -163,17 +216,28 @@ impl From<PhysPageNum> for PhysAddr {
         Self(v.0 << PAGE_SIZE_BITS)
     }
 }
+impl VirtAddr {
+    /// Get the mutable reference of virtual address
+    pub fn get_mut<T>(&self) -> &'static mut T {
+        unsafe { (self.0 as *mut T).as_mut().unwrap() }
+    }
+}
 
 impl VirtPageNum {
     /// Get the indexes of the page table entry
-    pub fn indexes(&self) -> [usize; 3] {
+    pub fn indexes(&self) -> [usize; PAGE_TABLE_LEVEL] {
         let mut vpn = self.0;
-        let mut idx = [0usize; 3];
-        for i in (0..3).rev() {
+        let mut idx = [0usize; PAGE_TABLE_LEVEL];
+        for i in (0..PAGE_TABLE_LEVEL).rev() {
             idx[i] = vpn & 511;
             vpn >>= 9;
         }
         idx
+    }
+    /// Get the mutable reference of virtual address
+    pub fn get_mut<T>(&self) -> &'static mut T {
+        let va: VirtAddr = (*self).into();
+        va.get_mut()
     }
 }
 
@@ -191,12 +255,16 @@ impl PhysPageNum {
     /// Get the reference of page table(array of ptes)
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         let pa: PhysAddr = (*self).into();
-        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 512) }
+        // debug!("get_pte_array: pa={:?}", pa);
+        let kernel_pa = KernelAddr::from(pa).0;
+        unsafe { core::slice::from_raw_parts_mut(kernel_pa as *mut PageTableEntry, 512) }
     }
     /// Get the reference of page(array of bytes)
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
         let pa: PhysAddr = (*self).into();
-        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut u8, 4096) }
+        //debug!("get_bytes_array: pa={:?}", pa);
+        let kernel_pa = KernelAddr::from(pa).0;
+        unsafe { core::slice::from_raw_parts_mut(kernel_pa as *mut u8, 4096) }
     }
     /// Get the mutable reference of physical address
     pub fn get_mut<T>(&self) -> &'static mut T {

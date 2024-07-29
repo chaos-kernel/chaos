@@ -3,7 +3,7 @@ use crate::error::{self, Error};
 use crate::sealed::lookahead::Sealed;
 use crate::span::IntoSpans;
 use crate::token::Token;
-use proc_macro2::{Delimiter, Span};
+use proc_macro2::Span;
 use std::cell::RefCell;
 
 /// Support for checking the next token in a stream to decide how to parse.
@@ -24,7 +24,7 @@ use std::cell::RefCell;
 /// # Example
 ///
 /// ```
-/// use syn::{ConstParam, Ident, Lifetime, LifetimeDef, Result, Token, TypeParam};
+/// use syn::{ConstParam, Ident, Lifetime, LifetimeParam, Result, Token, TypeParam};
 /// use syn::parse::{Parse, ParseStream};
 ///
 /// // A generic parameter, a single one of the comma-separated elements inside
@@ -40,7 +40,7 @@ use std::cell::RefCell;
 /// //       |          ^
 /// enum GenericParam {
 ///     Type(TypeParam),
-///     Lifetime(LifetimeDef),
+///     Lifetime(LifetimeParam),
 ///     Const(ConstParam),
 /// }
 ///
@@ -65,7 +65,7 @@ pub struct Lookahead1<'a> {
     comparisons: RefCell<Vec<&'static str>>,
 }
 
-pub fn new(scope: Span, cursor: Cursor) -> Lookahead1 {
+pub(crate) fn new(scope: Span, cursor: Cursor) -> Lookahead1 {
     Lookahead1 {
         scope,
         cursor,
@@ -110,7 +110,7 @@ impl<'a> Lookahead1<'a> {
     /// The error message will identify all of the expected token types that
     /// have been peeked against this lookahead instance.
     pub fn error(self) -> Error {
-        let comparisons = self.comparisons.borrow();
+        let comparisons = self.comparisons.into_inner();
         match comparisons.len() {
             0 => {
                 if self.cursor.eof() {
@@ -160,10 +160,6 @@ impl<S> IntoSpans<S> for TokenMarker {
     fn into_spans(self) -> S {
         match self {}
     }
-}
-
-pub fn is_delimiter(cursor: Cursor, delimiter: Delimiter) -> bool {
-    cursor.group(delimiter).is_some()
 }
 
 impl<F: Copy + FnOnce(TokenMarker) -> T, T: Token> Sealed for F {}
