@@ -83,32 +83,28 @@ impl BlockDevice for VirtIOBlock {
 
 impl ext4_rs::BlockDevice for VirtIOBlock {
     fn read_offset(&self, offset: usize) -> Vec<u8> {
-        // debug!("read_offset: offset = {:#x}", offset);
-        let mut buf = [0u8; BLOCK_SZ];
+        debug!("read_offset: offset = {:#x}", offset);
+        let block_id = offset / BLOCK_SIZE;
         let mut v = Vec::new();
-        let mut read_size = 0;
-        while v.len() < BLOCK_SIZE {
-            let block_id = (offset + read_size) / BLOCK_SZ;
-            let block_offset = (offset + read_size) % BLOCK_SZ;
-            let read_len = core::cmp::min(BLOCK_SZ - block_offset, BLOCK_SIZE - v.len());
+        for block_id in block_id * 8..block_id * 8 + 8 {
+            let mut buf = [0u8; BLOCK_SZ];
             self.0
                 .lock()
                 .read_blocks(block_id, &mut buf)
                 .expect("Error when reading VirtIOBlk");
-            v.extend_from_slice(&buf[block_offset..block_offset + read_len]);
-            read_size += read_len;
+            v.extend_from_slice(&buf);
         }
         v
     }
     fn write_offset(&self, offset: usize, data: &[u8]) {
-        // debug!("write_offset: offset = {:#x}", offset);
-        // debug!("data len = {:#x}", data.len());
+        debug!("write_offset: offset = {:#x}", offset);
+        debug!("data len = {:#x}", data.len());
         let mut write_size = 0;
         while write_size < data.len() {
             let block_id = (offset + write_size) / BLOCK_SZ;
             let block_offset = (offset + write_size) % BLOCK_SZ;
             let mut buf = [0u8; BLOCK_SZ];
-            let copy_size = core::cmp::min(data.len() - write_size, BLOCK_SZ);
+            let copy_size = core::cmp::min(data.len() - write_size, BLOCK_SZ - block_offset);
             self.0
                 .lock()
                 .read_blocks(block_id, &mut buf)
