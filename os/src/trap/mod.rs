@@ -15,7 +15,7 @@
 mod context;
 
 use crate::config::TRAP_CONTEXT_BASE;
-use crate::syscall::syscall;
+use crate::syscall::{self, syscall};
 use crate::task::{
     check_signals_of_current, current_add_signal, current_task, current_trap_cx,
     current_trap_cx_user_va, current_user_token, exit_current_and_run_next,
@@ -69,6 +69,7 @@ pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
+    let mut syscall_num = -1;
     // trace!("into {:?}", scause.cause());
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
@@ -81,6 +82,7 @@ pub fn trap_handler() -> ! {
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
+            syscall_num = cx.x[17] as i32;
             // get system call return value
             let result = syscall(
                 cx.x[17],
@@ -127,7 +129,23 @@ pub fn trap_handler() -> ! {
         trace!("[kernel] trap_handler: .. check signals {}", msg);
         exit_current_and_run_next(errno);
     }
-    trap_return();
+
+    match scause.cause() {
+        Trap::Exception(Exception::UserEnvCall) => {
+            if syscall_num == syscall::SYSCALL_EXECVE as i32 {
+                match current_task().unwrap().pid.0 {
+                    0 => initproc_entry(),
+                    _ => user_entry(),
+                }
+            } else {
+                trap_return();
+            }
+        }
+        _ => {
+            trap_return();
+        }
+    }
+    panic!("[kernel] trap_handler: unreachable code");
 }
 
 /// return to user space

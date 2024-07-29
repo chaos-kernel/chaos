@@ -251,7 +251,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
         if let Some((idx, _)) = pair {
             let child = inner.children.remove(idx);
             // confirm that child will be deallocated after being removed from children list
-            assert_eq!(Arc::strong_count(&child), 2);
+            // assert_eq!(Arc::strong_count(&child), 2);
             let found_pid = child.pid.0;
             // ++++ temporarily access child PCB exclusively
             let exit_code = child

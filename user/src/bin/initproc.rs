@@ -58,10 +58,8 @@ fn main() -> i32 {
     // 父进程等待所有子进程结束
     while app_num > 0 {
         let mut exit_code: i32 = 0;
-        println!("[initproc] waiting for child process");
         let pid = wait(&mut exit_code);
         if pid == -1 {
-            println!("[initproc] running child process");
             yield_();
             continue;
         }

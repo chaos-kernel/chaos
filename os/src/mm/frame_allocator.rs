@@ -80,7 +80,7 @@ impl FrameAllocator for StackFrameAllocator {
             error!("FrameAllocator out of memory!");
             None
         } else {
-            debug!("alloc a new page: new ppn={:#x}", self.current);
+            // debug!("alloc a new page: new ppn={:#x}", self.current);
             self.current += 1;
             Some((self.current - 1).into())
         }
@@ -101,7 +101,7 @@ impl FrameAllocator for StackFrameAllocator {
         (ret, root_ppn.into())
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
-        debug!("dealloc a page: ppn={:#x}", ppn.0);
+        // debug!("dealloc a page: ppn={:#x}", ppn.0);
         let ppn = ppn.0;
         // validity check
         if ppn >= self.current || self.recycled.iter().any(|&v| v == ppn) {

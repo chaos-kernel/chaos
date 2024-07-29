@@ -4,7 +4,7 @@ use super::process::Flags;
 use super::res::RecycleAllocator;
 use super::{kstack_alloc, CloneFlags, KernelStack, PidHandle, SignalFlags, TaskContext};
 use crate::config::{
-    BIG_STRIDE, MAX_SYSCALL_NUM, PAGE_SIZE, TRAP_CONTEXT_TRAMPOLINE, USER_STACK_SIZE,
+    __breakpoint, BIG_STRIDE, MAX_SYSCALL_NUM, PAGE_SIZE, TRAP_CONTEXT_TRAMPOLINE, USER_STACK_SIZE,
 };
 use crate::fs::file::File;
 use crate::fs::inode::{OSInode, ROOT_INODE};
@@ -728,6 +728,8 @@ impl TaskControlBlock {
         // }
 
         *self.get_trap_cx() = trap_cx;
+
+        __breakpoint();
     }
 
     // /// Create a new init_task
