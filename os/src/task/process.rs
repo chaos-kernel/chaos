@@ -22,7 +22,6 @@ use crate::{
     fs::{
         dentry::Dentry,
         file::{cast_file_to_inode, File},
-        inode::Inode,
         stdio::{Stdin, Stdout},
         ROOT_INODE,
     },
@@ -312,7 +311,7 @@ impl ProcessControlBlock {
                     kernel_clock: 0,
                     heap_base: user_heap_base.into(),
                     heap_end: user_heap_base.into(),
-                    work_dir: Arc::new(Dentry::new("/", ROOT_INODE.clone(), None)),
+                    work_dir: Arc::new(Dentry::new("/", ROOT_INODE.clone())),
                 })
             },
         });

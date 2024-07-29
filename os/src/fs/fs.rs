@@ -1,9 +1,6 @@
 use alloc::{collections::BTreeMap, sync::Arc};
 
-use spin::Mutex;
-
-use super::{file::File, inode::Inode, path::Path};
-use crate::sync::UPSafeCell;
+use super::{inode::Inode, path::Path};
 
 pub trait FileSystem: Send + Sync {
     fn fs_type(&self) -> FileSystemType;
@@ -39,6 +36,12 @@ impl FileSystemType {
 
 pub struct FileSystemManager {
     pub mounted_fs: BTreeMap<Path, Arc<dyn FileSystem>>,
+}
+
+impl Default for FileSystemManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FileSystemManager {

@@ -1,25 +1,20 @@
 use alloc::{
     string::{String, ToString},
-    sync::{Arc, Weak},
-    vec::Vec,
+    sync::Arc,
 };
 
 use super::inode::Inode;
 
 pub struct Dentry {
-    name:   String,
-    inode:  Arc<dyn Inode>,
-    parent: Option<Weak<Dentry>>,
-    child:  Vec<Arc<Dentry>>, // cached children
+    name:  String,
+    inode: Arc<dyn Inode>,
 }
 
 impl Dentry {
-    pub fn new(name: &str, inode: Arc<dyn Inode>, parent: Option<Weak<Dentry>>) -> Self {
+    pub fn new(name: &str, inode: Arc<dyn Inode>) -> Self {
         Self {
             name: name.to_string(),
             inode,
-            parent,
-            child: Vec::new(),
         }
     }
 

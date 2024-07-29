@@ -6,7 +6,7 @@ use core::cell::RefMut;
 use super::{id::TaskUserRes, kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
 use crate::{
     config::{BIG_STRIDE, MAX_SYSCALL_NUM},
-    fs::{dentry::Dentry, inode::Inode},
+    fs::dentry::Dentry,
     mm::PhysPageNum,
     sync::UPSafeCell,
     trap::TrapContext,

@@ -3,10 +3,9 @@ use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
 
 use crate::{
     fs::{
-        dentry,
-        file::{cast_file_to_inode, cast_inode_to_file, File},
-        flags::OpenFlags,
-        inode::{Inode, Stat},
+        defs::OpenFlags,
+        file::{cast_file_to_inode, cast_inode_to_file},
+        inode::Stat,
         open_file,
         pipe::make_pipe,
         ROOT_INODE,
@@ -73,7 +72,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 /// openat sys
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
+pub fn sys_open(path: *const u8, flags: i32) -> isize {
     trace!(
         "kernel:pid[{}] sys_open",
         current_task().unwrap().process.upgrade().unwrap().getpid()
@@ -97,7 +96,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
         ENOENT
     }
 }
-pub fn sys_openat(dirfd: i32, path: *const u8, flags: u32) -> isize {
+pub fn sys_openat(dirfd: i32, path: *const u8, flags: i32) -> isize {
     trace!(
         "kernel:pid[{}] sys_openat",
         current_task().unwrap().process.upgrade().unwrap().getpid()
@@ -321,7 +320,7 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let mut inner = task.inner_exclusive_access();
     let dir = inner.work_dir.clone();
     let inode = dir.inode();
-    let dir = open_file(inode, &path, OpenFlags::RDWR | OpenFlags::DIRECTORY);
+    let dir = open_file(inode, &path, OpenFlags::O_RDWR | OpenFlags::O_DIRECTORY);
     inner.work_dir = dir.unwrap();
     0
 }
@@ -352,13 +351,13 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
     }
     let token = inner.memory_set.token();
     let path = translated_str(token, path);
-    if let Some(_) = open_file(inode.clone(), &path, OpenFlags::RDONLY) {
+    if let Some(_) = open_file(inode.clone(), &path, OpenFlags::O_RDONLY) {
         return -1;
     }
     if let Some(dentry) = open_file(
         inode.clone(),
         &path,
-        OpenFlags::DIRECTORY | OpenFlags::CREATE,
+        OpenFlags::O_DIRECTORY | OpenFlags::O_CREAT,
     ) {
         let fd = inner.alloc_fd();
         let inode = dentry.inode();

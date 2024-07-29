@@ -1,8 +1,6 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::cmp::min;
 
-use spin::Mutex;
-
 use super::{
     dentry::{Fat32Dentry, Fat32DentryLayout, Fat32LDentryLayout, FileAttributes},
     fat::FAT,
@@ -82,9 +80,9 @@ impl Fat32FS {
         let cluster_size = self.sb.bytes_per_sector as usize * self.sb.sectors_per_cluster as usize;
         let mut read_size = 0;
         for i in 0..self.sb.sectors_per_cluster {
-            get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
+            get_block_cache(cluster_offset + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .read(0, |data: &[u8; BLOCK_SZ as usize]| {
+                .read(0, |data: &[u8; BLOCK_SZ]| {
                     let copy_size = core::cmp::min(cluster_size - read_size, data.len());
                     buf[read_size..read_size + copy_size].copy_from_slice(&data[..copy_size]);
                     read_size += copy_size;
@@ -99,9 +97,9 @@ impl Fat32FS {
         let cluster_size = self.sb.bytes_per_sector as usize * self.sb.sectors_per_cluster as usize;
         let mut write_size = 0;
         for i in 0..self.sb.sectors_per_cluster {
-            get_block_cache(cluster_offset as usize + i as usize, Arc::clone(&self.bdev))
+            get_block_cache(cluster_offset + i as usize, Arc::clone(&self.bdev))
                 .lock()
-                .modify(0, |data: &mut [u8; BLOCK_SZ as usize]| {
+                .modify(0, |data: &mut [u8; BLOCK_SZ]| {
                     let copy_size = core::cmp::min(cluster_size - write_size, data.len());
                     data[..copy_size].copy_from_slice(&buf[write_size..write_size + copy_size]);
                     write_size += copy_size;
@@ -118,11 +116,9 @@ impl Fat32FS {
         if next_offset >= 512 {
             let next_sector_id = sector_id + 1;
             if next_sector_id % self.sb.sectors_per_cluster as usize == 0 {
-                if let Some(next_sector_id) = self.fat.next_cluster_id(sector_id) {
-                    Some((next_sector_id, 0))
-                } else {
-                    None
-                }
+                self.fat
+                    .next_cluster_id(sector_id)
+                    .map(|next_sector_id| (next_sector_id, 0))
             } else {
                 Some((next_sector_id, 0))
             }
@@ -137,7 +133,7 @@ impl Fat32FS {
             return None;
         }
         let mut is_long_entry = false;
-        let dentry = get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
+        let dentry = get_block_cache(*sector_id, Arc::clone(&self.bdev))
             .lock()
             .read(*offset, |layout: &Fat32DentryLayout| {
                 if layout.is_empty() {
@@ -154,7 +150,7 @@ impl Fat32FS {
         if is_long_entry {
             let mut is_end = false;
             loop {
-                get_block_cache(*sector_id as usize, Arc::clone(&self.bdev))
+                get_block_cache(*sector_id, Arc::clone(&self.bdev))
                     .lock()
                     .read(*offset, |layout: &Fat32LDentryLayout| {
                         if layout.is_end() {
@@ -190,7 +186,7 @@ impl Fat32FS {
         let mut pos = 0;
         while pos < name.len() {
             let copy_len = min(13, name.len() - pos);
-            get_block_cache(sector_id as usize, Arc::clone(&self.bdev))
+            get_block_cache(sector_id, Arc::clone(&self.bdev))
                 .lock()
                 .modify(offset, |layout: &mut Fat32LDentryLayout| {
                     *layout = Fat32LDentryLayout::new(
@@ -203,11 +199,12 @@ impl Fat32FS {
             pos += copy_len;
             (sector_id, offset) = self.next_dentry_id(sector_id, offset).unwrap();
         }
-        get_block_cache(sector_id as usize, self.bdev.clone())
-            .lock()
-            .modify(offset, |layout: &mut Fat32DentryLayout| {
+        get_block_cache(sector_id, self.bdev.clone()).lock().modify(
+            offset,
+            |layout: &mut Fat32DentryLayout| {
                 *layout = Fat32DentryLayout::new(name.as_str(), attr, start_cluster, file_size);
-            });
+            },
+        );
         Some(Fat32Dentry::new(sector_id, offset, &self.bdev, &self.fat))
     }
 

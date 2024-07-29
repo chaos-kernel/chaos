@@ -1,12 +1,9 @@
 use alloc::{
-    boxed::Box,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
 use core::cmp::min;
-
-use spin::Mutex;
 
 use super::{
     dentry::{Fat32Dentry, FileAttributes},
@@ -18,6 +15,7 @@ use crate::{
     fs::{
         dentry::Dentry,
         file::File,
+        fs::FileSystemType,
         inode::{Inode, InodeType, Stat, StatMode},
     },
     mm::UserBuffer,
@@ -32,6 +30,9 @@ pub struct Fat32Inode {
 }
 
 impl Inode for Fat32Inode {
+    fn fstype(&self) -> FileSystemType {
+        FileSystemType::VFAT
+    }
     fn lookup(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
         let fs = self.fs.as_ref();
         let mut sector_id = fs.fat.cluster_id_to_sector_id(self.start_cluster).unwrap();
@@ -53,7 +54,7 @@ impl Inode for Fat32Inode {
                     bdev: Arc::clone(&self.bdev),
                     dentry: Some(Arc::new(dentry)),
                 };
-                let dentry = Dentry::new(name, Arc::new(fat32inode), None);
+                let dentry = Dentry::new(name, Arc::new(fat32inode));
                 return Some(Arc::new(dentry));
             }
         }
@@ -86,11 +87,11 @@ impl Inode for Fat32Inode {
             bdev: Arc::clone(&self.bdev),
             dentry: Some(Arc::new(dentry)),
         };
-        let dentry = Dentry::new(name, Arc::new(fat32inode), None);
+        let dentry = Dentry::new(name, Arc::new(fat32inode));
         Some(Arc::new(dentry))
     }
 
-    fn link(self: Arc<Self>, name: &str, target: Arc<Dentry>) -> bool {
+    fn link(self: Arc<Self>, _name: &str, _target: Arc<Dentry>) -> bool {
         warn!("FAT32 does not support link");
         false
     }
@@ -182,15 +183,15 @@ impl Inode for Fat32Inode {
         self.set_file_size(0);
     }
 
-    fn rename(self: Arc<Self>, old_name: &str, new_name: &str) -> bool {
+    fn rename(self: Arc<Self>, _old_name: &str, _new_name: &str) -> bool {
         todo!("FAT32 rename");
     }
 
-    fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
+    fn mkdir(self: Arc<Self>, _name: &str) -> Option<Arc<Dentry>> {
         todo!("FAT32 mkdir");
     }
 
-    fn rmdir(self: Arc<Self>, name: &str) -> bool {
+    fn rmdir(self: Arc<Self>, _name: &str) -> bool {
         todo!("FAT32 rmdir");
     }
 }
@@ -292,7 +293,7 @@ impl Fat32Inode {
         if cluster_chain.len() * CLUSTER_SIZE >= size {
             return;
         }
-        let mut last_cluster_id = cluster_chain.last().unwrap().clone();
+        let mut last_cluster_id = *cluster_chain.last().unwrap();
         while cluster_chain.len() * CLUSTER_SIZE < size {
             last_cluster_id = fs.fat.increase_cluster(last_cluster_id).unwrap();
         }

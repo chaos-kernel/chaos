@@ -1,15 +1,13 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::any::Any;
 
-use lazy_static::lazy_static;
-use spin::Mutex;
-
-use super::{dentry::Dentry, file::File};
+use super::{dentry::Dentry, file::File, fs::FileSystemType};
 use crate::{block::BLOCK_SZ, mm::UserBuffer, timer::TimeSpec};
 
 /* Inode Operators */
 
 pub trait Inode: Any + Send + Sync {
+    fn fstype(&self) -> FileSystemType;
     /// lookup an inode in the directory with the name (just name not path)
     fn lookup(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>>;
     /// create an inode in the directory with the name and type

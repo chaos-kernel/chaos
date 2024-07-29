@@ -46,7 +46,7 @@ pub use task::{TaskControlBlock, TaskStatus};
 use self::{id::TaskUserRes, manager::add_block_task};
 use crate::{
     board::QEMUExit,
-    fs::{flags::OpenFlags, open_file, ROOT_INODE},
+    fs::{defs::OpenFlags, open_file, ROOT_INODE},
     timer::remove_timer,
 };
 
@@ -218,7 +218,7 @@ pub fn add_initproc() {
 
 /// Run all files in the root directory
 pub fn add_file(file: &str) {
-    let dentry = open_file(ROOT_INODE.clone(), file, OpenFlags::RDONLY).unwrap();
+    let dentry = open_file(ROOT_INODE.clone(), file, OpenFlags::O_RDONLY).unwrap();
     let v = dentry.inode().read_all();
     let _pcb = ProcessControlBlock::new(v.as_slice());
 }
