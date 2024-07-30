@@ -166,7 +166,7 @@ impl TaskControlBlock {
     pub fn init_task(elf_data: &[u8]) -> Arc<Self> {
         trace!("TaskControlBlock new");
         let kstack = kstack_alloc();
-        let (mut memory_set, user_heap_base, ustack_top, entry_point) =
+        let (mut memory_set, user_heap_base, ustack_top, entry_point, auxv) =
             MemorySet::from_elf(elf_data);
         let pid_handle = pid_alloc();
         let tid = pid_handle.0;
@@ -596,36 +596,14 @@ impl TaskControlBlock {
     }
 
     /// Only support processes with a single thread or self as the main thread
-    pub fn exec(self: &Arc<Self>, elf_data: &[u8], args: Vec<String>) {
+    pub fn exec(self: &Arc<Self>, elf_data: &[u8], argv_vec: Vec<String>, envp_vec: Vec<String>) {
         trace!("[kernel: exec]");
         assert_eq!(self.pid.0, self.tid);
         // memory_set with elf program headers/trampoline/trap context/user stack
         trace!("[kernel: exec] .. MemorySet::from_elf");
-        let (mut memory_set, user_heap_base, ustack_top, entry_point) =
+        let (mut memory_set, user_heap_base, ustack_top, entry_point, auxv) =
             MemorySet::from_elf(elf_data);
         let mut task_inner = self.inner_exclusive_access(file!(), line!());
-
-        // 做一个临时映射，将参数复制到用户栈
-        let ppn = memory_set
-            .page_table
-            .translate_va(VirtAddr::from(0x162ff0).floor().into())
-            .unwrap()
-            .floor();
-
-        task_inner.memory_set.page_table.map(
-            VirtAddr::from(0x162ff0).floor(),
-            ppn,
-            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
-        );
-
-        unsafe { sstatus::set_sum() };
-
-        let test_va = VirtAddr::from(0x162ff0);
-        let test_pte = memory_set.page_table.translate(test_va.floor()).unwrap();
-        debug!("test_va: {:#x}, test_pa: {:#64b}", test_va.0, test_pte.bits);
-
-        let test_ptr: &mut usize = test_va.get_mut();
-        warn!("test_ptr: {:#x}", test_ptr);
 
         // substitute memory_set
         // set heap position
@@ -677,7 +655,7 @@ impl TaskControlBlock {
 
         // push arguments on user stack
         trace!("[kernel: exec] .. push arguments on user stack");
-        let mut user_sp = task_inner.user_stack_top;
+        let user_sp = task_inner.user_stack_top;
 
         // 做一个临时映射，将参数复制到用户栈
         let ppn = memory_set
@@ -692,49 +670,30 @@ impl TaskControlBlock {
             PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
         );
 
+        warn!("args: {:#?}", argv_vec);
+        warn!("envs: {:#?}", envp_vec);
+
+        // push arguments on user stack
+        // let mut user_sp = ustack_top;
+        let (user_sp, argc, argv_base, envp_base, aux_base) = task_inner.memory_set.build_stack(
+            ustack_top,
+            argv_vec,
+            envp_vec,
+            auxv,
+            memory_set.page_table.token(),
+        );
+
         // Enable kernel to visit user space
         unsafe {
             sstatus::set_sum(); //todo Use RAII
         }
 
-        // argv is a vector of each arg's addr
-        let mut argv = vec![0; args.len()];
-
-        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
-        debug!("push args to user stack");
-        let argv_base = user_sp;
-        for i in 0..args.len() {
-            unsafe {
-                *((argv_base + i * core::mem::size_of::<usize>()) as *mut usize) = argv[i];
-            }
-        }
-        unsafe {
-            *((argv_base + args.len() * core::mem::size_of::<usize>()) as *mut usize) = 0;
-        }
-
-        // Copy each arg to the newly allocated stack
-        debug!("copy args to user stack");
-        for i in 0..args.len() {
-            // Here we leave one byte to store a '\0' as a terminator
-            user_sp -= args[i].len() + 1;
-            let p = user_sp as *mut u8;
-            unsafe {
-                argv[i] = user_sp;
-                p.copy_from(args[i].as_ptr(), args[i].len());
-                *((p as usize + args[i].len()) as *mut u8) = 0;
-            }
-        }
-        user_sp -= user_sp % core::mem::size_of::<usize>();
-
-        // // Disable kernel to visit user space
-        // unsafe {
-        //     sstatus::clear_sum(); //todo Use RAII
-        // }
+        warn!("user_sp after push args: {:#x}", user_sp);
 
         task_inner.memory_set = memory_set; // todo dealloc page here
 
-        warn!("entry: {:#x}", entry_point);
-        debug!("sstatus before: {:#x?}", sstatus::read().spp());
+        warn!("app entry: {:#x}", entry_point);
+
         // initialize trap_cx
         trace!("[kernel: exec] .. initialize trap_cx for new process");
         let mut trap_cx = TrapContext::app_init_context(
@@ -744,8 +703,17 @@ impl TaskControlBlock {
             self.kstack.get_top(),
             trap_handler as usize,
         );
-        trap_cx.x[10] = args.len();
-        trap_cx.x[11] = argv_base;
+
+        trap_cx.x[10] = argc; //argc
+        trap_cx.x[11] = argv_base; //argv
+        trap_cx.x[12] = envp_base; //envp
+        trap_cx.x[13] = aux_base; //auxv
+
+        debug!(
+            "trap_cx.x[10] = {:#x}, trap_cx.x[11] = {:#x}, trap_cx.x[12] = {:#x}, trap_cx.x[13] = \
+             {:#x}",
+            trap_cx.x[10], trap_cx.x[11], trap_cx.x[12], trap_cx.x[13]
+        );
 
         // 获取 *mut TrapContext 的指针
         let trap_cx_ptr: *mut TrapContext = &mut trap_cx;
@@ -775,10 +743,10 @@ impl TaskControlBlock {
         // 重新设置被调度后的跳转地址以切换地址空间
         task_inner.task_cx = TaskContext::goto_user_entry(self.kstack.get_top());
 
-        // let entry = VirtAddr::from(0x1000 as usize).get_mut() as *mut i32;
-        // unsafe {
-        //     warn!("entry inst:{:#x?}", *entry);
-        // }
+        // Disable kernel to visit user space
+        unsafe {
+            sstatus::clear_sum(); //todo Use RAII
+        }
 
         *self.get_trap_cx() = trap_cx;
     }

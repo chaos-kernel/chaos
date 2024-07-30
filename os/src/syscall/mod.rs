@@ -171,7 +171,11 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[4] as *mut usize,
         ),
         SYSCALL_BRK => sys_brk(args[0]),
-        SYSCALL_EXECVE => sys_execve(args[0] as *const u8, args[1] as *const usize),
+        SYSCALL_EXECVE => sys_execve(
+            args[0] as *const u8,
+            args[1] as *const usize,
+            args[2] as *const usize,
+        ),
         SYSCALL_WAIT4 => sys_wait4(
             args[0] as isize,
             args[1] as *mut i32,

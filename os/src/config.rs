@@ -47,6 +47,9 @@ pub const KERNEL_SPACE_OFFSET: usize = 0xffff_ffc0_0000_0;
 
 pub const TRAP_CONTEXT_TRAMPOLINE: usize = 0xFFFF_FFFF_FFFF_E000;
 
+/// user trampoline
+pub const USER_TRAMPOLINE: usize = 0x191_9810;
+
 #[no_mangle]
 #[inline(never)]
 pub fn __breakpoint() {}

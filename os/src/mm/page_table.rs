@@ -175,6 +175,13 @@ impl PageTable {
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V | PTEFlags::D | PTEFlags::A);
     }
+
+    /// set the map between virtual page number and physical page number, allow to cover the original map
+    pub fn map_allow_cover(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        let pte = self.find_pte_create(vpn).unwrap();
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V | PTEFlags::D | PTEFlags::A);
+    }
+
     /// remove the map between virtual page number and physical page number
     #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {

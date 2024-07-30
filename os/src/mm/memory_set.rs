@@ -1,13 +1,25 @@
 //! Address Space [`MemorySet`] management of Process
 
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
-use core::arch::asm;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::*,
+};
+use core::{
+    arch::asm,
+    fmt::{Display, Formatter},
+    ptr,
+};
 
 use lazy_static::*;
-use riscv::register::satp;
+use riscv::register::{satp, sstatus};
 
 use super::{
+    config::*,
     frame_alloc,
+    translated_refmut,
     FrameTracker,
     PTEFlags,
     PageTable,
@@ -19,6 +31,7 @@ use super::{
     VirtPageNum,
 };
 use crate::{
+    board::CLOCK_FREQ,
     config::{
         KERNEL_SPACE_OFFSET,
         MEMORY_END,
@@ -27,10 +40,14 @@ use crate::{
         PAGE_SIZE,
         PAGE_SIZE_BITS,
         USER_STACK_SIZE,
+        USER_TRAMPOLINE,
     },
+    fs::{defs::OpenFlags, ROOT_INODE},
+    mm::config::AT_PHENT,
     sync::UPSafeCell,
     syscall::errno::SUCCESS,
     task::process::Flags,
+    utils::string::c_ptr_to_string,
 };
 
 extern "C" {
@@ -166,12 +183,12 @@ impl MemorySet {
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
-            warn!(
-                "push map area, vpn: {:#x} - {:#x}, perm: {:?} start copying",
-                map_area.vpn_range.get_start().0,
-                map_area.vpn_range.get_end().0,
-                map_area.map_perm
-            );
+            // warn!(
+            //     "push map area, vpn: {:#x} - {:#x}, perm: {:?} start copying",
+            //     map_area.vpn_range.get_start().0,
+            //     map_area.vpn_range.get_end().0,
+            //     map_area.map_perm
+            // );
             if map_area.vpn_range.get_start().0 == 0x162 {
                 debug!("{:x?}", data);
             }
@@ -293,17 +310,40 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp_base and entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize, Vec<AuxHeader>) {
         let mut memory_set = Self::new_process();
         // map trampoline
         // memory_set.map_trampoline();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
+
+        // auxv
+        let mut auxv = vec![
+            AuxHeader::new(AT_PHENT, elf_header.pt2.ph_entry_size() as usize),
+            AuxHeader::new(AT_PHNUM, elf_header.pt2.ph_count() as usize),
+            AuxHeader::new(AT_PAGESIZE, PAGE_SIZE as usize),
+            AuxHeader::new(AT_FLAGS, 0),
+            AuxHeader::new(AT_ENTRY, elf_header.pt2.entry_point() as usize),
+            AuxHeader::new(AT_UID, 0),
+            AuxHeader::new(AT_EUID, 0),
+            AuxHeader::new(AT_GID, 0),
+            AuxHeader::new(AT_EGID, 0),
+            AuxHeader::new(AT_PLATFORM, 0),
+            AuxHeader::new(AT_HWCAP, 0),
+            AuxHeader::new(AT_CLKTCK, CLOCK_FREQ),
+            AuxHeader::new(AT_SECURE, 0),
+            AuxHeader::new(AT_NOELF, 0x112d),
+        ];
+
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
+        let mut head_va: usize = 0;
+        let mut interp_entry: Option<usize> = None;
+        let mut interp_base: Option<usize> = None;
+
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -312,6 +352,9 @@ impl MemorySet {
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
                 let mut map_perm = MapPermission::U;
                 let ph_flags = ph.flags();
+                if head_va == 0 {
+                    head_va = start_va.0;
+                }
                 if ph_flags.is_read() {
                     map_perm |= MapPermission::R;
                 }
@@ -342,8 +385,42 @@ impl MemorySet {
                         ),
                     );
                 }
+            } else if ph.get_type().unwrap() == xmas_elf::program::Type::Interp {
+                // // log!("[from_elf] .interp")
+                // let mut path = String::from_utf8_lossy(
+                //     &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size() - 1) as usize],
+                // )
+                // .to_string();
+                // match ROOT_INODE.open(&path, OpenFlags::O_RDONLY, false) {
+                //     Ok(file) => {
+                //         // let elf_data = file.read_all();
+                //         let elf_data = file.map_to_kernel_space(SECOND_MMAP_BASE);
+                //         let (entry, base) = memory_set.load_interp(elf_data);
+                //         crate::mm::KERNEL_SPACE
+                //             .exclusive_access()
+                //             .remove_area_with_start_vpn(VirtAddr::from(SECOND_MMAP_BASE).floor());
+                //         interp_entry = Some(entry);
+                //         interp_base = Some(base);
+                //     }
+                //     Err(errno) => {
+                //         panic!("[from_elf] Unkonwn interpreter path = {}", path);
+                //     }
+                // }
+                todo!("interpreter not supported yet");
             }
         }
+
+        if let Some(base) = interp_base {
+            auxv.push(AuxHeader::new(AT_BASE, base));
+        } else {
+            auxv.push(AuxHeader::new(AT_BASE, 0));
+        }
+
+        auxv.push(AuxHeader::new(
+            AT_PHDR,
+            head_va + elf_header.pt2.ph_offset() as usize,
+        ));
+
         // map user stack with U flags
         let max_end_va: VirtAddr = max_end_vpn.into();
         let mut user_stack_bottom: usize = max_end_va.into();
@@ -357,6 +434,7 @@ impl MemorySet {
             user_heap_base,
             user_stack_top,
             elf.header.pt2.entry_point() as usize,
+            auxv,
         )
     }
     /// Create a new address space by copy code&data from a exited process's address space.
@@ -587,6 +665,215 @@ impl MemorySet {
         }
         SUCCESS
     }
+
+    pub fn build_stack(
+        &mut self, mut user_sp: usize, argv_vec: Vec<String>, mut envp_vec: Vec<String>,
+        mut auxv_vec: Vec<AuxHeader>, token: usize,
+    ) -> (usize, usize, usize, usize, usize) {
+        // The structure of the user stack
+        // STACK TOP (low address)
+        //      argc
+        //      *argv [] (with NULL as the end) 8 bytes each
+        //      *envp [] (with NULL as the end) 8 bytes each
+        //      auxv[] (with NULL as the end) 16 bytes each: now has PAGESZ(6)
+        //      padding (16 bytes-align)
+        //      rand bytes: Now set 0x00 ~ 0x0f (not support random) 16bytes
+        //      String: platform "RISC-V64"
+        //      Argument string(argv[])
+        //      Environment String (envp[]): now has SHELL, PWD, LOGNAME, HOME, USER, PATH
+        // STACK BOTTOM (high address)
+
+        // let envp_vec = vec![
+        //     String::from("SHELL=/bin/sh"),
+        //     String::from("PWD=/"),
+        //     String::from("USER=root"),
+        //     String::from("MOTD_SHOWN=pam"),
+        //     String::from("LANG=C.UTF-8"),
+        //     String::from("INVOCATION_ID=e9500a871cf044d9886a157f53826684"),
+        //     String::from("TERM=vt220"),
+        //     String::from("SHLVL=2"),
+        //     String::from("JOURNAL_STREAM=8:9265"),
+        //     String::from("OLDPWD=/root"),
+        //     String::from("_=busybox"),
+        //     String::from("LOGNAME=root"),
+        //     String::from("HOME=/"),
+        //     String::from("LD_LIBRARY_PATH=/"),
+        //     String::from("PATH=/:/bin/"),
+        // ];
+
+        trace!("building user stack sp:{:#x}", user_sp);
+
+        // Enable kernel to visit user space
+        unsafe {
+            sstatus::set_sum(); //todo Use RAII
+        }
+
+        // envp_vec.push(String::from("PATH=/:/bin/"));
+
+        let push_stack = |mmset: &mut MemorySet, parms: Vec<String>, user_sp: &mut usize| {
+            //record parm ptr
+            let mut ptr_vec: Vec<usize> = (0..=parms.len()).collect();
+
+            //end with null
+            ptr_vec[parms.len()] = 0;
+
+            for index in 0..parms.len() {
+                *user_sp -= parms[index].len() + 1;
+                ptr_vec[index] = *user_sp;
+                let mut p = *user_sp;
+
+                //write chars to [user_sp,user_sp + len]
+                for c in parms[index].as_bytes() {
+                    *mmset.write_to_user_ptr(token, p as *mut u8) = *c;
+                    // unsafe {
+                    //     warn!(
+                    //         "write char: {:?}",
+                    //         *(VirtAddr::from(p).get_mut() as *mut char)
+                    //     );
+                    // }
+                    p += 1;
+                }
+                *mmset.write_to_user_ptr(token, p as *mut u8) = 0;
+                // unsafe {
+                //     warn!(
+                //         "write char: {:?}",
+                //         *(VirtAddr::from(p).get_mut() as *mut char)
+                //     );
+                // }
+            }
+            ptr_vec
+        };
+
+        user_sp -= 2 * core::mem::size_of::<usize>();
+
+        //========================= envp[] ==========================
+        let envp = push_stack(self, envp_vec, &mut user_sp);
+        // make sure aligned to 8b for k210
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+
+        //========================= argv[] ==========================
+        let argc = argv_vec.len();
+        let argv = push_stack(self, argv_vec, &mut user_sp);
+        // make the user_sp aligned to 8B for k210 platform
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+
+        //========================= platform ==========================
+        // let platform = "RISC-V64";
+        // user_sp -= platform.len() + 1;
+        // user_sp -= user_sp % core::mem::size_of::<usize>();
+        // let mut p = user_sp;
+        // for &c in platform.as_bytes() {
+        //     *self.write_to_user_ptr(token, p as *mut u8) = c;
+        //     unsafe {
+        //         warn!(
+        //             "write char: {:?}",
+        //             *(VirtAddr::from(0x191_9810).get_mut() as *mut char)
+        //         );
+        //     }
+        //     p += 1;
+        // }
+        // *self.write_to_user_ptr(token, p as *mut u8) = 0;
+        // unsafe {
+        //     warn!(
+        //         "write char: {:?}",
+        //         *(VirtAddr::from(0x191_9810).get_mut() as *mut char)
+        //     );
+        // }
+
+        //========================= rand bytes ==========================
+        user_sp -= 16;
+        auxv_vec.push(AuxHeader::new(AT_RANDOM, user_sp));
+        *self.write_to_user_ptr(token, user_sp as *mut usize) = 0x01020304050607;
+        *self.write_to_user_ptr(
+            token,
+            (user_sp + core::mem::size_of::<usize>()) as *mut usize,
+        ) = 0x08090a0b0c0d0e0f;
+
+        //========================= padding ==========================
+        user_sp -= user_sp % 16;
+
+        //========================= auxv[] ==========================
+        auxv_vec.push(AuxHeader::new(AT_EXECFN, argv[0]));
+        auxv_vec.push(AuxHeader::new(AT_NULL, 0));
+        user_sp -= auxv_vec.len() * core::mem::size_of::<AuxHeader>();
+        let aux_base = user_sp;
+        let mut addr = aux_base;
+        for aux_header in auxv_vec {
+            *self.write_to_user_ptr(token, addr as *mut usize) = aux_header._type;
+            *self.write_to_user_ptr(token, (addr + core::mem::size_of::<usize>()) as *mut usize) =
+                aux_header.value;
+            addr += core::mem::size_of::<AuxHeader>();
+        }
+
+        //========================= *envp[] ==========================
+        user_sp -= envp.len() * core::mem::size_of::<usize>();
+        let envp_base = user_sp;
+        let mut ustack_ptr = envp_base;
+        for env_ptr in envp {
+            *self.write_to_user_ptr(token, ustack_ptr as *mut usize) = env_ptr;
+            // unsafe {
+            //     warn!(
+            //         "write char: {:?}",
+            //         *(VirtAddr::from(ustack_ptr).get_mut() as *mut char)
+            //     );
+            // }
+            ustack_ptr += core::mem::size_of::<usize>();
+        }
+
+        //========================= *argv[] ==========================
+        user_sp -= argv.len() * core::mem::size_of::<usize>();
+        let argv_base = user_sp;
+        let mut ustack_ptr = argv_base;
+        for argv_ptr in argv {
+            *self.write_to_user_ptr(token, ustack_ptr as *mut usize) = argv_ptr;
+            // unsafe {
+            //     warn!(
+            //         "write char: {:#x?}",
+            //         *(VirtAddr::from(ustack_ptr).get_mut() as *mut usize)
+            //     );
+            // }
+            ustack_ptr += core::mem::size_of::<usize>();
+        }
+
+        //========================= argc ==========================
+        user_sp -= core::mem::size_of::<usize>();
+        *self.write_to_user_ptr(token, user_sp as *mut usize) = argc;
+        // unsafe {
+        //     warn!(
+        //         "write char: {:?}",
+        //         *(VirtAddr::from(user_sp).get_mut() as *mut usize)
+        //     );
+        // }
+
+        // Disable kernel to visit user space
+        unsafe {
+            sstatus::clear_sum(); //todo Use RAII
+        }
+
+        (user_sp, argc, argv_base, envp_base, aux_base)
+    }
+
+    /// 向另一个地址空间的地址写数据
+    pub fn write_to_user_ptr<T>(&mut self, token: usize, ptr: *mut T) -> &'static mut T {
+        let user_pagetable = PageTable::from_token(token);
+        let va = VirtAddr::from(ptr as usize);
+        let pa = user_pagetable.translate_va(va).unwrap();
+
+        // debug!(
+        //     "write_to_user_ptr: va: {:#x}, pa: {:#x}, token: {:#x}",
+        //     va.0, pa.0, token
+        // );
+        self.page_table
+            .map_allow_cover(va.floor(), pa.floor(), PTEFlags::R | PTEFlags::W);
+
+        // debug!(
+        //     "map pipe in user space token: {:#x}",
+        //     self.page_table.token()
+        // );
+
+        let translated_ptr: &mut T = va.get_mut();
+        translated_ptr
+    }
 }
 
 pub struct MapArea {
@@ -767,4 +1054,22 @@ pub fn remap_test() {
         .unwrap()
         .executable(),);
     info!("remap_test passed!");
+}
+
+pub struct AuxHeader {
+    pub _type: usize,
+    pub value: usize,
+}
+
+impl AuxHeader {
+    #[inline]
+    pub fn new(_type: usize, value: usize) -> Self {
+        Self { _type, value }
+    }
+}
+
+impl Display for AuxHeader {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "AuxHeader type: {} value: {}", self._type, self.value)
+    }
 }

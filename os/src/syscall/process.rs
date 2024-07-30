@@ -195,14 +195,15 @@ pub fn sys_clone(
     }
 }
 /// exec syscall
-pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
+pub fn sys_execve(path: *const u8, mut args: *const usize, mut envp: *const usize) -> isize {
     trace!("kernel:pid[{}] sys_execve", current_task().unwrap().pid.0);
     unsafe {
         sstatus::set_sum();
     }
-    let path = c_ptr_to_string(path);
+    let mut path = c_ptr_to_string(path);
     debug!("kernel: execve new app : {}", path);
     let mut args_vec: Vec<String> = Vec::new();
+    let mut envp_vec: Vec<String> = Vec::new();
     loop {
         if unsafe { *args == 0 } {
             break;
@@ -213,6 +214,25 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
             args = args.add(1);
         }
     }
+
+    if envp as usize != 0 {
+        loop {
+            let env_str_ptr = envp;
+            if unsafe { *env_str_ptr == 0 } {
+                break;
+            }
+            envp_vec.push(c_ptr_to_string(env_str_ptr as *const u8));
+            unsafe {
+                envp = envp.add(1);
+            }
+        }
+    }
+    if path.ends_with(".sh") {
+        args_vec.insert(0, String::from("sh"));
+        args_vec.insert(0, String::from("/busybox"));
+        path = String::from("./busybox");
+    }
+
     unsafe {
         sstatus::clear_sum();
     }
@@ -227,7 +247,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
         let all_data = inode.read_all();
         debug!("kernel: execve read app success : {}", path.as_str());
         let argc = args_vec.len();
-        task.exec(all_data.as_slice(), args_vec);
+        task.exec(all_data.as_slice(), args_vec, envp_vec);
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {
