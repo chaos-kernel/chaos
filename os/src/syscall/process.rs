@@ -544,20 +544,24 @@ pub fn sys_uname(uts: *mut Utsname) -> isize {
 
 /// 获取用户 id。在实现多用户权限前默认为最高权限。目前直接返回0。
 pub fn sys_getuid() -> isize {
+    trace!("kernel:pid[{}] sys_getuid", current_task().unwrap().pid.0);
     0
 }
 
 /// 获取有效用户 id，即相当于哪个用户的权限。在实现多用户权限前默认为最高权限。目前直接返回0。
 pub fn sys_geteuid() -> isize {
+    trace!("kernel:pid[{}] sys_geteuid", current_task().unwrap().pid.0);
     0
 }
 
 /// 获取用户组 id。在实现多用户权限前默认为最高权限。目前直接返回0。
 pub fn sys_getgid() -> isize {
+    trace!("kernel:pid[{}] sys_getgid", current_task().unwrap().pid.0);
     0
 }
 
 /// 获取有效用户组 id，即相当于哪个用户组的权限。在实现多用户组权限前默认为最高权限。目前直接返回0。
 pub fn sys_getegid() -> isize {
+    trace!("kernel:pid[{}] sys_getegid", current_task().unwrap().pid.0);
     0
 }

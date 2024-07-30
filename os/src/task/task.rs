@@ -655,20 +655,20 @@ impl TaskControlBlock {
 
         // push arguments on user stack
         trace!("[kernel: exec] .. push arguments on user stack");
-        let user_sp = task_inner.user_stack_top;
+        // let user_sp = task_inner.user_stack_top;
 
-        // 做一个临时映射，将参数复制到用户栈
-        let ppn = memory_set
-            .page_table
-            .translate_va(VirtAddr::from(user_sp).floor().into())
-            .unwrap()
-            .floor();
+        // // 做一个临时映射，将参数复制到用户栈
+        // let ppn = memory_set
+        //     .page_table
+        //     .translate_va(VirtAddr::from(user_sp).floor().into())
+        //     .unwrap()
+        //     .floor();
 
-        task_inner.memory_set.page_table.map(
-            VirtAddr::from(user_sp).floor(),
-            ppn,
-            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
-        );
+        // task_inner.memory_set.page_table.map(
+        //     VirtAddr::from(user_sp).floor(),
+        //     ppn,
+        //     PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        // );
 
         warn!("args: {:#?}", argv_vec);
         warn!("envs: {:#?}", envp_vec);

@@ -12,6 +12,11 @@ use crate::task::current_task;
 ///
 /// Reference: [sigprocmask](https://www.man7.org/linux/man-pages/man2/sigprocmask.2.html)
 pub fn sys_sigprocmask(how: usize, set: usize, oldset: usize, _sig_set_size: usize) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_sigprocmask",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
     //todo
     0
 }
@@ -28,6 +33,11 @@ pub fn sys_sigprocmask(how: usize, set: usize, oldset: usize, _sig_set_size: usi
 ///
 /// 函数执行成功后返回 0；若输入的 `sig` 是 `SIGSTOP`, `SIGKILL`, `ERR`中的一个时，将导致函数返回 `EINVAL`。
 pub fn sys_sigaction(sig: usize, action: usize, old_action: usize) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_sigaction",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
     //todo
     0
 }

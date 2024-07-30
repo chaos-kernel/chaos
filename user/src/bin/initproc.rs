@@ -10,9 +10,9 @@ fn main() -> i32 {
     println!("[initproc] Start running...");
 
     if fork() == 0 {
-        let task = "busybox\0";
+        let task = "time-test\0";
         // q: 如果我想传递参数 sh 呢
-        let args = ["sh\0"];
+        let args = ["time-test\0"];
         let a = args.map(|arg| arg.as_ptr());
         println!("[initproc] exec busybox sh...");
         exec(&task, &a);
