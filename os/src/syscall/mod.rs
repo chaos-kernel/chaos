@@ -52,14 +52,12 @@ pub const SYSCALL_SLEEP: usize = 101;
 pub const SYSCALL_YIELD: usize = 124;
 /// kill syscall
 pub const SYSCALL_KILL: usize = 129;
-/*
 /// sigaction syscall
 pub const SYSCALL_SIGACTION: usize = 134;
 /// sigprocmask syscall
 pub const SYSCALL_SIGPROCMASK: usize = 135;
 /// sigreturn syscall
 pub const SYSCALL_SIGRETURN: usize = 139;
-*/
 /// times syscall
 pub const SYSCALL_TIMES: usize = 153;
 /// uname syscall
@@ -133,11 +131,13 @@ pub const SYSCALL_CONDVAR_WAIT: usize = 473;
 
 mod fs;
 mod process;
+mod signal;
 mod sync;
 mod thread;
 
 use fs::*;
 use process::*;
+use signal::{sys_sigaction, sys_sigprocmask};
 use sync::*;
 use thread::*;
 
@@ -175,6 +175,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETGID => sys_getgid(),
         SYSCALL_GETEGID => sys_getegid(),
         SYSCALL_GETTID => sys_gettid(),
+        SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),
+        SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0], args[1], args[2], args[3]),
         SYSCALL_CLONE => sys_clone(
             args[0],
             args[1],
