@@ -1,17 +1,20 @@
 use crate::prelude::*;
 
+/**@brief   Mount point descriptor.*/
 #[derive(Clone)]
 pub struct Ext4MountPoint {
-    /// Mount done flag.
+    /**@brief   Mount done flag.*/
     pub mounted: bool,
-    /// Mount point name
-    pub mount_name: String,
+    /**@brief   Mount point name (@ref ext4_mount)*/
+    pub mount_name: CString,
+    // pub mount_name_string: String,
 }
 impl Ext4MountPoint {
     pub fn new(name: &str) -> Self {
         Self {
             mounted: false,
-            mount_name: String::from(name),
+            mount_name: CString::new(name).unwrap(),
+            // mount_name_string: name.to_string(),
         }
     }
 }

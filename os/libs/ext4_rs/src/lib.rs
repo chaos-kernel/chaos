@@ -1,23 +1,31 @@
 #![feature(error_in_core)]
 #![no_std]
-#![allow(unused)]
+
+pub mod consts;
+pub mod ext4_error;
+pub mod prelude;
+pub mod ext4_structs;
+pub mod utils;
+pub mod ext4_impl;
+pub mod ext4_interface;
+
+pub use consts::*;
+pub use ext4_error::*;
+// pub use ext4::*;
+pub use ext4_structs::*;
+pub use utils::*;
+pub use ext4_interface::*;
+#[allow(unused)]
+pub use ext4_impl::*;
+
 
 extern crate alloc;
 
-pub mod utils;
-pub mod prelude;
+#[cfg(test)]
+mod tests {
+    mod write_test {
 
-pub use utils::*;
-pub use prelude::*;
-
-
-mod ext4_defs;
-mod ext4_impls;
-
-
-pub mod simple_interface;
-pub mod fuse_interface;
-
-
-pub use simple_interface::*;
-pub use fuse_interface::*;
+        #[test]
+        fn test_write() {}
+    }
+}

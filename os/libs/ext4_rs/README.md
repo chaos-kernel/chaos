@@ -1,4 +1,4 @@
-# a cross-platform rust ext4 crate
+# a cross-platform rust ext4 crate support read/write/mkdir
 
 ## env
 wsl2 ubuntu22.04
@@ -7,18 +7,17 @@ rust version nightly-2024-06-01
 
 rustc 1.80.0-nightly (ada5e2c7b 2024-05-31)
 
-## run example
+## read/write example
 ```sh
 git clone https://github.com/yuoo655/ext4_rs.git
-sh run.sh
+git checkout dev
+sh 1.sh
 ```
-## fuse example
+## test
 ```
 git clone https://github.com/yuoo655/ext4libtest.git
 cd ext4libtest
-sh gen_img.sh
-# cargo run /path/to/mountpoint
-cargo run ./foo/
+sh run.sh
 ```
 # features
 
@@ -42,7 +41,7 @@ cargo run ./foo/
 
 
 
-# how to use (old interface in dev branch)
+# how to use 
 
 ## impl BlockDevice Trait
 
@@ -88,6 +87,8 @@ impl BlockDevice for Disk {
 let disk = Arc::new(Disk {});
 let ext4 = Ext4::open(disk);
 ```
+
+## read/write/mkdir
 
 ### read regular file
 ```rust

@@ -14,19 +14,15 @@ use virtio_drivers::{
 // use virtio_drivers::{Hal, VirtIOBlk, VirtIOHeader};
 use super::BlockDevice;
 use crate::{
-    block::{self, BLOCK_SZ},
+    block::BLOCK_SZ,
     config::{KERNEL_SPACE_OFFSET, PAGE_SIZE},
     mm::{
-        frame_alloc,
         frame_alloc_contiguous,
         frame_dealloc,
-        kernel_token,
         FrameTracker,
         KernelAddr,
-        PageTable,
         PhysAddr,
         PhysPageNum,
-        StepByOne,
         VirtAddr,
         KERNEL_SPACE,
     },
@@ -84,26 +80,15 @@ impl BlockDevice for VirtIOBlock {
 impl ext4_rs::BlockDevice for VirtIOBlock {
     fn read_offset(&self, offset: usize) -> Vec<u8> {
         // debug!("read_offset: offset = {:#x}", offset);
-        let mut buf = [0u8; BLOCK_SZ];
-        let mut v = Vec::new();
-        let mut read_size = 0;
-        let mut read_offset = offset % BLOCK_SIZE;
-        while read_offset < BLOCK_SIZE {
-            let block_id = (offset + read_size) / BLOCK_SZ;
-            let block_offset = (offset + read_size) % BLOCK_SZ;
-            let read_len = core::cmp::min(BLOCK_SZ - block_offset, BLOCK_SIZE - read_offset);
-            self.0
-                .lock()
-                .read_blocks(block_id, &mut buf)
-                .expect("Error when reading VirtIOBlk");
-            v.extend_from_slice(&buf[block_offset..block_offset + read_len]);
-            read_size += read_len;
-            read_offset += read_len;
-        }
-        v
+        let mut buf = [0u8; BLOCK_SIZE];
+        self.0
+            .lock()
+            .read_blocks(offset / BLOCK_SZ, &mut buf)
+            .expect("Error when reading VirtIOBlk");
+        buf[offset % BLOCK_SZ..].to_vec()
     }
     fn write_offset(&self, offset: usize, data: &[u8]) {
-        //     debug!("write_offset: offset = {:#x}", offset);
+        debug!("write_offset: offset = {:#x}", offset);
         //     debug!("data len = {:#x}", data.len());
         let mut write_size = 0;
         while write_size < data.len() {

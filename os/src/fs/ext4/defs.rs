@@ -1,1 +1,1 @@
-pub const ROOT_INO: u64 = 2;
+pub const ROOT_INO: u32 = 2;

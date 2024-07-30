@@ -1,4 +1,8 @@
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use core::{borrow::BorrowMut, mem::size_of, ptr};
 
 use riscv::register::{satp, sstatus};
@@ -200,9 +204,14 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
     unsafe {
         sstatus::set_sum();
     }
-    let path = c_ptr_to_string(path);
+    let mut path = c_ptr_to_string(path);
     debug!("kernel: execve new app : {}", path);
     let mut args_vec: Vec<String> = Vec::new();
+    if path.ends_with(".sh") {
+        path = "/busybox".to_string();
+        args_vec.push("busybox".to_string());
+        args_vec.push("sh".to_string());
+    }
     loop {
         if unsafe { *args == 0 } {
             break;

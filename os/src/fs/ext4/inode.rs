@@ -1,6 +1,6 @@
 use alloc::{string::String, sync::Arc, vec::Vec};
 
-use ext4_rs::InodeFileType;
+use ext4_rs::{ext4_path_check, inode, Ext4DirSearchResult, Ext4File, Ext4InodeRef};
 
 use super::fs::Ext4FS;
 use crate::fs::{
@@ -11,7 +11,7 @@ use crate::fs::{
 
 pub struct Ext4Inode {
     pub fs:  Arc<Ext4FS>,
-    pub ino: u64,
+    pub ino: u32,
 }
 
 impl Inode for Ext4Inode {
@@ -26,26 +26,21 @@ impl Inode for Ext4Inode {
     }
 
     fn lookup(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
-        let attr = self
-            .fs
+        let mut file = Ext4File::new();
+        self.fs
             .ext4
-            .exclusive_access(file!(), line!())
-            .fuse_lookup(self.ino, name)
+            .ext4_open_from(self.ino, &mut file, name, "r", false)
             .ok()?;
         let inode = Ext4Inode {
-            fs:  Arc::clone(&self.fs),
-            ino: attr.ino,
+            fs:  self.fs.clone(),
+            ino: file.inode,
         };
         let dentry = Dentry::new(name, Arc::new(inode));
         Some(Arc::new(dentry))
     }
 
     fn unlink(self: Arc<Self>, name: &str) -> bool {
-        self.fs
-            .ext4
-            .exclusive_access(file!(), line!())
-            .fuse_unlink(self.ino, name)
-            .is_ok()
+        todo!()
     }
 
     fn link(self: Arc<Self>, _name: &str, _target: Arc<Dentry>) -> bool {
@@ -57,36 +52,11 @@ impl Inode for Ext4Inode {
     }
 
     fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>> {
-        self.fs
-            .ext4
-            .exclusive_access(file!(), line!())
-            .fuse_mkdir(
-                self.ino,
-                name,
-                InodeFileType::bits(&InodeFileType::S_IFDIR) as u32,
-                0,
-            )
-            .ok()?;
-        let dir = self
-            .fs
-            .ext4
-            .exclusive_access(file!(), line!())
-            .fuse_lookup(self.ino, name)
-            .ok()?;
-        let inode = Ext4Inode {
-            fs:  Arc::clone(&self.fs),
-            ino: dir.ino,
-        };
-        let dentry = Dentry::new(name, Arc::new(inode));
-        Some(Arc::new(dentry))
+        todo!()
     }
 
     fn rmdir(self: Arc<Self>, name: &str) -> bool {
-        self.fs
-            .ext4
-            .exclusive_access(file!(), line!())
-            .fuse_rmdir(self.ino, name)
-            .is_ok()
+        todo!()
     }
 
     fn ls(&self) -> Vec<String> {
@@ -94,34 +64,18 @@ impl Inode for Ext4Inode {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        let mut file = Ext4File::new();
+        file.inode = self.ino;
+        file.fpos = offset;
+        file.fsize = offset as u64;
         let mut read_size = 0;
-        if let Ok(ret_v) = self.fs.ext4.exclusive_access(file!(), line!()).fuse_read(
-            self.ino,
-            0,
-            offset as i64,
-            buf.len() as u32,
-            0,
-            None,
-        ) {
-            read_size += ret_v.len();
-            buf[..ret_v.len()].copy_from_slice(&ret_v);
-        }
+        self.fs
+            .ext4
+            .ext4_file_read(&mut file, buf, buf.len(), &mut read_size);
         read_size
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
-        if let Ok(write_size) = self.fs.ext4.exclusive_access(file!(), line!()).fuse_write(
-            self.ino,
-            0,
-            offset as i64,
-            buf,
-            0,
-            0,
-            None,
-        ) {
-            write_size
-        } else {
-            0
-        }
+        todo!()
     }
 }

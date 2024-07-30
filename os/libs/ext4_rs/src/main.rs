@@ -1,23 +1,23 @@
 #![feature(error_in_core)]
-#![allow(unused)]
 
 extern crate alloc;
 
+use alloc::vec;
+
+mod consts;
+mod ext4_error;
+mod ext4_impl;
+mod ext4_interface;
+mod ext4_structs;
 mod prelude;
 mod utils;
 
+pub use consts::*;
+pub use ext4_error::*;
+pub use ext4_interface::*;
+pub use ext4_structs::*;
 use prelude::*;
-use utils::*;
-
-pub mod ext4_defs;
-pub mod ext4_impls;
-
-mod fuse_interface;
-mod simple_interface;
-
-use ext4_defs::*;
-use fuse_interface::*;
-use simple_interface::*;
+pub use utils::*;
 
 use log::{Level, LevelFilter, Metadata, Record};
 
@@ -31,7 +31,7 @@ struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Trace
+        metadata.level() <= Level::Info
     }
 
     fn log(&self, record: &Record) {
@@ -99,48 +99,92 @@ impl BlockDevice for Disk {
     }
 }
 
-fn main() {
+pub fn main() {
     log::set_logger(&SimpleLogger).unwrap();
-    log::set_max_level(LevelFilter::Trace);
+    log::set_max_level(LevelFilter::Info);
     let disk = Arc::new(Disk {});
     let ext4 = Ext4::open(disk);
 
-    // dir make
+    // read regular file
+    log::info!("----read regular file----");
+    let path = "/test_files/1.txt";
+    let mut ext4_file = Ext4File::new();
+    let r = ext4.ext4_open(&mut ext4_file, path, "r+", false);
+    assert!(r.is_ok(), "open file error {:?}", r.err());
+
+    let mut read_buf = vec![0u8; 0x20000000];
+    let mut read_cnt = 0;
+    let r = ext4.ext4_file_read(&mut ext4_file, &mut read_buf, 0x20000000, &mut read_cnt);
+    assert!(r.is_ok(), "open file error {:?}", r.err());
+
+    log::info!("read data sample {:x?}", &read_buf[0..10]);
+
+    // read link
+    log::info!("----read link file----");
+    let path = "/test_files/linktest";
+    let mut ext4_file = Ext4File::new();
+    let r = ext4.ext4_open(&mut ext4_file, path, "r+", false);
+    assert!(r.is_ok(), "open link error {:?}", r.err());
+
+    let mut read_buf = vec![0u8; 0x1000];
+    let mut read_cnt = 0;
+    let r = ext4.ext4_file_read(&mut ext4_file, &mut read_buf, 0x1000, &mut read_cnt);
+    assert!(r.is_ok(), "read link error {:?}", r.err());
+    log::info!("read data sample {:x?}", &read_buf[0..10]);
+
+    // dir
     log::info!("----mkdir----");
     for i in 0..10 {
         let path = format!("dirtest{}", i);
         let path = path.as_str();
-        log::info!("mkdir making {:?}", path);
-        let r = ext4.dir_mk(&path);
+        let r = ext4.ext4_dir_mk(&path);
         assert!(r.is_ok(), "dir make error {:?}", r.err());
     }
-    let path = "dir1/dir2/dir3/dir4/dir5/dir6";
-    log::info!("mkdir making {:?}", path);
-    let r = ext4.dir_mk(&path);
-    assert!(r.is_ok(), "dir make error {:?}", r.err());
 
-    // dir ls
-    let entries = ext4.dir_get_entries(ROOT_INODE);
-    log::info!("dir ls root");
-    for entry in entries {
-        log::info!("{:?}", entry.get_name());
+    // write test
+    // file
+    log::info!("----write file in dir----");
+    for i in 0..10 {
+        const WRITE_SIZE: usize = 0x400000;
+        let path = format!("dirtest{}/write_{}.txt", i, i);
+        let path = path.as_str();
+        let mut ext4_file = Ext4File::new();
+        let r = ext4.ext4_open(&mut ext4_file, path, "w+", true);
+        assert!(r.is_ok(), "open file error {:?}", r.err());
+
+        let write_data = vec![0x41 + i as u8; WRITE_SIZE];
+        ext4.ext4_file_write(&mut ext4_file, &write_data, WRITE_SIZE);
+
+        // test
+        let r = ext4.ext4_open(&mut ext4_file, path, "r+", false);
+        assert!(r.is_ok(), "open file error {:?}", r.err());
+
+        let mut read_buf = vec![0u8; WRITE_SIZE];
+        let mut read_cnt = 0;
+        let r = ext4.ext4_file_read(&mut ext4_file, &mut read_buf, WRITE_SIZE, &mut read_cnt);
+        assert!(r.is_ok(), "open file error {:?}", r.err());
+        assert_eq!(write_data, read_buf);
     }
 
-    // file remove
+    // ls
+    log::info!("----ls----");
+    let path = "test_files";
+    let mut ext4_file = Ext4File::new();
+    let r = ext4.ext4_open(&mut ext4_file, path, "r+", false);
+    assert!(r.is_ok(), "open link error {:?}", r.err());
+
+    let de = ext4.read_dir_entry(ext4_file.inode as _);
+    for i in de.iter() {
+        log::info!("{:?}", i.get_name());
+    }
+
+    //file remove
+    log::info!("----file remove----");
     let path = "test_files/file_to_remove";
-    let r = ext4.file_remove(&path);
+    let r = ext4.ext4_file_remove(&path);
 
-    // dir remove
+    //dir remove
+    log::info!("----dir remove----");
     let path = "dir_to_remove";
-    let r = ext4.dir_remove(ROOT_INODE, &path);
-
-    // file create/write
-    log::info!("----create file----");
-    let inode_mode = InodeFileType::S_IFREG.bits();
-    let inode_ref = ext4.create(ROOT_INODE, "511M.txt", inode_mode).unwrap();
-    log::info!("----write file----");
-    // test 511M  for 512M we need split the extent tree
-    const WRITE_SIZE: usize = (0x100000 * 511);
-    let write_buf = vec![0x41 as u8; WRITE_SIZE];
-    let r = ext4.write_at(inode_ref.inode_num, 0, &write_buf);
+    let r = ext4.ext4_dir_remove(2, &path);
 }

@@ -3,26 +3,19 @@ use alloc::sync::Arc;
 use ext4_rs::{BlockDevice, Ext4};
 
 use super::{defs::ROOT_INO, inode::Ext4Inode};
-use crate::{
-    fs::{
-        fs::{FileSystem, FileSystemType},
-        inode::Inode,
-    },
-    sync::UPSafeCell,
+use crate::fs::{
+    fs::{FileSystem, FileSystemType},
+    inode::Inode,
 };
 
 pub struct Ext4FS {
-    pub ext4: UPSafeCell<Ext4>,
+    pub ext4: Arc<Ext4>,
 }
 
 impl Ext4FS {
     pub fn new(block_dev: Arc<dyn BlockDevice>) -> Self {
         let ext4 = Ext4::open(block_dev);
-        unsafe {
-            Self {
-                ext4: UPSafeCell::new(ext4),
-            }
-        }
+        Self { ext4 }
     }
 }
 

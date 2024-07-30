@@ -13,6 +13,5 @@ for i in range(2):
 
 name = "test_files/file_to_remove"
 f = open(name, "w")
-#1MB * 1024
-f.write("A"  * (0x100000 * 1024))
+f.write("A"  * 0x100000)
 f.close()
