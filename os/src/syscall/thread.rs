@@ -1,6 +1,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use crate::{
+    config::__breakpoint,
     mm::kernel_token,
     task::{add_task, current_task, kstack_alloc, TaskControlBlock},
     trap::{trap_handler, TrapContext},
@@ -94,4 +95,17 @@ pub fn sys_waittid(tid: usize) -> i32 {
     //     -2
     // }
     -1
+}
+
+pub fn sys_set_tid_address(tidptr: usize) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_set_tid_address",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
+    let task = current_task().unwrap();
+    let mut task_inner = task.inner_exclusive_access(file!(), line!());
+    task_inner.clear_child_tid = tidptr;
+    __breakpoint();
+    task.get_tid() as isize
 }

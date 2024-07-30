@@ -44,6 +44,8 @@ pub const SYSCALL_WRITE: usize = 64;
 pub const SYSCALL_FSTAT: usize = 80;
 /// exit syscall
 pub const SYSCALL_EXIT: usize = 93;
+/// set tid syscall
+pub const SYSCALL_SETTID: usize = 96;
 /// sleep syscall
 pub const SYSCALL_SLEEP: usize = 101;
 /// yield syscall
@@ -153,6 +155,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
+        SYSCALL_SETTID => sys_set_tid_address(args[0]),
         // SYSCALL_SLEEP => sys_sleep(args[0] as *const u64, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut Tms),

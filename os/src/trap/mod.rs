@@ -152,6 +152,7 @@ pub fn trap_handler() -> ! {
                     _ => user_entry(),
                 }
             } else {
+                trace!("syscall {:?} finished, return to user space", syscall_num);
                 trap_return();
             }
         }

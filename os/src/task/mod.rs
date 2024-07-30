@@ -95,6 +95,11 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         "kernel: pid[{}] exit_current_and_run_next",
         current_task().unwrap().pid.0
     );
+    println!(
+        "kernel: pid[{}] exit with exit_code {}",
+        current_task().unwrap().pid.0,
+        exit_code
+    );
     // take from Processor
     let task = take_current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access(file!(), line!());
@@ -143,6 +148,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
             // move all child processes under init process
             let mut initproc_inner = INITPROC.inner_exclusive_access(file!(), line!());
             for child in task_inner.children.iter() {
+                println!("kernel: move child process {} to initproc", child.pid.0);
                 child.inner_exclusive_access(file!(), line!()).parent =
                     Some(Arc::downgrade(&INITPROC));
                 initproc_inner.children.push(child.clone());
