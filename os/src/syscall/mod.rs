@@ -50,6 +50,8 @@ pub const SYSCALL_EXIT: usize = 93;
 pub const SYSCALL_SETTID: usize = 96;
 /// sleep syscall
 pub const SYSCALL_SLEEP: usize = 101;
+/// clock gettime syscall
+pub const SYSCALL_CLOCK_GETTIME: usize = 113;
 /// yield syscall
 pub const SYSCALL_YIELD: usize = 124;
 /// kill syscall
@@ -136,14 +138,16 @@ mod process;
 mod signal;
 mod sync;
 mod thread;
+mod time;
 
 use fs::*;
 use process::*;
 use signal::{sys_sigaction, sys_sigprocmask};
 use sync::*;
 use thread::*;
+use time::sys_clock_gettime;
 
-use crate::{fs::inode::Stat, task::current_task};
+use crate::{fs::inode::Stat, task::current_task, timer::TimeSpec};
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
@@ -167,6 +171,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_SETTID => sys_set_tid_address(args[0]),
         // SYSCALL_SLEEP => sys_sleep(args[0] as *const u64, args[1] as *mut u64),
+        SYSCALL_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut Tms),
         SYSCALL_UNAME => sys_uname(args[0] as *mut Utsname),
