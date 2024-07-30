@@ -19,7 +19,7 @@ pub trait Inode: Any + Send + Sync {
     /// rename an inode in the directory with the old name and new name
     fn rename(self: Arc<Self>, old_name: &str, new_name: &str) -> bool;
     /// make a directory in the directory with the name
-    fn mkdir(self: Arc<Self>, name: &str) -> Option<Arc<Dentry>>;
+    fn mkdir(self: Arc<Self>, name: &str) -> bool;
     /// remove a directory in the directory with the name
     fn rmdir(self: Arc<Self>, name: &str) -> bool;
     /// list all inodes in the directory

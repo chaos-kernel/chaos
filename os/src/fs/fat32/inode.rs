@@ -187,7 +187,7 @@ impl Inode for Fat32Inode {
         todo!("FAT32 rename");
     }
 
-    fn mkdir(self: Arc<Self>, _name: &str) -> Option<Arc<Dentry>> {
+    fn mkdir(self: Arc<Self>, _name: &str) -> bool {
         todo!("FAT32 mkdir");
     }
 

@@ -162,7 +162,7 @@ impl Ext4 {
         return Ok(EOK);
     }
     #[allow(unused)]
-    pub fn ext4_dir_mk(&self, path: &str) -> Result<usize> {
+    pub fn ext4_dir_mk(&self, parent_inode: u32, path: &str) -> Result<usize> {
         log::trace!("ext4_dir_mk {:?}", path);
         let mut file = Ext4File::new();
         let flags = "w";
@@ -181,7 +181,7 @@ impl Ext4 {
             self.ext4_trans_start();
         }
 
-        let mut root_inode_ref = Ext4InodeRef::get_inode_ref(self.self_ref.clone(), 2);
+        let mut root_inode_ref = Ext4InodeRef::get_inode_ref(self.self_ref.clone(), parent_inode);
 
         let r = self.ext4_generic_open(
             &mut file,
@@ -731,7 +731,7 @@ impl Ext4 {
     }
 
     #[allow(unused)]
-    pub fn ext4_file_remove(&self, path: &str) -> Result<usize> {
+    pub fn ext4_file_remove(&self, parent_inode: u32, path: &str) -> Result<usize> {
         let mut name_off = 0;
 
         let mut file = Ext4File::new();
@@ -744,7 +744,7 @@ impl Ext4 {
 
         let mut filetype = DirEntryType::EXT4_DE_UNKNOWN;
 
-        let mut root_inode_ref = Ext4InodeRef::get_inode_ref(self.self_ref.clone(), 2);
+        let mut root_inode_ref = Ext4InodeRef::get_inode_ref(self.self_ref.clone(), parent_inode);
 
         let r = self.ext4_generic_open2(
             &mut file,
