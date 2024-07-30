@@ -1,8 +1,4 @@
-use alloc::{
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{string::String, sync::Arc, vec::Vec};
 use core::{borrow::BorrowMut, mem::size_of, ptr};
 
 use riscv::register::{satp, sstatus};
@@ -204,14 +200,9 @@ pub fn sys_execve(path: *const u8, mut args: *const usize) -> isize {
     unsafe {
         sstatus::set_sum();
     }
-    let mut path = c_ptr_to_string(path);
+    let path = c_ptr_to_string(path);
     debug!("kernel: execve new app : {}", path);
     let mut args_vec: Vec<String> = Vec::new();
-    if path.ends_with(".sh") {
-        path = "/busybox".to_string();
-        args_vec.push("busybox".to_string());
-        args_vec.push("sh".to_string());
-    }
     loop {
         if unsafe { *args == 0 } {
             break;
@@ -259,14 +250,12 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             .iter()
             .any(|p| pid == -1 || pid as usize == p.pid.0)
         {
+            warn!("kernel:sys_waitpid: no child process");
             return ECHILD;
-            // ---- release current PCB
         }
         let pair = inner.children.iter().enumerate().find(|(_, p)| {
-            // ++++ temporarily access child PCB exclusively
             p.inner_exclusive_access(file!(), line!()).is_zombie
                 && (pid == -1 || pid as usize == p.pid.0)
-            // ++++ release child PCB
         });
         if let Some((idx, _)) = pair {
             let child = inner.children.remove(idx);
@@ -280,27 +269,6 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
                 .unwrap();
             // ++++ release child PCB
             if !exit_code_ptr.is_null() {
-                for mem in inner.memory_set.areas.iter() {
-                    let start = mem.vpn_range.get_start().0;
-                    let end = mem.vpn_range.get_end().0;
-                    let permission = mem.map_perm;
-                    debug!(
-                        "kernel:pid[{}] sys_waitpid: memory area [{:#x}, {:#x}] perm: {:?} page \
-                         table: {:#x?}",
-                        task.pid.0,
-                        start,
-                        end,
-                        permission,
-                        inner.memory_set.token()
-                    );
-                }
-                debug!("page table: {:#x?}", satp::read().bits());
-                debug!(
-                    "kernel:pid[{}] sys_waitpid: write exit code {} to {:x?}",
-                    task.pid.0, exit_code, exit_code_ptr
-                );
-
-                debug!("sstatus: {:#x?}", sstatus::read().bits());
                 unsafe { sstatus::set_sum() };
 
                 unsafe {

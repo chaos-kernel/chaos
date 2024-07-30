@@ -31,7 +31,7 @@ use crate::{
     },
     fs::{
         dentry::Dentry,
-        file::{cast_file_to_inode, File},
+        file::{self, cast_file_to_inode, File},
         inode::Inode,
         stdio::{Stdin, Stdout},
         ROOT_INODE,
@@ -603,14 +603,38 @@ impl TaskControlBlock {
         trace!("[kernel: exec] .. MemorySet::from_elf");
         let (mut memory_set, user_heap_base, ustack_top, entry_point) =
             MemorySet::from_elf(elf_data);
+        let mut task_inner = self.inner_exclusive_access(file!(), line!());
+
+        // 做一个临时映射，将参数复制到用户栈
+        let ppn = memory_set
+            .page_table
+            .translate_va(VirtAddr::from(0x162ff0).floor().into())
+            .unwrap()
+            .floor();
+
+        task_inner.memory_set.page_table.map(
+            VirtAddr::from(0x162ff0).floor(),
+            ppn,
+            PTEFlags::from_bits((MapPermission::R | MapPermission::W).bits()).unwrap(),
+        );
+
+        unsafe { sstatus::set_sum() };
+
+        let test_va = VirtAddr::from(0x162ff0);
+        let test_pte = memory_set.page_table.translate(test_va.floor()).unwrap();
+        debug!("test_va: {:#x}, test_pa: {:#64b}", test_va.0, test_pte.bits);
+
+        let test_ptr: &mut usize = test_va.get_mut();
+        warn!("test_ptr: {:#x}", test_ptr);
+
         // substitute memory_set
         // set heap position
-        self.inner_exclusive_access(file!(), line!()).heap_base = user_heap_base.into();
-        self.inner_exclusive_access(file!(), line!()).heap_end = user_heap_base.into();
+        task_inner.heap_base = user_heap_base.into();
+        task_inner.heap_end = user_heap_base.into();
         // then we alloc user resource for main thread again
         // since memory_set has been changed
         trace!("[kernel: exec] .. alloc user resource for main thread again");
-        let mut task_inner = self.inner_exclusive_access(file!(), line!());
+
         task_inner.user_stack_top = ustack_top - 8;
 
         // 为新地址空间分配用户栈和trap_cx
@@ -757,8 +781,6 @@ impl TaskControlBlock {
         // }
 
         *self.get_trap_cx() = trap_cx;
-
-        __breakpoint();
     }
 
     // /// Create a new init_task
@@ -892,6 +914,17 @@ impl TaskControlBlock {
         task_inner
             .memory_set
             .remove_area_with_start_vpn(trap_cx_bottom_va.into());
+    }
+
+    /// 设置 `clear_child_tid` 字段的 值
+    pub fn set_tid_address(&self, tidptr: usize) {
+        let mut inner = self.inner_exclusive_access(file!(), line!());
+        inner.clear_child_tid = tidptr;
+    }
+
+    pub fn get_tid(&self) -> usize {
+        let tid = self.tid;
+        tid
     }
 }
 
