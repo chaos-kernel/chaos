@@ -70,6 +70,14 @@ pub const SYSCALL_GETTIMEOFDAY: usize = 169;
 pub const SYSCALL_GETPID: usize = 172;
 /// getppid syscall
 pub const SYSCALL_GETPPID: usize = 173;
+/// getuid syscall
+pub const SYSCALL_GETUID: usize = 174;
+/// get euid syscall
+pub const SYSCALL_GETEUID: usize = 175;
+/// getgid syscall
+pub const SYSCALL_GETGID: usize = 176;
+/// getegid syscall
+pub const SYSCALL_GETEGID: usize = 177;
 /// gettid syscall
 pub const SYSCALL_GETTID: usize = 178;
 /// fork syscall
@@ -162,6 +170,10 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_UNAME => sys_uname(args[0] as *mut Utsname),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
+        SYSCALL_GETUID => sys_getuid(),
+        SYSCALL_GETEUID => sys_geteuid(),
+        SYSCALL_GETGID => sys_getgid(),
+        SYSCALL_GETEGID => sys_getegid(),
         SYSCALL_GETTID => sys_gettid(),
         SYSCALL_CLONE => sys_clone(
             args[0],
