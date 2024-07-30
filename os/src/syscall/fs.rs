@@ -12,7 +12,7 @@ use crate::{
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
     syscall::{
-        errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR},
+        errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR, ENOTTY},
         Dirent,
     },
     task::{current_task, current_user_token},
@@ -433,4 +433,24 @@ pub fn sys_mount(
 ) -> isize {
     trace!("kernel:pid[{}] sys_mount", current_task().unwrap().pid.0);
     0
+}
+
+pub fn sys_ioctl(fd: usize, request: usize, arg: usize) -> isize {
+    trace!("kernel:pid[{}] sys_ioctl", current_task().unwrap().pid.0);
+    // TODO:
+    ENOTTY
+    // let task = current_task().unwrap();
+    // let mut inner = task.inner_exclusive_access(file!(), line!());
+    // if fd >= inner.fd_table.len() {
+    //     return EBADF;
+    // }
+    // if inner.fd_table[fd].is_none() {
+    //     return EBADF;
+    // }
+    // if let Some(file) = &inner.fd_table[fd] {
+    //     let file = file.clone();
+    //     file.ioctl(request, arg1, arg2, arg3, arg4)
+    // } else {
+    //     EBADF
+    // }
 }

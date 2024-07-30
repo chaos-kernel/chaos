@@ -18,6 +18,8 @@ pub const SYSCALL_GETCWD: usize = 17;
 pub const SYSCALL_DUP: usize = 23;
 /// dup3 syscall
 pub const SYSCALL_DUP3: usize = 24;
+/// ioctl syscall
+pub const SYSCALL_IOCTL: usize = 29;
 /// mkdirat syscall
 pub const SYSCALL_MKDIRAT: usize = 34;
 /// unlinkat syscall
@@ -225,6 +227,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[3] as u32,
             args[4] as *const u8,
         ),
+        SYSCALL_IOCTL => sys_ioctl(args[0], args[1], args[2]),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
