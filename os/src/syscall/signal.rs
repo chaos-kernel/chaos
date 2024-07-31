@@ -6,7 +6,7 @@ use crate::{
     task::{
         current_task,
         sigaction::SignalAction,
-        signal::{SigInfo, MAX_SIG},
+        signal::{SigInfo, MAX_SIG, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK},
         suspend_current_and_run_next,
         SignalFlags,
     },
@@ -24,14 +24,56 @@ use crate::{
 /// 函数正常执行后，返回 0。
 ///
 /// Reference: [sigprocmask](https://www.man7.org/linux/man-pages/man2/sigprocmask.2.html)
-pub fn sys_sigprocmask(how: usize, set: usize, oldset: usize, _sig_set_size: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] tid[{}] sys_sigprocmask",
-        current_task().unwrap().pid.0,
-        current_task().unwrap().tid
-    );
-    //todo
-    0
+pub fn sys_sigprocmask(
+    how: usize, set: *mut usize, old_set: *mut usize, kernel_space: bool,
+) -> isize {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
+
+    let mut mask = inner.signal_mask;
+
+    if kernel_space {
+        if old_set as usize != 0 {
+            unsafe {
+                sstatus::set_sum();
+                *old_set = mask.bits();
+                sstatus::clear_sum();
+            }
+        }
+    } else {
+        if old_set as usize != 0 {
+            unsafe {
+                sstatus::set_sum();
+                *old_set = mask.bits();
+                sstatus::clear_sum();
+            }
+        }
+    }
+
+    if set as usize != 0 {
+        let mut new_set = 0;
+        unsafe {
+            sstatus::set_sum();
+            new_set = *set;
+            sstatus::clear_sum();
+        }
+        // tip!("[sys_sigprocmask] set = {:#b}, how = {}", set, how);
+        let set_flags = SignalFlags::from_bits(new_set).unwrap();
+        // if set_flags.contains(SignalFlags::SIGILL) {
+        //     log!("[sys_sigprocmask] SignalFlags::SIGILL");
+        // }
+        match how {
+            // SIG_BLOCK The set of blocked signals is the union of the current set and the set argument.
+            SIG_BLOCK => mask |= set_flags,
+            // SIG_UNBLOCK The signals in set are removed from the current set of blocked signals.
+            SIG_UNBLOCK => mask &= !set_flags,
+            // SIG_SETMASK The set of blocked signals is set to the argument set.
+            SIG_SETMASK => mask = set_flags,
+            _ => return EPERM,
+        }
+        inner.signal_mask = mask;
+    }
+    SUCCESS
 }
 
 /// 一个系统调用，用于获取或修改与指定信号相关联的处理动作。

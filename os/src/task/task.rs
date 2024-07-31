@@ -96,6 +96,8 @@ pub struct TaskControlBlockInner {
     // Signal actions
     pub signal_actions:   SignalActions,
     pub signals_pending:  SignalFlags,
+    // the signal to mask
+    pub signal_mask:      SignalFlags,
 }
 
 impl TaskControlBlock {
@@ -265,6 +267,7 @@ impl TaskControlBlock {
                     work_dir,
                     signal_actions: SignalActions::default(),
                     signals_pending: SignalFlags::empty(),
+                    signal_mask: SignalFlags::empty(),
                 })
             },
         });
@@ -452,6 +455,7 @@ impl TaskControlBlock {
                     work_dir: task_inner.work_dir.clone(),
                     signal_actions: SignalActions::default(),
                     signals_pending: task_inner.signals_pending,
+                    signal_mask: SignalFlags::empty(),
                 })
             },
         });
@@ -561,6 +565,7 @@ impl TaskControlBlock {
                     work_dir: father_inner.work_dir.clone(),
                     signal_actions: SignalActions::default(),
                     signals_pending: father_inner.signals_pending,
+                    signal_mask: SignalFlags::empty(),
                 })
             },
         });

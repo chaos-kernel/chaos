@@ -204,7 +204,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[1] as *const SignalAction,
             args[2] as *mut SignalAction,
         ),
-        SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0], args[1], args[2], args[3]),
+        SYSCALL_SIGPROCMASK => {
+            sys_sigprocmask(args[0], args[1] as *mut usize, args[2] as *mut usize, false)
+        }
         SYSCALL_SIGTIMEDWAIT => sys_sigtimedwait(
             args[0] as *mut usize,
             args[1] as *mut SigInfo,
