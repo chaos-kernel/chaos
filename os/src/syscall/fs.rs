@@ -4,6 +4,7 @@ use core::{borrow::Borrow, cmp::min, mem::size_of, ops::Add, ptr};
 use riscv::register::sstatus;
 
 use crate::{
+    config::__breakpoint,
     fs::{
         defs::OpenFlags,
         file::{cast_file_to_inode, cast_inode_to_file},
@@ -467,8 +468,7 @@ pub fn sys_ioctl(fd: usize, request: usize, arg: usize) -> isize {
 pub fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> isize {
     trace!("kernel:pid[{}] sys_writev", current_task().unwrap().pid.0);
     let task = current_task().unwrap();
-    let token = current_user_token();
-    let mut inner = task.inner_exclusive_access(file!(), line!());
+    let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
         return EBADF;
     }
@@ -479,24 +479,24 @@ pub fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> isize {
         if !file.writable() {
             return EACCES;
         }
-        unsafe {
-            sstatus::set_sum();
-        }
         let file = file.clone();
         let mut total_len = 0;
-        let iovec_size = core::mem::size_of::<Iovec>();
+        let iovec_size: usize = core::mem::size_of::<Iovec>();
         for i in 0..iovcnt {
+            unsafe {
+                sstatus::set_sum();
+            }
             let current = iov.add(iovec_size * i);
             let iov_base = unsafe { (*(current as *const Iovec)).iov_base };
             let iov_len = unsafe { (*(current as *const Iovec)).iov_len };
             let buf = unsafe { core::slice::from_raw_parts(iov_base as *const u8, iov_len) };
+            total_len += file.write(buf);
+            unsafe {
+                sstatus::clear_sum();
+            }
+        }
 
-            file.write(buf);
-        }
-        unsafe {
-            sstatus::clear_sum();
-        }
-        total_len
+        total_len as isize
     } else {
         EBADF
     }

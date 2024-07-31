@@ -106,6 +106,5 @@ pub fn sys_set_tid_address(tidptr: usize) -> isize {
     let task = current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access(file!(), line!());
     task_inner.clear_child_tid = tidptr;
-    __breakpoint();
     task.get_tid() as isize
 }
