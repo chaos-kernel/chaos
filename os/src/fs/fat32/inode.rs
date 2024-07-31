@@ -251,6 +251,9 @@ impl File for Fat32Inode {
             0,
         ))
     }
+    fn hang_up(&self) -> bool {
+        todo!()
+    }
 }
 
 impl Fat32Inode {

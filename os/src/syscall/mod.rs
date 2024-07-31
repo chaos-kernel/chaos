@@ -146,6 +146,7 @@ pub const SYSCALL_CONDVAR_SIGNAL: usize = 472;
 pub const SYSCALL_CONDVAR_WAIT: usize = 473;
 
 mod fs;
+mod ppoll;
 mod process;
 mod signal;
 mod sync;
@@ -153,14 +154,15 @@ mod thread;
 mod time;
 
 use fs::*;
+use ppoll::{sys_ppoll, PollFd};
 use process::*;
 use signal::{sys_sigaction, sys_sigprocmask, sys_sigtimedwait};
 use thread::*;
-use time::{sys_clock_gettime, sys_ppoll};
+use time::sys_clock_gettime;
 
 use crate::{
     fs::inode::Stat,
-    task::{current_task, sigaction::SignalAction, signal::SigInfo},
+    task::{current_task, sigaction::SignalAction, signal::SigInfo, SignalFlags},
     timer::TimeSpec,
 };
 
@@ -263,7 +265,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         ),
         SYSCALL_IOCTL => sys_ioctl(args[0], args[1], args[2]),
         SYSCALL_FCNTL => sys_fcntl(args[0], args[1] as i32, args[2]),
-        SYSCALL_PPOLL => sys_ppoll(),
+        SYSCALL_PPOLL => sys_ppoll(
+            args[0] as *mut PollFd,
+            args[1],
+            args[2] as *const TimeSpec,
+            args[3] as *const SignalFlags,
+        ),
         SYSCALL_SENDFILE => sys_sendfile(args[0], args[1], args[2], args[3]),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }

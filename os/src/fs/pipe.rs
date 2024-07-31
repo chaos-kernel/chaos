@@ -47,6 +47,7 @@ pub struct PipeRingBuffer {
     tail:      usize,
     status:    RingBufferStatus,
     write_end: Option<Weak<Pipe>>,
+    read_end:  Option<Weak<Pipe>>,
 }
 
 impl Default for PipeRingBuffer {
@@ -63,6 +64,7 @@ impl PipeRingBuffer {
             tail:      0,
             status:    RingBufferStatus::Empty,
             write_end: None,
+            read_end:  None,
         }
     }
     pub fn set_write_end(&mut self, write_end: &Arc<Pipe>) {
@@ -83,7 +85,6 @@ impl PipeRingBuffer {
         if self.head == self.tail {
             self.status = RingBufferStatus::Empty;
         }
-        error!("read byte: {}", c as char);
         c
     }
     pub fn available_read(&self) -> usize {
@@ -105,6 +106,9 @@ impl PipeRingBuffer {
     }
     pub fn all_write_ends_closed(&self) -> bool {
         self.write_end.as_ref().unwrap().upgrade().is_none()
+    }
+    pub fn all_read_ends_closed(&self) -> bool {
+        self.read_end.as_ref().unwrap().upgrade().is_none()
     }
 }
 
@@ -203,5 +207,21 @@ impl File for Pipe {
     }
     fn fstat(&self) -> Option<Stat> {
         panic!("Pipe::fstat not implemented");
+    }
+    fn hang_up(&self) -> bool {
+        let mut ring_buffer = self.buffer.exclusive_access(file!(), line!());
+        if self.readable {
+            ring_buffer.all_write_ends_closed()
+        } else {
+            ring_buffer.all_read_ends_closed()
+        }
+    }
+    fn r_ready(&self) -> bool {
+        let ring_buffer = self.buffer.exclusive_access(file!(), line!());
+        ring_buffer.status != RingBufferStatus::Empty
+    }
+    fn w_ready(&self) -> bool {
+        let ring_buffer = self.buffer.exclusive_access(file!(), line!());
+        ring_buffer.status != RingBufferStatus::Full
     }
 }

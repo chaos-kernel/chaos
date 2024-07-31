@@ -30,6 +30,13 @@ pub trait File: Any + Send + Sync {
             true
         }
     }
+    fn hang_up(&self) -> bool;
+    fn r_ready(&self) -> bool {
+        true
+    }
+    fn w_ready(&self) -> bool {
+        true
+    }
 }
 
 // TODO: 优化这个函数

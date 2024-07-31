@@ -129,4 +129,7 @@ impl File for Ext4Inode {
     fn read_all(&self) -> Vec<u8> {
         todo!()
     }
+    fn hang_up(&self) -> bool {
+        todo!()
+    }
 }

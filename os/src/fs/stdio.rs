@@ -48,6 +48,9 @@ impl File for Stdin {
     fn fstat(&self) -> Option<Stat> {
         None
     }
+    fn hang_up(&self) -> bool {
+        todo!()
+    }
 }
 
 impl File for Stdout {
@@ -73,5 +76,8 @@ impl File for Stdout {
     }
     fn fstat(&self) -> Option<Stat> {
         None
+    }
+    fn hang_up(&self) -> bool {
+        todo!()
     }
 }
