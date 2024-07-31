@@ -36,3 +36,8 @@ pub fn sys_clock_gettime(clock_id: usize, timespec: *mut TimeSpec) -> isize {
     }
     0
 }
+
+pub fn sys_ppoll() -> isize {
+    // TODO: implement sys_ppoll
+    0
+}

@@ -1,4 +1,7 @@
-use alloc::sync::{Arc, Weak};
+use alloc::{
+    sync::{Arc, Weak},
+    vec::Vec,
+};
 
 use super::{file::File, inode::Stat};
 use crate::{mm::UserBuffer, sync::UPSafeCell, task::suspend_current_and_run_next};
@@ -117,10 +120,12 @@ pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
 
 impl File for Pipe {
     fn readable(&self) -> bool {
-        self.readable
+        // TODO: check if the write end is closed
+        true
     }
     fn writable(&self) -> bool {
-        self.writable
+        // TODO: check if the read end is closed
+        true
     }
     fn read(&self, buf: &mut [u8]) -> usize {
         trace!("kernel: Pipe::read");
@@ -141,9 +146,7 @@ impl File for Pipe {
             }
             for _ in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
-                    unsafe {
-                        *byte_ref = ring_buffer.read_byte();
-                    }
+                    *byte_ref = ring_buffer.read_byte();
                     already_read += 1;
                     if already_read == want_to_read {
                         return want_to_read;
@@ -154,8 +157,18 @@ impl File for Pipe {
             }
         }
     }
-    fn read_all(&self) -> alloc::vec::Vec<u8> {
-        panic!("Pipe::read_all not implemented");
+    fn read_all(&self) -> Vec<u8> {
+        trace!("kernel: Pipe::read_all");
+        let mut v = Vec::new();
+        let mut buf = [0u8; 512];
+        loop {
+            let len = self.read(&mut buf);
+            if len == 0 {
+                break;
+            }
+            v.extend_from_slice(&buf[..len]);
+        }
+        v
     }
     fn write(&self, buf: &[u8]) -> usize {
         trace!("kernel: Pipe::write");

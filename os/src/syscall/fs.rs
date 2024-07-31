@@ -562,3 +562,20 @@ pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> isize {
         }
     }
 }
+
+pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: usize, count: usize) -> isize {
+    trace!("kernel:pid[{}] sys_sendfile", current_task().unwrap().pid.0);
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access(file!(), line!());
+    if out_fd >= inner.fd_table.len() || in_fd >= inner.fd_table.len() {
+        return EBADF;
+    }
+    if inner.fd_table[out_fd].is_none() || inner.fd_table[in_fd].is_none() {
+        return EBADF;
+    }
+    let out_file = inner.fd_table[out_fd].as_ref().unwrap().clone();
+    let in_file = inner.fd_table[in_fd].as_ref().unwrap().clone();
+    drop(inner);
+    let buf = out_file.read_all();
+    in_file.write(&buf) as isize
+}

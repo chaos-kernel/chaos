@@ -46,6 +46,10 @@ pub const SYSCALL_READ: usize = 63;
 pub const SYSCALL_WRITE: usize = 64;
 /// writev syscall
 pub const SYSCALL_WRITEV: usize = 66;
+/// sendfile syscall
+pub const SYSCALL_SENDFILE: usize = 71;
+/// ppol syscall
+pub const SYSCALL_PPOLL: usize = 73;
 /// fstat syscall
 pub const SYSCALL_FSTAT: usize = 80;
 /// exit syscall
@@ -152,7 +156,7 @@ use fs::*;
 use process::*;
 use signal::{sys_sigaction, sys_sigprocmask, sys_sigtimedwait};
 use thread::*;
-use time::sys_clock_gettime;
+use time::{sys_clock_gettime, sys_ppoll};
 
 use crate::{
     fs::inode::Stat,
@@ -257,9 +261,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         ),
         SYSCALL_IOCTL => sys_ioctl(args[0], args[1], args[2]),
         SYSCALL_FCNTL => sys_fcntl(args[0], args[1] as i32, args[2]),
-        _ => {
-            error!("Unsupported syscall_id: {}", syscall_id);
-            0
-        }
+        SYSCALL_PPOLL => sys_ppoll(),
+        SYSCALL_SENDFILE => sys_sendfile(args[0], args[1], args[2], args[3]),
+        _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
