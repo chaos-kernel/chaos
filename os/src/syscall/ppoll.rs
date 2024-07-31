@@ -61,9 +61,9 @@ pub fn sys_ppoll(
     if !sigmask.is_null() {
         sys_sigprocmask(
             SIG_SETMASK,
-            sigmask as usize,
-            raw_ptr as usize,
-            true as usize,
+            sigmask as *mut usize,
+            raw_ptr as *mut usize,
+            true,
         );
     }
     if tmo_p as usize != 0 {
@@ -105,7 +105,7 @@ pub fn sys_ppoll(
     }
 
     if !sigmask.is_null() {
-        sys_sigprocmask(SIG_SETMASK, raw_ptr as usize, 0 as usize, true as usize);
+        sys_sigprocmask(SIG_SETMASK, raw_ptr as *mut usize, 0 as *mut usize, true);
     }
     unsafe {
         let _ = Box::from_raw(raw_ptr);
