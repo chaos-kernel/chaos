@@ -2,6 +2,16 @@
 
 use bitflags::*;
 
+pub const MAX_SIG: usize = 63;
+// how flags
+pub const SIG_BLOCK: usize = 0;
+pub const SIG_UNBLOCK: usize = 1;
+pub const SIG_SETMASK: usize = 2;
+
+// sigaction sa_handler
+pub const SIG_DFL: usize = 0; /* Default action.  */
+pub const SIG_IGN: usize = 1; /* Ignore signal.  */
+
 bitflags! {
     /// Signal flags
     pub struct SignalFlags: usize {
@@ -119,6 +129,49 @@ impl SignalFlags {
         } else {
             // warn!("[kernel] signalflags check_error  {:?}", self);
             None
+        }
+    }
+}
+
+bitflags! {
+    /// Bits in `sa_flags' used to denote the default signal action.
+    pub struct SaFlags: u32{
+    /// Don't send SIGCHLD when children stop.
+        const SA_NOCLDSTOP = 1		   ;
+    /// Don't create zombie on child death.
+        const SA_NOCLDWAIT = 2		   ;
+    /// Invoke signal-catching function with three arguments instead of one.
+        const SA_SIGINFO   = 4		   ;
+    /// Use signal stack by using `sa_restorer'.
+        const SA_ONSTACK   = 0x08000000;
+    /// Restart syscall on signal return.
+        const SA_RESTART   = 0x10000000;
+    /// Don't automatically block the signal when its handler is being executed.
+        const SA_NODEFER   = 0x40000000;
+    /// Reset to SIG_DFL on entry to handler.
+        const SA_RESETHAND = 0x80000000;
+    /// Historical no-op.
+        const SA_INTERRUPT = 0x20000000;
+    /// Use signal trampoline provided by C library's wrapper function.
+        const SA_RESTORER  = 0x04000000;
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SigInfo {
+    si_signo: u32,
+    si_errno: u32,
+    si_code:  u32,
+    _si_pad:  [u8; 128 - 3 * core::mem::size_of::<u32>()],
+}
+
+impl SigInfo {
+    pub fn new(si_signo: usize, si_errno: usize, si_code: usize) -> Self {
+        Self {
+            si_signo: si_signo as u32,
+            si_errno: si_errno as u32,
+            si_code:  si_code as u32,
+            _si_pad:  [0; 128 - 3 * core::mem::size_of::<u32>()],
         }
     }
 }

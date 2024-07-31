@@ -150,7 +150,11 @@ use signal::{sys_sigaction, sys_sigprocmask};
 use thread::*;
 use time::sys_clock_gettime;
 
-use crate::{fs::inode::Stat, task::current_task, timer::TimeSpec};
+use crate::{
+    fs::inode::Stat,
+    task::{current_task, sigaction::SignalAction},
+    timer::TimeSpec,
+};
 
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
@@ -187,7 +191,11 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETGID => sys_getgid(),
         SYSCALL_GETEGID => sys_getegid(),
         SYSCALL_GETTID => sys_gettid(),
-        SYSCALL_SIGACTION => sys_sigaction(args[0], args[1], args[2]),
+        SYSCALL_SIGACTION => sys_sigaction(
+            args[0],
+            args[1] as *const SignalAction,
+            args[2] as *mut SignalAction,
+        ),
         SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0], args[1], args[2], args[3]),
         SYSCALL_CLONE => sys_clone(
             args[0],

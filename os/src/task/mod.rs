@@ -14,7 +14,8 @@ mod manager;
 pub mod process;
 mod processor;
 mod res;
-mod signal;
+pub mod sigaction;
+pub mod signal;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;

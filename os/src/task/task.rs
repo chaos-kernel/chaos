@@ -6,14 +6,14 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use core::{cell::RefMut, mem, slice, task};
+use core::{cell::RefMut, slice};
 
-use riscv::register::{mstatus, sstatus, sstatus::set_mxr};
+use riscv::register::sstatus;
 
 use super::{
     kstack_alloc,
     process::Flags,
-    res::RecycleAllocator,
+    sigaction::SignalActions,
     CloneFlags,
     KernelStack,
     PidHandle,
@@ -21,31 +21,17 @@ use super::{
     TaskContext,
 };
 use crate::{
-    config::{
-        __breakpoint,
-        BIG_STRIDE,
-        MAX_SYSCALL_NUM,
-        PAGE_SIZE,
-        TRAP_CONTEXT_TRAMPOLINE,
-        USER_STACK_SIZE,
-    },
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE, TRAP_CONTEXT_TRAMPOLINE, USER_STACK_SIZE},
     fs::{
         dentry::Dentry,
-        file::{self, cast_file_to_inode, File},
-        inode::Inode,
+        file::{cast_file_to_inode, File},
         stdio::{Stdin, Stdout},
         ROOT_INODE,
     },
     mm::{MapPermission, MemorySet, PTEFlags, PhysPageNum, VirtAddr, KERNEL_SPACE},
     sync::UPSafeCell,
     syscall::errno::EPERM,
-    task::{
-        add_task,
-        manager::insert_into_pid2process,
-        pid2process,
-        pid_alloc,
-        res::{kernel_stack_position, trap_cx_bottom_from_tid},
-    },
+    task::{add_task, manager::insert_into_pid2process, pid_alloc, res::trap_cx_bottom_from_tid},
     timer::get_time,
     trap::{trap_handler, TrapContext},
 };
@@ -107,6 +93,8 @@ pub struct TaskControlBlockInner {
     pub is_zombie:        bool,
     /// signal flags
     pub signals:          SignalFlags,
+    // Signal actions
+    pub signal_actions:   SignalActions,
 }
 
 impl TaskControlBlock {
@@ -274,6 +262,7 @@ impl TaskControlBlock {
                     heap_base: user_heap_base.into(),
                     heap_end: user_heap_base.into(),
                     work_dir,
+                    signal_actions: SignalActions::default(),
                 })
             },
         });
@@ -458,6 +447,7 @@ impl TaskControlBlock {
                     heap_base: task_inner.heap_base.clone(),
                     heap_end: task_inner.heap_end.clone(),
                     work_dir: task_inner.work_dir.clone(),
+                    signal_actions: SignalActions::default(),
                 })
             },
         });
@@ -565,6 +555,7 @@ impl TaskControlBlock {
                     heap_base: father_inner.heap_base.clone(), //todo 这里存在一个疑问，即共享堆空间，子线程修改堆空间后如何及时更新线程组下其他
                     heap_end: father_inner.heap_end.clone(), //todo  的线程包括主线程，以及地址空间的修改也需要同步，后续需要修改为线程组使用同一个对象，暂时先别用线程
                     work_dir: father_inner.work_dir.clone(),
+                    signal_actions: SignalActions::default(),
                 })
             },
         });

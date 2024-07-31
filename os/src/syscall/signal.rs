@@ -1,4 +1,8 @@
-use crate::task::current_task;
+use crate::{
+    mm::{translated_ref, translated_refmut},
+    syscall::errno::{EPERM, SUCCESS},
+    task::{current_task, sigaction::SignalAction, signal::MAX_SIG, SignalFlags},
+};
 
 /// 一个系统调用，用于获取和设置信号的屏蔽位。通过 `sigprocmask`，进程可以方便的屏蔽某些信号。
 ///
@@ -32,12 +36,52 @@ pub fn sys_sigprocmask(how: usize, set: usize, oldset: usize, _sig_set_size: usi
 /// + `old_action`: 指出原信号处理方式要保存到的位置。详情可见 [`SigAction`]。当该值为空指针时，`sigaction` 将不会保存信号的原处理动作。
 ///
 /// 函数执行成功后返回 0；若输入的 `sig` 是 `SIGSTOP`, `SIGKILL`, `ERR`中的一个时，将导致函数返回 `EINVAL`。
-pub fn sys_sigaction(sig: usize, action: usize, old_action: usize) -> isize {
+pub fn sys_sigaction(
+    signum: usize, action: *const SignalAction, old_action: *mut SignalAction,
+) -> isize {
     trace!(
         "kernel:pid[{}] tid[{}] sys_sigaction",
         current_task().unwrap().pid.0,
         current_task().unwrap().tid
     );
-    //todo
-    0
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
+    if signum > MAX_SIG {
+        error!("[sys_sigaction] error signum");
+        return EPERM;
+    }
+    if old_action as usize != 0 {
+        unsafe { *old_action = inner.signal_actions.table[signum].clone() };
+    }
+    if let Some(flag) = SignalFlags::from_bits(1 << (signum - 1)) {
+        if check_sigaction_error(flag) {
+            error!("[sys_sigaction] check_sigaction_error");
+            return EPERM;
+        }
+        let old_kernel_action = inner.signal_actions.table[signum];
+        if old_action as usize != 0 {
+            if old_kernel_action.mask != SignalFlags::from_bits(40).unwrap() {
+                unsafe { *old_action = old_kernel_action };
+            } else {
+                let mut ref_old_action = unsafe { *old_action };
+                ref_old_action.sa_handler = old_kernel_action.sa_handler;
+            }
+        }
+        if action as usize != 0 {
+            let ref_action = unsafe { &*action };
+            inner.signal_actions.table[signum as usize] = *ref_action;
+        }
+        return SUCCESS;
+    } else {
+        println!("Undefined SignalFlags");
+        return EPERM;
+    }
+}
+
+fn check_sigaction_error(signal: SignalFlags) -> bool {
+    if signal == SignalFlags::SIGKILL || signal == SignalFlags::SIGSTOP {
+        true
+    } else {
+        false
+    }
 }
