@@ -48,6 +48,8 @@ pub const SYSCALL_WRITEV: usize = 66;
 pub const SYSCALL_FSTAT: usize = 80;
 /// exit syscall
 pub const SYSCALL_EXIT: usize = 93;
+/// exit group syscall
+pub const SYSCALL_EXIT_GROUP: usize = 94;
 /// set tid syscall
 pub const SYSCALL_SETTID: usize = 96;
 /// sleep syscall
@@ -171,6 +173,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_WRITEV => sys_writev(args[0], args[1], args[2]),
         SYSCALL_FSTAT => sys_fstat(args[0], args[1] as *mut Stat),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
+        SYSCALL_EXIT_GROUP => sys_exit_group(args[0] as i32),
         SYSCALL_SETTID => sys_set_tid_address(args[0]),
         // SYSCALL_SLEEP => sys_sleep(args[0] as *const u64, args[1] as *mut u64),
         SYSCALL_CLOCK_GETTIME => sys_clock_gettime(args[0], args[1] as *mut TimeSpec),

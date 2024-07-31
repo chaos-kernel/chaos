@@ -105,6 +105,16 @@ pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
     panic!("Unreachable in sys_exit!");
 }
+
+/// 一个系统调用，退出当前进程(进程组)下的所有线程(进程)。
+///
+/// 目前该系统调用直接调用[`exit_current_and_run_next`]，有关进程组的相关功能有待实现。
+pub fn sys_exit_group(exit_code: i32) -> isize { //todo 不确定返回值是否有用，目前无返回值
+    trace!("kernel:pid[{}] sys_exit", current_task().unwrap().pid.0);
+    exit_current_and_run_next(exit_code);
+    panic!("Unreachable in sys_exit!");
+}
+
 /// yield syscall
 pub fn sys_yield() -> isize {
     trace!("kernel:pid[{}] sys_yield", current_task().unwrap().pid.0);
