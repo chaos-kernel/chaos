@@ -1,7 +1,11 @@
 //! RISC-V timer-related functionality
 
 use alloc::{collections::BinaryHeap, sync::Arc};
-use core::{arch, cmp::Ordering};
+use core::{
+    arch,
+    cmp::Ordering,
+    ops::{Add, AddAssign, Sub},
+};
 
 use lazy_static::*;
 use riscv::register::time;
@@ -22,16 +26,121 @@ pub const NSEC_PER_USEC: usize = 1_000;
 const TICKS_PER_SEC: usize = 10;
 /// The number of milliseconds per second
 const MSEC_PER_SEC: usize = 1000;
+
+pub const USEC_PER_SEC: usize = 1_000_000;
+pub const USEC_PER_MSEC: usize = 1_000;
+
 /// The number of microseconds per second
 #[allow(dead_code)]
 const MICRO_PER_SEC: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Traditional UNIX timespec structures represent elapsed time, measured by the system clock
+/// # *CAUTION*
+/// tv_sec & tv_usec should be usize.
 pub struct TimeSpec {
     /// The tv_sec member represents the elapsed time, in whole seconds.
     pub tv_sec:  usize,
     /// The tv_usec member captures rest of the elapsed time, represented as the number of microseconds.
     pub tv_nsec: usize,
+}
+impl AddAssign for TimeSpec {
+    fn add_assign(&mut self, rhs: Self) {
+        self.tv_sec += rhs.tv_sec;
+        self.tv_nsec += rhs.tv_nsec;
+    }
+}
+impl Add for TimeSpec {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let mut sec = self.tv_sec + other.tv_sec;
+        let mut nsec = self.tv_nsec + other.tv_nsec;
+        sec += nsec / NSEC_PER_SEC;
+        nsec %= NSEC_PER_SEC;
+        Self {
+            tv_sec:  sec,
+            tv_nsec: nsec,
+        }
+    }
+}
+
+impl Sub for TimeSpec {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let self_ns = self.to_ns();
+        let other_ns = other.to_ns();
+        if self_ns <= other_ns {
+            TimeSpec::new()
+        } else {
+            TimeSpec::from_ns(self_ns - other_ns)
+        }
+    }
+}
+
+impl Ord for TimeSpec {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.tv_sec.cmp(&other.tv_sec) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Equal => self.tv_nsec.cmp(&other.tv_nsec),
+            Ordering::Greater => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for TimeSpec {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl TimeSpec {
+    pub fn new() -> Self {
+        Self {
+            tv_sec:  0,
+            tv_nsec: 0,
+        }
+    }
+    pub fn from_tick(tick: usize) -> Self {
+        Self {
+            tv_sec:  tick / CLOCK_FREQ,
+            tv_nsec: (tick % CLOCK_FREQ) * NSEC_PER_SEC / CLOCK_FREQ,
+        }
+    }
+    pub fn from_s(s: usize) -> Self {
+        Self {
+            tv_sec:  s,
+            tv_nsec: 0,
+        }
+    }
+    pub fn from_ms(ms: usize) -> Self {
+        Self {
+            tv_sec:  ms / MSEC_PER_SEC,
+            tv_nsec: (ms % MSEC_PER_SEC) * NSEC_PER_MSEC,
+        }
+    }
+    pub fn from_us(us: usize) -> Self {
+        Self {
+            tv_sec:  us / USEC_PER_SEC,
+            tv_nsec: (us % USEC_PER_SEC) * NSEC_PER_USEC,
+        }
+    }
+    pub fn from_ns(ns: usize) -> Self {
+        Self {
+            tv_sec:  ns / NSEC_PER_SEC,
+            tv_nsec: ns % NSEC_PER_SEC,
+        }
+    }
+    pub fn to_ns(&self) -> usize {
+        self.tv_sec * NSEC_PER_SEC + self.tv_nsec
+    }
+    pub fn is_zero(&self) -> bool {
+        self.tv_sec == 0 && self.tv_nsec == 0
+    }
+    pub fn now() -> Self {
+        TimeSpec::from_tick(get_time())
+    }
 }
 
 /// Get the current time in ticks
@@ -231,30 +340,6 @@ pub struct TimeVal {
     pub tv_sec:  usize,
     /// microseconds
     pub tv_usec: usize,
-}
-
-impl TimeSpec {
-    /// 创建一个新的 [`TimeSpec`] 时钟
-    pub fn new(sec: usize, ns: usize) -> Self {
-        Self {
-            tv_sec:  sec,
-            tv_nsec: ns,
-        }
-    }
-
-    /// 获取一个可以表示当前 cpu 时间的一个 [`TimeSpec`] 时钟
-    pub fn now() -> Self {
-        let time = get_time();
-        Self {
-            tv_sec:  time / CLOCK_FREQ,
-            tv_nsec: (time % CLOCK_FREQ) * 1000_000_000 / CLOCK_FREQ,
-        }
-    }
-
-    /// 将本时钟所表示的时间间隔转化为 cpu 上时钟的跳变数
-    pub fn to_clock(&self) -> usize {
-        self.tv_sec * CLOCK_FREQ + self.tv_nsec * CLOCK_FREQ / 1000_000_000
-    }
 }
 
 /// [`getitimer`] / [`setitimer`] 指定的类型，用户执行系统调用时获取和输入的计时器

@@ -2,8 +2,15 @@ use riscv::register::{sscratch, sstatus};
 
 use crate::{
     mm::{translated_ref, translated_refmut},
-    syscall::errno::{EPERM, SUCCESS},
-    task::{current_task, sigaction::SignalAction, signal::MAX_SIG, SignalFlags},
+    syscall::errno::{EAGAIN, EPERM, SUCCESS},
+    task::{
+        current_task,
+        sigaction::SignalAction,
+        signal::{SigInfo, MAX_SIG},
+        suspend_current_and_run_next,
+        SignalFlags,
+    },
+    timer::TimeSpec,
 };
 
 /// 一个系统调用，用于获取和设置信号的屏蔽位。通过 `sigprocmask`，进程可以方便的屏蔽某些信号。
@@ -93,5 +100,70 @@ fn check_sigaction_error(signal: SignalFlags) -> bool {
         true
     } else {
         false
+    }
+}
+
+// The timedwait used in the libtest is different from the linux manual page
+pub fn sys_sigtimedwait(
+    uthese: *mut usize,
+    info: *mut SigInfo,
+    uts: *const TimeSpec,
+    // I find sigsetsize in Linux 5.2 source code, but I dont know how to use it.
+    sigsetsize: usize,
+) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_sigtimedwait",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
+
+    if uthese as usize == 0 || uts as usize == 0 {
+        error!("[sys_sigtimedwait] Null pointer.");
+        return EPERM;
+    }
+    let mut timeout: TimeSpec = TimeSpec::now();
+    unsafe {
+        sstatus::set_sum();
+        timeout = *uts;
+        sstatus::clear_sum();
+    }
+
+    let limit_time = TimeSpec::now() + timeout;
+
+    let mut set = 0;
+    unsafe {
+        sstatus::set_sum();
+        set = *uthese;
+        sstatus::clear_sum();
+    }
+
+    let set_flags = SignalFlags::from_bits(set).unwrap();
+
+    loop {
+        let task = current_task().unwrap();
+        let signals_pending = task
+            .inner_exclusive_access(file!(), line!())
+            .signals_pending;
+        // Every matched signals will return. This method is wrong.
+        let match_signals = set_flags & signals_pending;
+        if !match_signals.is_empty() {
+            let first_signals = match_signals.bits().trailing_zeros();
+            if info as usize != 0 {
+                let siginfo = SigInfo::new(first_signals as usize, 0, 0);
+                unsafe {
+                    sstatus::set_sum();
+                    *info = siginfo;
+                    sstatus::clear_sum();
+                }
+            }
+            return SUCCESS;
+        }
+        if limit_time < TimeSpec::now() {
+            println!("[sys_sigtimedwait] Timeout.");
+            return EAGAIN;
+        }
+        drop(task);
+        drop(signals_pending);
+        suspend_current_and_run_next();
     }
 }

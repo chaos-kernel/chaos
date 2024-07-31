@@ -95,6 +95,7 @@ pub struct TaskControlBlockInner {
     pub signals:          SignalFlags,
     // Signal actions
     pub signal_actions:   SignalActions,
+    pub signals_pending:  SignalFlags,
 }
 
 impl TaskControlBlock {
@@ -263,6 +264,7 @@ impl TaskControlBlock {
                     heap_end: user_heap_base.into(),
                     work_dir,
                     signal_actions: SignalActions::default(),
+                    signals_pending: SignalFlags::empty(),
                 })
             },
         });
@@ -448,6 +450,7 @@ impl TaskControlBlock {
                     heap_end: task_inner.heap_end.clone(),
                     work_dir: task_inner.work_dir.clone(),
                     signal_actions: SignalActions::default(),
+                    signals_pending: task_inner.signals_pending,
                 })
             },
         });
@@ -556,6 +559,7 @@ impl TaskControlBlock {
                     heap_end: father_inner.heap_end.clone(), //todo  的线程包括主线程，以及地址空间的修改也需要同步，后续需要修改为线程组使用同一个对象，暂时先别用线程
                     work_dir: father_inner.work_dir.clone(),
                     signal_actions: SignalActions::default(),
+                    signals_pending: father_inner.signals_pending,
                 })
             },
         });

@@ -66,6 +66,8 @@ pub const SYSCALL_KILL: usize = 129;
 pub const SYSCALL_SIGACTION: usize = 134;
 /// sigprocmask syscall
 pub const SYSCALL_SIGPROCMASK: usize = 135;
+/// sigtimedwait syscall
+pub const SYSCALL_SIGTIMEDWAIT: usize = 137;
 /// sigreturn syscall
 pub const SYSCALL_SIGRETURN: usize = 139;
 /// times syscall
@@ -148,13 +150,13 @@ mod time;
 
 use fs::*;
 use process::*;
-use signal::{sys_sigaction, sys_sigprocmask};
+use signal::{sys_sigaction, sys_sigprocmask, sys_sigtimedwait};
 use thread::*;
 use time::sys_clock_gettime;
 
 use crate::{
     fs::inode::Stat,
-    task::{current_task, sigaction::SignalAction},
+    task::{current_task, sigaction::SignalAction, signal::SigInfo},
     timer::TimeSpec,
 };
 
@@ -199,6 +201,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[2] as *mut SignalAction,
         ),
         SYSCALL_SIGPROCMASK => sys_sigprocmask(args[0], args[1], args[2], args[3]),
+        SYSCALL_SIGTIMEDWAIT => sys_sigtimedwait(
+            args[0] as *mut usize,
+            args[1] as *mut SigInfo,
+            args[2] as *const TimeSpec,
+            args[3],
+        ),
         SYSCALL_CLONE => sys_clone(
             args[0],
             args[1],
@@ -249,6 +257,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         ),
         SYSCALL_IOCTL => sys_ioctl(args[0], args[1], args[2]),
         SYSCALL_FCNTL => sys_fcntl(args[0], args[1] as i32, args[2]),
-        _ => panic!("Unsupported syscall_id: {}", syscall_id),
+        _ => {
+            error!("Unsupported syscall_id: {}", syscall_id);
+            0
+        }
     }
 }
