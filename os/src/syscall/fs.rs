@@ -74,13 +74,13 @@ pub fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
         }
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        let mut buf = unsafe {
+        unsafe {
             sstatus::set_sum();
             let buf = core::slice::from_raw_parts_mut(buf, len);
+            let ret = file.read(buf) as isize;
             sstatus::clear_sum();
-            buf
-        };
-        file.read(&mut buf) as isize
+            ret
+        }
     } else {
         EBADF
     }

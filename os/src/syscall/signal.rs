@@ -69,13 +69,17 @@ pub fn sys_sigaction(
                 unsafe { *old_action = old_kernel_action };
                 unsafe { sstatus::clear_sum() };
             } else {
+                unsafe { sstatus::set_sum() };
                 let mut ref_old_action = unsafe { *old_action };
+                unsafe { sstatus::clear_sum() };
                 ref_old_action.sa_handler = old_kernel_action.sa_handler;
             }
         }
         if action as usize != 0 {
+            unsafe { sstatus::set_sum() };
             let ref_action = unsafe { &*action };
             inner.signal_actions.table[signum as usize] = *ref_action;
+            unsafe { sstatus::clear_sum() };
         }
         return SUCCESS;
     } else {
