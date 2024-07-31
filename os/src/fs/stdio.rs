@@ -19,6 +19,9 @@ impl File for Stdin {
     fn read(&self, user_buf: &mut [u8]) -> usize {
         // assert_eq!(user_buf.len(), 1);
         // busy loop
+        unsafe {
+            sstatus::set_sum();
+        }
         let mut c: usize;
         loop {
             c = console_getchar();
@@ -31,6 +34,9 @@ impl File for Stdin {
         }
         let ch = c as u8;
         user_buf[0] = ch;
+        unsafe {
+            sstatus::clear_sum();
+        }
         1
     }
     fn read_all(&self) -> alloc::vec::Vec<u8> {
