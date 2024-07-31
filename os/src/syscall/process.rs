@@ -190,12 +190,19 @@ pub fn sys_clone(
             new_thread_ttid = 0;
         }
 
-        let token = current_user_token();
         if clone_signals.contains(CloneFlags::CLONE_PARENT_SETTID) && !ptid.is_null() {
-            *translated_refmut(token, ptid) = new_thread_ttid;
+            unsafe {
+                sstatus::set_sum();
+                *ptid = new_thread_ttid;
+                sstatus::clear_sum();
+            };
         }
         if clone_signals.contains(CloneFlags::CLONE_CHILD_SETTID) && !ctid.is_null() {
-            *translated_refmut(token, ctid) = new_thread_ttid;
+            unsafe {
+                sstatus::set_sum();
+                *ctid = new_thread_ttid;
+                sstatus::clear_sum();
+            };
         }
         if clone_signals.contains(CloneFlags::CLONE_CHILD_CLEARTID) {
             let mut thread_inner = new_thread.inner_exclusive_access(file!(), line!());
@@ -348,18 +355,14 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 pub fn sys_gettimeofday(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
     let us = get_time_us();
-    let mut v = translated_byte_buffer(current_user_token(), ts as *const u8, size_of::<TimeVal>());
-    let mut ts = TimeVal {
+    let new_ts = TimeVal {
         sec:  us / 1_000_000,
         usec: us % 1_000_000,
     };
     unsafe {
-        let mut p = ts.borrow_mut() as *mut TimeVal as *mut u8;
-        for slice in v.iter_mut() {
-            let len = slice.len();
-            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
-            p = p.add(len);
-        }
+        sstatus::set_sum();
+        *ts = new_ts;
+        sstatus::clear_sum();
     }
     0
 }
@@ -370,22 +373,17 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
         "kernel:pid[{}] sys_task_info",
         current_task().unwrap().pid.0
     );
-    let mut v =
-        translated_byte_buffer(current_user_token(), ti as *const u8, size_of::<TaskInfo>());
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
-    let mut ti = TaskInfo {
+    let ti_new = TaskInfo {
         status:        TaskStatus::Running,
         syscall_times: inner.syscall_times,
         time:          get_time_ms() - inner.first_time.unwrap(),
     };
     unsafe {
-        let mut p = ti.borrow_mut() as *mut TaskInfo as *mut u8;
-        for slice in v.iter_mut() {
-            let len = slice.len();
-            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
-            p = p.add(len);
-        }
+        sstatus::set_sum();
+        *ti = ti_new;
+        sstatus::clear_sum();
     }
     0
 }
@@ -487,8 +485,6 @@ pub fn sys_set_priority(prio: isize) -> isize {
 #[allow(unused)]
 pub fn sys_times(tms: *mut Tms) -> isize {
     trace!("kernel:pid[{}] sys_get_time", current_task().unwrap().pid.0);
-    let mut tms_k =
-        translated_byte_buffer(current_user_token(), tms as *const u8, size_of::<Tms>());
     let (tms_stime, tms_utime) = current_task()
         .unwrap()
         .inner_exclusive_access(file!(), line!())
@@ -504,12 +500,9 @@ pub fn sys_times(tms: *mut Tms) -> isize {
         tms_cstime,
     };
     unsafe {
-        let mut p = sys_tms.borrow_mut() as *mut Tms as *mut u8;
-        for slice in tms_k.iter_mut() {
-            let len = slice.len();
-            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
-            p = p.add(len);
-        }
+        sstatus::set_sum();
+        *tms = sys_tms;
+        sstatus::clear_sum();
     }
     (tms_stime + tms_utime) as isize
 }

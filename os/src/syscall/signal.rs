@@ -1,3 +1,5 @@
+use riscv::register::{sscratch, sstatus};
+
 use crate::{
     mm::{translated_ref, translated_refmut},
     syscall::errno::{EPERM, SUCCESS},
@@ -51,7 +53,9 @@ pub fn sys_sigaction(
         return EPERM;
     }
     if old_action as usize != 0 {
+        unsafe { sstatus::set_sum() };
         unsafe { *old_action = inner.signal_actions.table[signum].clone() };
+        unsafe { sstatus::clear_sum() };
     }
     if let Some(flag) = SignalFlags::from_bits(1 << (signum - 1)) {
         if check_sigaction_error(flag) {
@@ -61,7 +65,9 @@ pub fn sys_sigaction(
         let old_kernel_action = inner.signal_actions.table[signum];
         if old_action as usize != 0 {
             if old_kernel_action.mask != SignalFlags::from_bits(40).unwrap() {
+                unsafe { sstatus::set_sum() };
                 unsafe { *old_action = old_kernel_action };
+                unsafe { sstatus::clear_sum() };
             } else {
                 let mut ref_old_action = unsafe { *old_action };
                 ref_old_action.sa_handler = old_kernel_action.sa_handler;
@@ -84,4 +90,5 @@ fn check_sigaction_error(signal: SignalFlags) -> bool {
     } else {
         false
     }
+
 }
