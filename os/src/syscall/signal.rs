@@ -90,5 +90,4 @@ fn check_sigaction_error(signal: SignalFlags) -> bool {
     } else {
         false
     }
-
 }

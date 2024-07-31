@@ -18,7 +18,8 @@ use crate::{
         errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR, ENOTTY},
         Dirent,
     },
-    task::{current_task, current_user_token}, utils::string::c_ptr_to_string,
+    task::{current_task, current_user_token},
+    utils::string::c_ptr_to_string,
 };
 
 pub const AT_FDCWD: i32 = -100;
@@ -500,5 +501,64 @@ pub fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> isize {
         total_len as isize
     } else {
         EBADF
+    }
+}
+
+const F_DUPFD: i32 = 0;
+const F_DUPFD_CLOEXEC: i32 = 1030;
+const F_GETFD: i32 = 1;
+const F_SETFD: i32 = 2;
+const F_GETFL: i32 = 3;
+const F_SETFL: i32 = 4;
+
+pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> isize {
+    trace!("kernel:pid[{}] sys_fcntl", current_task().unwrap().pid.0);
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
+    if fd >= inner.fd_table.len() {
+        return EBADF;
+    }
+    if inner.fd_table[fd].is_none() {
+        return EBADF;
+    }
+    match cmd {
+        F_DUPFD => {
+            let new_fd = inner.alloc_fd();
+            inner.fd_table[new_fd] = inner.fd_table[fd].clone();
+            debug!(
+                "kernel:pid[{}] sys_fcntl F_DUPFD fd:{} => new_fd:{}",
+                task.pid.0, fd, new_fd
+            );
+            new_fd as isize
+        }
+        F_DUPFD_CLOEXEC => {
+            let new_fd = inner.alloc_fd();
+            inner.fd_table[new_fd] = inner.fd_table[fd].clone();
+            // TODO: fix this
+            // inner.fd_table[new_fd].as_mut().unwrap().flags |= OpenFlags::CLOEXEC;
+            debug!(
+                "kernel:pid[{}] sys_fcntl F_DUPFD fd:{} => new_fd:{}",
+                task.pid.0, fd, new_fd
+            );
+            new_fd as isize
+        }
+        F_SETFD => {
+            // TODO: fix this
+            // let flags = OpenFlags::from_bits(arg as u32).ok_or(SyscallErr::EINVAL)?;
+            // inner.fd_table[fd].as_mut().unwrap().flags = flags;
+            0
+        }
+        F_SETFL => {
+            // TODO: fix this
+            // let flags = OpenFlags::from_bits(arg as u32).ok_or(SyscallErr::EINVAL)?;
+            // inner.fd_table[fd].as_mut().unwrap().flags = flags;
+            0
+        }
+        F_GETFD | F_GETFL => {
+            todo!()
+        }
+        _ => {
+            todo!()
+        }
     }
 }
