@@ -1,4 +1,9 @@
-use alloc::sync::Arc;
+use alloc::{
+    borrow::ToOwned,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+};
 use core::{borrow::Borrow, cmp::min, mem::size_of, ops::Add, ptr};
 
 use riscv::register::sstatus;
@@ -78,6 +83,12 @@ pub fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
             sstatus::set_sum();
             let buf = core::slice::from_raw_parts_mut(buf, len);
             let ret = file.read(buf) as isize;
+            trace!(
+                "kernel:pid[{}] sys_read fd:{} buf:{}",
+                task.pid.0,
+                fd,
+                buf.iter().map(|&c| c as char).collect::<String>(),
+            );
             sstatus::clear_sum();
             ret
         }
@@ -90,8 +101,8 @@ pub fn sys_open(path: *const u8, flags: i32) -> isize {
     trace!("kernel:pid[{}] sys_open", current_task().unwrap().pid.0);
     let task = current_task().unwrap();
     let token = current_user_token();
-    debug!("kernel: sys_open path: {:?}", path);
     let path = translated_str(token, path);
+    debug!("kernel: sys_open path: {}", path);
     let curdir = task
         .inner_exclusive_access(file!(), line!())
         .work_dir
@@ -106,6 +117,7 @@ pub fn sys_open(path: *const u8, flags: i32) -> isize {
         let fd = inner.alloc_fd();
         let file = cast_inode_to_file(inode).unwrap();
         inner.fd_table[fd] = Some(file);
+        trace!("kernel:pid[{}] sys_open success fd:{}", task.pid.0, fd);
         fd as isize
     } else {
         ENOENT
@@ -177,6 +189,10 @@ pub fn sys_pipe(pipe: *mut u32) -> isize {
         *pipe.add(1) = write_fd as u32;
         sstatus::clear_sum();
     }
+    debug!(
+        "kernel:pid[{}] sys_pipe read_fd:{} write_fd:{}",
+        task.pid.0, read_fd, write_fd
+    );
     0
 }
 /// dup syscall
@@ -210,9 +226,14 @@ pub fn sys_dup3(fd: usize, new_fd: usize) -> isize {
         inner.fd_table.push(None);
     }
     if inner.fd_table[new_fd].is_some() {
-        inner.fd_table[new_fd] = inner.fd_table[fd].clone();
+        inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
     }
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+
+    debug!(
+        "kernel:pid[{}] sys_dup3 fd:{} => new_fd:{}",
+        task.pid.0, fd, new_fd
+    );
 
     new_fd as isize
 }
@@ -564,7 +585,12 @@ pub fn sys_fcntl(fd: usize, cmd: i32, arg: usize) -> isize {
 }
 
 pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: usize, count: usize) -> isize {
-    trace!("kernel:pid[{}] sys_sendfile", current_task().unwrap().pid.0);
+    trace!(
+        "kernel:pid[{}] sys_sendfile in_fd:{} out_fd:{}",
+        current_task().unwrap().pid.0,
+        in_fd,
+        out_fd
+    );
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if out_fd >= inner.fd_table.len() || in_fd >= inner.fd_table.len() {
@@ -575,7 +601,11 @@ pub fn sys_sendfile(out_fd: usize, in_fd: usize, offset: usize, count: usize) ->
     }
     let out_file = inner.fd_table[out_fd].as_ref().unwrap().clone();
     let in_file = inner.fd_table[in_fd].as_ref().unwrap().clone();
+    let mut buf = vec![0u8; 10000];
     drop(inner);
-    let buf = out_file.read_all();
-    in_file.write(&buf) as isize
+    let read_size = in_file.read(&mut buf);
+    // warn!("buf: {:?}", buf,);
+    let ret = out_file.write(&buf[..read_size]) as isize;
+    error!("count: {}, write size: {}", count, ret);
+    ret
 }

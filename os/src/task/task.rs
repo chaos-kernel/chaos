@@ -357,6 +357,7 @@ impl TaskControlBlock {
     }
 
     pub fn fork(self: &Arc<Self>) -> usize {
+        error!("fork: pid[{}]", self.pid.0);
         trace!("[kernel]: sys_fork");
         let pid = pid_alloc();
         warn!("fork: pid[{}]", pid.0);

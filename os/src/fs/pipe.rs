@@ -34,7 +34,7 @@ impl Pipe {
 
 const RING_BUFFER_SIZE: usize = 32;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 enum RingBufferStatus {
     Full,
     Empty,
@@ -83,6 +83,7 @@ impl PipeRingBuffer {
         if self.head == self.tail {
             self.status = RingBufferStatus::Empty;
         }
+        error!("read byte: {}", c as char);
         c
     }
     pub fn available_read(&self) -> usize {
@@ -95,6 +96,7 @@ impl PipeRingBuffer {
         }
     }
     pub fn available_write(&self) -> usize {
+        // error!("status: {:?}", self.status);
         if self.status == RingBufferStatus::Full {
             0
         } else {
@@ -147,6 +149,7 @@ impl File for Pipe {
             for _ in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
                     *byte_ref = ring_buffer.read_byte();
+                    warn!("read byte: {}", *byte_ref as char);
                     already_read += 1;
                     if already_read == want_to_read {
                         return want_to_read;

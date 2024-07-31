@@ -3,16 +3,24 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use ext4_rs::{Ext4File, Ext4InodeRef};
 
 use super::fs::Ext4FS;
-use crate::fs::{
-    dentry::Dentry,
-    file::File,
-    fs::FileSystemType,
-    inode::{Inode, InodeType, Stat},
+use crate::{
+    fs::{
+        dentry::Dentry,
+        file::File,
+        fs::FileSystemType,
+        inode::{Inode, InodeType, Stat},
+    },
+    sync::UPSafeCell,
 };
 
 pub struct Ext4Inode {
-    pub fs:  Arc<Ext4FS>,
-    pub ino: u32,
+    pub fs:    Arc<Ext4FS>,
+    pub ino:   u32,
+    pub inner: UPSafeCell<Ext4InodeInner>,
+}
+
+pub struct Ext4InodeInner {
+    pub fpos: usize,
 }
 
 impl Inode for Ext4Inode {
@@ -33,8 +41,9 @@ impl Inode for Ext4Inode {
             .ext4_open_from(self.ino, &mut file, name, "r", false)
             .ok()?;
         let inode = Ext4Inode {
-            fs:  self.fs.clone(),
-            ino: file.inode,
+            fs:    self.fs.clone(),
+            ino:   file.inode,
+            inner: unsafe { UPSafeCell::new(Ext4InodeInner { fpos: 0 }) },
         };
         let dentry = Dentry::new(name, Arc::new(inode));
         Some(Arc::new(dentry))
@@ -101,7 +110,10 @@ impl File for Ext4Inode {
     }
     fn read(&self, buf: &mut [u8]) -> usize {
         // TODO: 暂时不考虑 pos
-        self.read_at(0, buf)
+        let mut inner = self.inner.exclusive_access(file!(), line!());
+        let read_size = self.read_at(inner.fpos, buf);
+        inner.fpos += read_size;
+        read_size
     }
     fn readable(&self) -> bool {
         true
@@ -115,17 +127,6 @@ impl File for Ext4Inode {
         write_size
     }
     fn read_all(&self) -> Vec<u8> {
-        let mut buffer = [0u8; 512];
-        let mut v: Vec<u8> = Vec::new();
-        let mut total_read_size = 0;
-        loop {
-            let len = self.read_at(total_read_size, &mut buffer);
-            if len == 0 {
-                break;
-            }
-            total_read_size += len;
-            v.extend_from_slice(&buffer[..len]);
-        }
-        v
+        todo!()
     }
 }

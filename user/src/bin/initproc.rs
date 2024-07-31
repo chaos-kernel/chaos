@@ -22,6 +22,9 @@ fn main() -> i32 {
             let mut exit_code: i32 = 0;
             let pid = wait(&mut exit_code);
             if pid == -1 {
+                println!(
+                    "[initproc] yield and wait again..."
+                );
                 yield_();
                 continue;
             }
