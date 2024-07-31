@@ -206,9 +206,10 @@ pub fn sys_dup3(fd: usize, new_fd: usize) -> isize {
         inner.fd_table.push(None);
     }
     if inner.fd_table[new_fd].is_some() {
-        return EBUSY;
+        inner.fd_table[new_fd] = inner.fd_table[fd].clone();
     }
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+
     new_fd as isize
 }
 

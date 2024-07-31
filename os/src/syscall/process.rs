@@ -426,7 +426,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 
 /// change data segment size
 pub fn sys_brk(addr: usize) -> isize {
-    // println!("[sys_brk] addr = {:#x}", addr);
+    trace!("kernel:pid[{}] sys_brk", current_task().unwrap().pid.0);
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     if addr == 0 {
@@ -436,19 +436,17 @@ pub fn sys_brk(addr: usize) -> isize {
     } else {
         // We need to calculate to determine if we need a new page table
         // current end page address
-        let _align_addr = ((addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
+        let align_addr = ((addr) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
         // the end of 'addr' value
         let align_end = ((inner.heap_end.0) + PAGE_SIZE - 1) & (!(PAGE_SIZE - 1));
         if align_end >= addr {
             inner.heap_end = addr.into();
-            //todo: should return aligned adreess
-            addr as isize
+            align_addr as isize
         } else {
             let heap_end = inner.heap_end;
             // map heap
-            //todo: aim_addr should map aligned adreess
-            inner.memory_set.map_heap(heap_end, addr.into());
-            inner.heap_end = addr.into();
+            inner.memory_set.map_heap(heap_end, align_addr.into());
+            inner.heap_end = align_addr.into();
             addr as isize
         }
     }
@@ -518,8 +516,8 @@ pub fn sys_times(tms: *mut Tms) -> isize {
 
 ///get OS informations
 pub fn sys_uname(uts: *mut Utsname) -> isize {
-    let mut uts_k =
-        translated_byte_buffer(current_user_token(), uts as *const u8, size_of::<Utsname>());
+    trace!("kernel:pid[{}] sys_uname", current_task().unwrap().pid.0);
+    unsafe { sstatus::set_sum() };
     let mut sys_uts = Utsname {
         sysname:    [0; 65],
         nodename:   [0; 65],
@@ -543,13 +541,9 @@ pub fn sys_uname(uts: *mut Utsname) -> isize {
     sys_uts.machine[..machine_bytes.len()].copy_from_slice(machine_bytes);
     sys_uts.domainname[..domainname_bytes.len()].copy_from_slice(domainname_bytes);
     unsafe {
-        let mut p = sys_uts.borrow_mut() as *mut Utsname as *mut u8;
-        for slice in uts_k.iter_mut() {
-            let len = slice.len();
-            ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
-            p = p.add(len);
-        }
+        *uts = sys_uts;
     }
+    unsafe { sstatus::clear_sum() };
     0
 }
 
