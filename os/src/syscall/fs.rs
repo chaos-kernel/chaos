@@ -1,10 +1,9 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::sync::Arc;
 use core::{borrow::Borrow, cmp::min, mem::size_of, ops::Add, ptr};
 
 use riscv::register::sstatus;
 
 use crate::{
-    config::__breakpoint,
     fs::{
         defs::OpenFlags,
         file::{cast_file_to_inode, cast_inode_to_file},
@@ -14,7 +13,7 @@ use crate::{
         Iovec,
         ROOT_INODE,
     },
-    mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
+    mm::{translated_byte_buffer, translated_refmut, translated_str},
     syscall::{
         errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR, ENOTTY},
         Dirent,
@@ -56,13 +55,12 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 /// read syscall
-pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
+pub fn sys_read(fd: usize, buf: *mut u8, len: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_read fd:{}",
         current_task().unwrap().pid.0,
         fd,
     );
-    let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
@@ -75,8 +73,13 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         }
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        trace!("kernel: sys_read .. file.read");
-        file.read(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+        let mut buf = unsafe {
+            sstatus::set_sum();
+            let buf = core::slice::from_raw_parts_mut(buf, len);
+            sstatus::clear_sum();
+            buf
+        };
+        file.read(&mut buf) as isize
     } else {
         EBADF
     }

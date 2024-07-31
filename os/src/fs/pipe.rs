@@ -122,7 +122,7 @@ impl File for Pipe {
     fn writable(&self) -> bool {
         self.writable
     }
-    fn read(&self, buf: UserBuffer) -> usize {
+    fn read(&self, buf: &mut [u8]) -> usize {
         trace!("kernel: Pipe::read");
         assert!(self.readable());
         let want_to_read = buf.len();

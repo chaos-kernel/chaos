@@ -207,16 +207,9 @@ impl File for Fat32Inode {
         true
     }
 
-    fn read(&self, mut buf: UserBuffer) -> usize {
-        let mut total_read_size = 0;
-        for slice in buf.buffers.iter_mut() {
-            let read_size = self.read_at(total_read_size, slice);
-            if read_size == 0 {
-                break;
-            }
-            total_read_size += read_size;
-        }
-        total_read_size
+    fn read(&self, mut buf: &mut [u8]) -> usize {
+        // TODO: 暂时不考虑 pos
+        self.read_at(0, &mut buf)
     }
 
     fn read_all(&self) -> Vec<u8> {

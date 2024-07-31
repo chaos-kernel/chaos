@@ -16,7 +16,7 @@ impl File for Stdin {
     fn writable(&self) -> bool {
         false
     }
-    fn read(&self, mut user_buf: UserBuffer) -> usize {
+    fn read(&self, user_buf: &mut [u8]) -> usize {
         // assert_eq!(user_buf.len(), 1);
         // busy loop
         let mut c: usize;
@@ -30,9 +30,7 @@ impl File for Stdin {
             }
         }
         let ch = c as u8;
-        unsafe {
-            user_buf.buffers[0].as_mut_ptr().write_volatile(ch);
-        }
+        user_buf[0] = ch;
         1
     }
     fn read_all(&self) -> alloc::vec::Vec<u8> {
@@ -53,7 +51,7 @@ impl File for Stdout {
     fn writable(&self) -> bool {
         true
     }
-    fn read(&self, _user_buf: UserBuffer) -> usize {
+    fn read(&self, _user_buf: &mut [u8]) -> usize {
         panic!("Cannot read from stdout!");
     }
     fn read_all(&self) -> alloc::vec::Vec<u8> {

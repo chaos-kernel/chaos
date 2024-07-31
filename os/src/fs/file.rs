@@ -14,7 +14,7 @@ pub trait File: Any + Send + Sync {
     /// the file writable?
     fn writable(&self) -> bool;
     /// read from the file to buf, return the number of bytes read
-    fn read(&self, buf: UserBuffer) -> usize;
+    fn read(&self, buf: &mut [u8]) -> usize;
     /// read all data from the file
     fn read_all(&self) -> Vec<u8>;
     /// write to the file from buf, return the number of bytes writte
