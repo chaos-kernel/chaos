@@ -18,7 +18,7 @@ use crate::{
         errno::{EACCES, EBADF, EBUSY, ENOENT, ENOTDIR, ENOTTY},
         Dirent,
     },
-    task::{current_task, current_user_token},
+    task::{current_task, current_user_token}, utils::string::c_ptr_to_string,
 };
 
 pub const AT_FDCWD: i32 = -100;
@@ -164,15 +164,18 @@ pub fn sys_close(fd: usize) -> isize {
 pub fn sys_pipe(pipe: *mut u32) -> isize {
     trace!("kernel:pid[{}] sys_pipe", current_task().unwrap().pid.0);
     let task = current_task().unwrap();
-    let token = current_user_token();
     let mut inner = task.inner_exclusive_access(file!(), line!());
     let (pipe_read, pipe_write) = make_pipe();
     let read_fd = inner.alloc_fd();
     inner.fd_table[read_fd] = Some(pipe_read);
     let write_fd = inner.alloc_fd();
     inner.fd_table[write_fd] = Some(pipe_write);
-    *translated_refmut(token, pipe) = read_fd as u32;
-    *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd as u32;
+    unsafe {
+        sstatus::set_sum();
+        *pipe = read_fd as u32;
+        *pipe.add(1) = write_fd as u32;
+        sstatus::clear_sum();
+    }
     0
 }
 /// dup syscall
@@ -231,15 +234,10 @@ pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
             return EBADF;
         }
         let stat = stat.unwrap();
-        let mut v =
-            translated_byte_buffer(inner.get_user_token(), st as *const u8, size_of::<Stat>());
         unsafe {
-            let mut p = stat.borrow() as *const Stat as *const u8;
-            for slice in v.iter_mut() {
-                let len = slice.len();
-                ptr::copy_nonoverlapping(p, slice.as_mut_ptr(), len);
-                p = p.add(len);
-            }
+            sstatus::set_sum();
+            *st = stat;
+            sstatus::clear_sum();
         }
     }
     0
@@ -341,8 +339,7 @@ pub fn sys_mkdirat64(dirfd: i32, path: *const u8, _mode: u32) -> isize {
         }
         inode = cast_file_to_inode(dir).unwrap();
     }
-    let token = inner.memory_set.token();
-    let path = translated_str(token, path);
+    let path = c_ptr_to_string(path);
     if let Some(_) = open_file(inode.clone(), &path, OpenFlags::O_RDONLY) {
         return -1;
     }
