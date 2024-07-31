@@ -11,11 +11,11 @@ fn main() -> i32 {
 
     if fork() == 0 {
         let task = "busybox\0";
-        // q: 如果我想传递参数 sh 呢
-        let args = [""];
-        let a = args.map(|arg| arg.as_ptr());
+        let args = ["busybox\0", "sh\0", "busybox_testcode.sh\0"];
+        let mut v= args.map(|arg| arg.as_ptr()).to_vec();
+        v.push(0 as *const u8);
         println!("[initproc] exec busybox sh...");
-        exec(&task, &a);
+        exec(&task, &v);
     } else {
         // 父进程等待所有子进程结束
         loop {

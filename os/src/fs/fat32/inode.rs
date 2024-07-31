@@ -207,9 +207,9 @@ impl File for Fat32Inode {
         true
     }
 
-    fn read(&self, mut buf: &mut [u8]) -> usize {
+    fn read(&self, buf: &mut [u8]) -> usize {
         // TODO: 暂时不考虑 pos
-        self.read_at(0, &mut buf)
+        self.read_at(0, buf)
     }
 
     fn read_all(&self) -> Vec<u8> {

@@ -2,6 +2,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::any::Any;
 
 use super::{
+    ext4::inode::Ext4Inode,
     fat32::inode::Fat32Inode,
     inode::{Inode, Stat},
 };
@@ -54,6 +55,10 @@ pub fn cast_inode_to_file(inode: Arc<dyn Inode>) -> Option<Arc<dyn File>> {
         let inode_ref = &*(inode_ptr as *const dyn Any);
         if inode_ref.is::<Fat32Inode>() {
             let file_ptr = inode_ptr as *const Fat32Inode;
+            let file = Arc::from_raw(file_ptr);
+            Some(file)
+        } else if inode_ref.is::<Ext4Inode>() {
+            let file_ptr = inode_ptr as *const Ext4Inode;
             let file = Arc::from_raw(file_ptr);
             Some(file)
         } else {

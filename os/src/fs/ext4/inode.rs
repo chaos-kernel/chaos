@@ -5,8 +5,9 @@ use ext4_rs::{Ext4File, Ext4InodeRef};
 use super::fs::Ext4FS;
 use crate::fs::{
     dentry::Dentry,
+    file::File,
     fs::FileSystemType,
-    inode::{Inode, InodeType},
+    inode::{Inode, InodeType, Stat},
 };
 
 pub struct Ext4Inode {
@@ -88,5 +89,43 @@ impl Inode for Ext4Inode {
         file.fsize = inode_ref.inner.inode.inode_get_size();
         self.fs.ext4.ext4_file_write(&mut file, buf, buf.len());
         buf.len()
+    }
+}
+
+impl File for Ext4Inode {
+    fn fstat(&self) -> Option<Stat> {
+        todo!()
+    }
+    fn is_dir(&self) -> bool {
+        todo!()
+    }
+    fn read(&self, buf: &mut [u8]) -> usize {
+        // TODO: 暂时不考虑 pos
+        self.read_at(0, buf)
+    }
+    fn readable(&self) -> bool {
+        true
+    }
+    fn writable(&self) -> bool {
+        true
+    }
+    fn write(&self, buf: &[u8]) -> usize {
+        // 暂时不考虑 pos
+        let write_size = self.write_at(0, buf);
+        write_size
+    }
+    fn read_all(&self) -> Vec<u8> {
+        let mut buffer = [0u8; 512];
+        let mut v: Vec<u8> = Vec::new();
+        let mut total_read_size = 0;
+        loop {
+            let len = self.read_at(total_read_size, &mut buffer);
+            if len == 0 {
+                break;
+            }
+            total_read_size += len;
+            v.extend_from_slice(&buffer[..len]);
+        }
+        v
     }
 }
