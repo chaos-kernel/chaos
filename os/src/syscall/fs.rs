@@ -1,5 +1,7 @@
-use alloc::sync::Arc;
-use core::{borrow::Borrow, cmp::min, mem::size_of, ptr};
+use alloc::{sync::Arc, vec::Vec};
+use core::{borrow::Borrow, cmp::min, mem::size_of, ops::Add, ptr};
+
+use riscv::register::sstatus;
 
 use crate::{
     fs::{
@@ -8,6 +10,7 @@ use crate::{
         inode::Stat,
         open_file,
         pipe::make_pipe,
+        Iovec,
         ROOT_INODE,
     },
     mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer},
@@ -27,7 +30,6 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         current_task().unwrap().pid.0,
         fd,
     );
-    let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.inner_exclusive_access(file!(), line!());
     if fd >= inner.fd_table.len() {
@@ -40,7 +42,14 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         let file = file.clone();
         // release current task TCB manually to avoid multi-borrow
         drop(inner);
-        file.write(UserBuffer::new(translated_byte_buffer(token, buf, len))) as isize
+
+        let buf = unsafe {
+            sstatus::set_sum();
+            let buf = core::slice::from_raw_parts(buf, len);
+            sstatus::clear_sum();
+            buf
+        };
+        file.write(buf) as isize
     } else {
         EBADF
     }
@@ -453,4 +462,42 @@ pub fn sys_ioctl(fd: usize, request: usize, arg: usize) -> isize {
     // } else {
     //     EBADF
     // }
+}
+
+pub fn sys_writev(fd: usize, iov: usize, iovcnt: usize) -> isize {
+    trace!("kernel:pid[{}] sys_writev", current_task().unwrap().pid.0);
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let mut inner = task.inner_exclusive_access(file!(), line!());
+    if fd >= inner.fd_table.len() {
+        return EBADF;
+    }
+    if inner.fd_table[fd].is_none() {
+        return EBADF;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        if !file.writable() {
+            return EACCES;
+        }
+        unsafe {
+            sstatus::set_sum();
+        }
+        let file = file.clone();
+        let mut total_len = 0;
+        let iovec_size = core::mem::size_of::<Iovec>();
+        for i in 0..iovcnt {
+            let current = iov.add(iovec_size * i);
+            let iov_base = unsafe { (*(current as *const Iovec)).iov_base };
+            let iov_len = unsafe { (*(current as *const Iovec)).iov_len };
+            let buf = unsafe { core::slice::from_raw_parts(iov_base as *const u8, iov_len) };
+
+            file.write(buf);
+        }
+        unsafe {
+            sstatus::clear_sum();
+        }
+        total_len
+    } else {
+        EBADF
+    }
 }

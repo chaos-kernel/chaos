@@ -1,3 +1,5 @@
+use riscv::register::sstatus;
+
 use super::{file::File, inode::Stat};
 use crate::{mm::UserBuffer, sbi::console_getchar, task::suspend_current_and_run_next};
 
@@ -36,7 +38,7 @@ impl File for Stdin {
     fn read_all(&self) -> alloc::vec::Vec<u8> {
         panic!("Stdin::read_all not implemented");
     }
-    fn write(&self, _user_buf: UserBuffer) -> usize {
+    fn write(&self, _user_buf: &[u8]) -> usize {
         panic!("Cannot write to stdin!");
     }
     fn fstat(&self) -> Option<Stat> {
@@ -57,9 +59,11 @@ impl File for Stdout {
     fn read_all(&self) -> alloc::vec::Vec<u8> {
         panic!("Stdout::read_all not allowed");
     }
-    fn write(&self, user_buf: UserBuffer) -> usize {
-        for buffer in user_buf.buffers.iter() {
-            print!("{}", core::str::from_utf8(buffer).unwrap());
+    fn write(&self, user_buf: &[u8]) -> usize {
+        unsafe {
+            sstatus::set_sum();
+            print!("{}", core::str::from_utf8(user_buf).unwrap());
+            sstatus::clear_sum();
         }
         user_buf.len()
     }

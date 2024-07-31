@@ -234,16 +234,10 @@ impl File for Fat32Inode {
         v
     }
 
-    fn write(&self, buf: UserBuffer) -> usize {
-        let mut total_write_size = 0;
-        for slice in buf.buffers.iter() {
-            let write_size = self.write_at(total_write_size, slice);
-            if write_size == 0 {
-                break;
-            }
-            total_write_size += write_size;
-        }
-        total_write_size
+    fn write(&self, buf: &[u8]) -> usize {
+        // 暂时不考虑 pos
+        let write_size = self.write_at(0, buf);
+        write_size
     }
 
     fn fstat(&self) -> Option<Stat> {

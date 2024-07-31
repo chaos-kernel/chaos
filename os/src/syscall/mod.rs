@@ -42,6 +42,8 @@ pub const SYSCALL_GETDENTS64: usize = 61;
 pub const SYSCALL_READ: usize = 63;
 /// write syscall
 pub const SYSCALL_WRITE: usize = 64;
+/// writev syscall
+pub const SYSCALL_WRITEV: usize = 66;
 /// fstat syscall
 pub const SYSCALL_FSTAT: usize = 80;
 /// exit syscall
@@ -143,7 +145,6 @@ mod time;
 use fs::*;
 use process::*;
 use signal::{sys_sigaction, sys_sigprocmask};
-use sync::*;
 use thread::*;
 use time::sys_clock_gettime;
 

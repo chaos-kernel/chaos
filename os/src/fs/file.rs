@@ -18,7 +18,7 @@ pub trait File: Any + Send + Sync {
     /// read all data from the file
     fn read_all(&self) -> Vec<u8>;
     /// write to the file from buf, return the number of bytes writte
-    fn write(&self, buf: UserBuffer) -> usize;
+    fn write(&self, buf: &[u8]) -> usize;
     /// get file status
     fn fstat(&self) -> Option<Stat>;
     /// is directory

@@ -3,7 +3,6 @@ use alloc::sync::Arc;
 use defs::OpenFlags;
 use dentry::Dentry;
 use ext4::fs::Ext4FS;
-use fat32::fs::Fat32FS;
 use fs::FileSystemManager;
 use inode::{Inode, InodeType};
 use lazy_static::lazy_static;
@@ -65,4 +64,9 @@ pub fn open_file(inode: Arc<dyn Inode>, name: &str, flags: OpenFlags) -> Option<
     } else {
         None
     }
+}
+
+pub struct Iovec {
+    pub iov_base: usize,
+    pub iov_len:  usize,
 }

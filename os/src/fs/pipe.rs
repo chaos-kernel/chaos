@@ -157,7 +157,7 @@ impl File for Pipe {
     fn read_all(&self) -> alloc::vec::Vec<u8> {
         panic!("Pipe::read_all not implemented");
     }
-    fn write(&self, buf: UserBuffer) -> usize {
+    fn write(&self, buf: &[u8]) -> usize {
         trace!("kernel: Pipe::write");
         assert!(self.writable());
         let want_to_write = buf.len();
