@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct Ext4FS {
-    pub ext4: Arc<Ext4>,
+    pub ext4: Ext4,
 }
 
 impl Ext4FS {

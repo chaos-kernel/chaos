@@ -78,6 +78,7 @@ impl BlockDevice for VirtIOBlock {
 }
 
 impl ext4_rs::BlockDevice for VirtIOBlock {
+    // 目前实现的方式是从 offset 开始读取一个 block 的数据
     fn read_offset(&self, offset: usize) -> Vec<u8> {
         // debug!("read_offset: offset = {:#x}", offset);
         let mut buf = [0u8; BLOCK_SIZE];
