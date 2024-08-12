@@ -481,6 +481,7 @@ impl TaskControlBlock {
 
         // fork出的子进程应该返回0
         trap_cx.x[10] = 0;
+        trap_cx.kernel_sp = kstack_top;
         let pid = child_task.pid.0.clone();
         insert_into_pid2process(pid, Arc::clone(&child_task));
         // add this thread to scheduler
