@@ -21,3 +21,4 @@ sdcard-riscv.img
 testcases-backup
 kernel-qemu
 sbi-qemu
+.DS_Store
