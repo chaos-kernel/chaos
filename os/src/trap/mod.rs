@@ -18,6 +18,7 @@ use core::arch::{asm, global_asm};
 
 use riscv::register::{
     mtvec::TrapMode,
+    satp,
     scause::{self, Exception, Interrupt, Trap},
     sepc,
     sie,
@@ -26,6 +27,7 @@ use riscv::register::{
 };
 
 use crate::{
+    config::__breakpoint,
     syscall::{self, syscall},
     task::{
         check_signals_of_current,
@@ -81,6 +83,15 @@ pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
+    let sepc = sepc::read();
+    let call_trap_process_satp = satp::read().bits();
+    let mut result = -1;
+    info!(
+        "[kernel] trap triggered, trap_handler: scause = {:?}, stval = {:#x}, sepc = {:#x}",
+        scause.cause(),
+        stval,
+        sepc
+    );
     let mut syscall_num = -1;
     // trace!("into {:?}", scause.cause());
     match scause.cause() {
@@ -96,13 +107,13 @@ pub fn trap_handler() -> ! {
             cx.sepc += 4;
             syscall_num = cx.x[17] as i32;
             // get system call return value
-            let result = syscall(
+            result = syscall(
                 cx.x[17],
                 [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]],
             );
-            // cx is changed during sys_exec, so we have to call it again
-            cx = current_trap_cx();
-            cx.x[10] = result as usize;
+            // // cx is changed during sys_exec, so we have to call it again
+            // cx = current_trap_cx();
+            // cx.x[10] = result as usize;
         }
         Trap::Exception(Exception::StoreFault)
         | Trap::Exception(Exception::StorePageFault)
@@ -127,6 +138,7 @@ pub fn trap_handler() -> ! {
             set_next_trigger();
             check_timer();
             suspend_current_and_run_next();
+            debug!("back from timer interrupt");
         }
         _ => {
             panic!(
@@ -144,20 +156,51 @@ pub fn trap_handler() -> ! {
         exit_current_and_run_next(errno);
     }
 
+    let leave_trap_process_satp = satp::read().bits();
+
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
             if syscall_num == syscall::SYSCALL_EXECVE as i32 {
+                // cx is changed during sys_exec, so we have to call it again
+                let cx = current_trap_cx();
+                cx.x[10] = result as usize;
                 match current_task().unwrap().pid.0 {
                     0 => initproc_entry(),
                     _ => user_entry(),
                 }
             } else {
                 trace!("syscall {:?} finished, return to user space", syscall_num);
-                trap_return();
+                if call_trap_process_satp != leave_trap_process_satp {
+                    debug!(
+                        "trap_handler: leave_trap_process = {:#x}, call_trap_process = {:#x}",
+                        leave_trap_process_satp, call_trap_process_satp
+                    );
+                    match current_task().unwrap().pid.0 {
+                        0 => initproc_entry(),
+                        _ => user_entry(),
+                    }
+                } else {
+                    // todo 不确定这样做对不对，最稳妥的做法是如果satp不同，就建立临时映射再写入这个返回值，但是我懒得写
+                    let cx = current_trap_cx();
+                    cx.x[10] = result as usize;
+                    trap_return();
+                }
             }
         }
         _ => {
-            trap_return();
+            // 实际上这里只针对timer interrupt
+            debug!(
+                "trap_handler: leave_trap_process = {:#x}, call_trap_process = {:#x}",
+                leave_trap_process_satp, call_trap_process_satp
+            );
+            if leave_trap_process_satp != call_trap_process_satp {
+                match current_task().unwrap().pid.0 {
+                    0 => initproc_entry(),
+                    _ => user_entry(),
+                }
+            } else {
+                trap_return();
+            }
         }
     }
     panic!("[kernel] trap_handler: unreachable code");
@@ -208,7 +251,12 @@ pub fn trap_return() -> ! {
 /// handle trap from kernel
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
-    error!("stval = {:#x}, sepc = {:#x}", stval::read(), sepc::read());
+    error!(
+        "stval = {:#x}, sepc = {:#x}, satp = {:#x}",
+        stval::read(),
+        sepc::read(),
+        satp::read().bits()
+    );
     panic!("a trap {:?} from kernel!", scause::read().cause());
 }
 

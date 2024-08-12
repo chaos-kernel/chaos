@@ -7,10 +7,11 @@
 use alloc::sync::Arc;
 
 use lazy_static::*;
-use riscv::register::satp;
+use riscv::register::{satp, sstatus};
 
-use super::{__switch, fetch_task, TaskContext, TaskControlBlock, TaskStatus};
+use super::{__switch, fetch_task, switch::__schedule, TaskContext, TaskControlBlock, TaskStatus};
 use crate::{
+    config::__breakpoint,
     mm::{VirtAddr, KERNEL_SPACE},
     sync::UPSafeCell,
     timer::get_time_ms,
@@ -69,11 +70,13 @@ pub fn run_tasks() {
                 task_inner.first_time = Some(get_time_ms());
             }
 
-            // 切换进程也要切换页表
-            task_inner.task_cx.ra = match task.pid.0 {
-                0 => crate::trap::initproc_entry as usize,
-                _ => crate::trap::user_entry as usize,
-            };
+            // // 切换进程也要切换页表
+            // task_inner.task_cx.ra = match task.pid.0 {
+            //     0 => crate::trap::initproc_entry as usize,
+            //     _ => crate::trap::user_entry as usize,
+            // };
+
+            // let next_task_satp = task.get_user_token().clone();
 
             //被调度，开始计算进程时钟时间
             task_inner.clock_time_refresh();
@@ -146,6 +149,6 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
     drop(processor);
     unsafe {
-        __switch(switched_task_cx_ptr, idle_task_cx_ptr);
+        __schedule(switched_task_cx_ptr, idle_task_cx_ptr);
     }
 }

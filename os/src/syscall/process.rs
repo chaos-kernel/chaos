@@ -269,6 +269,7 @@ pub fn sys_execve(path: *const u8, mut args: *const usize, mut envp: *const usiz
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {
+        error!("kernel: execve open app error : {}", path.as_str());
         ENOENT
     }
 }

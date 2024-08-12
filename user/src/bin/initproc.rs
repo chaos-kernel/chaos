@@ -10,8 +10,8 @@ fn main() -> i32 {
     println!("[initproc] Start running...");
 
     if fork() == 0 {
-        let task = "time-test\0";
-        let args = ["time-test\0"];
+        let task = "busybox\0";
+        let args = ["busybox\0", "sh\0", "libctest_testcode.sh\0"];
         let mut v= args.map(|arg| arg.as_ptr()).to_vec();
         v.push(0 as *const u8);
         println!("[initproc] exec busybox sh...");
