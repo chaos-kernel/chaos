@@ -20,5 +20,5 @@ ext4_rs = { path = "libs/ext4_rs" }
 
 [features]
 default = ["qemu"]  # 默认编译 QEMU 版本
-qemu = ["qemu"]
-visionfive2 = ["visionfive2"]
+qemu = []
+visionfive2 = []

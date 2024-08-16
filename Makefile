@@ -13,6 +13,16 @@ all: fmt
 	@echo "Copying kernel-qemu..."
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu
 
+vf2:
+	@echo "Building user..."
+	@cd user && make build
+	@echo "Building os..."
+	@cd os && make vf2
+	@echo "Copying kernel-vf2..."
+	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-vf2
+	@echo "Copying kernel-vf2 to tftpboot..."
+	@sudo cp kernel-vf2 ../tftpboot/kernel-vf2
+
 env:
 	@echo "Setting up cargo environment..."
 	@cd os && make env

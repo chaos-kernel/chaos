@@ -9,6 +9,12 @@ FS_IMG_PATH := ../testcases
 APPS := ../user/src/bin/*
 OFFLINE :=
 MAKEFLAGS += --no-print-directory
+# 定义一个变量来表示当前的 kernel 目标
+KERNEL_TARGET := kernel
+
+ifeq ($(MAKECMDGOALS),vf2)
+    KERNEL_TARGET := kernel-vf2
+endif
 
 # BOARD
 BOARD := qemu
@@ -21,7 +27,8 @@ ifeq ($(MODE), release)
 endif
 
 # KERNEL ENTRY
-KERNEL_ENTRY_PA := 0x80200000
+KERNEL_ENTRY_PA_QEMU := 0x80200000
+KERNEL_ENTRY_PA_VF2 := 0x40020000
 
 # Binutils
 OBJDUMP := rust-objdump --arch-name=riscv64
@@ -44,16 +51,35 @@ ifeq ($(OFFLINE),)
 	rustup component add llvm-tools-preview
 endif
 
-$(KERNEL_BIN): kernel
+# 修改 $(KERNEL_BIN) 的依赖
+$(KERNEL_BIN): $(KERNEL_TARGET)
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
 fs-img:
 	@rm -f $(FS_IMG)
 	@cp $(FS_IMG_PATH)/$(FS_IMG) .
 
+# 默认的 kernel 目标
 kernel:
 	@echo Platform: $(BOARD)
-	@cargo build $(MODE_ARG) --offline
+	@cargo build $(MODE_ARG) \
+	--offline \
+	-q 
+# 离线构建
+# 安静模式
+
+# 为 visionfive2 操作定义一个特殊的 kernel 目标
+kernel-vf2:
+	@echo Platform: VisionFive 2
+	@cargo build $(MODE_ARG) \
+	--offline \
+	--features visionfive2 \
+	--no-default-features \
+	-q
+# 离线构建
+# 使用 visionfive2 特性
+# 禁用默认特性，不写这个会莫名其妙启用默认特性
+# 安静模式，忽略warning用
 
 clean:
 	@cargo clean
@@ -79,7 +105,7 @@ run-inner:
 
 debug: build
 	@tmux new-session -d \
-		"qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) -s -S" && \
+		"qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA_QEMU) -s -S" && \
 		tmux split-window -h "riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'" && \
 		tmux -2 attach-session -d
 
@@ -93,4 +119,7 @@ gdbserver: build
 gdbclient:
 	@riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
-.PHONY: build env kernel clean disasm disasm-vim run-inner fs-img gdbserver gdbclient config
+vf2: build
+	
+
+.PHONY: build env kernel clean disasm disasm-vim run-inner fs-img gdbserver gdbclient config vf2
