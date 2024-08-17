@@ -31,14 +31,11 @@ boot_pagetable:
     # we need 2 pte here
     # 0x0000_0000_4000_0000 -> 0x0000_0000_4000_0000
     # 0xffff_fc00_4000_0000 -> 0x0000_0000_4000_0000
-    .quad (0x00000 << 10) | 0xcf # VRWXAD 1G大页
+    .quad 0
     .quad (0x40000 << 10) | 0xcf # VRWXAD 1G大页
-    .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
+    .quad 0
     .zero 8 * 253
-    .quad (0x00000 << 10) | 0xcf # VRWXAD 1G大页
+    .quad 0
     .quad (0x40000 << 10) | 0xcf # VRWXAD 1G大页
-    .quad (0x80000 << 10) | 0xcf # VRWXAD 1G大页
+    .quad 0
     .zero 8 * 253
-
-message:
-    .string "Hello, World!"

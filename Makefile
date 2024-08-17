@@ -7,6 +7,7 @@ all: fmt
 	@echo "Building user..."
 	@cd user && make build
 	@echo "Building os..."
+	@cp os/src/linker-qemu.ld os/src/linker.ld
 	@cd os && make build
 	@echo "Copying sbi-qemu..."
 	@cp bootloader/rustsbi-qemu.bin sbi-qemu
@@ -17,6 +18,7 @@ vf2:
 	@echo "Building user..."
 	@cd user && make build
 	@echo "Building os..."
+	@cp os/src/linker-vf2.ld os/src/linker.ld
 	@cd os && make vf2
 	@echo "Copying kernel-vf2..."
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-vf2

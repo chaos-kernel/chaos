@@ -112,22 +112,12 @@ pub fn fake_main() {
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
-    let c = 'a';
-    console_putchar(c as usize);
-    let c = 'b';
-    console_putchar(c as usize);
     println!("Hello, world!\n");
-    let c = 'c';
-    console_putchar(c as usize);
     show_logo();
-    let c = 'd';
-    console_putchar(c as usize);
     clear_bss();
     println!("[kernel] Hello, world!");
     logging::init();
     info!("logging init done");
-    let c = 'e';
-    console_putchar(c as usize);
     let satp = satp::read();
     info!(" satp: {:#x}", satp.bits());
     mm::init();
