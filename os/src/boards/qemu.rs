@@ -1,4 +1,9 @@
 //! QEMU riscv-64 virt machine
+//! 外露接口：
+//! shutdown()
+//! BlockDeviceImpl
+//! MMIO
+//! CLOCK_FREQ
 
 /// clock frequency
 pub const CLOCK_FREQ: usize = 12500000;
@@ -97,3 +102,7 @@ impl QEMUExit for RISCV64 {
 const VIRT_TEST: u64 = 0x100000;
 
 pub const QEMU_EXIT_HANDLE: RISCV64 = RISCV64::new(VIRT_TEST);
+
+pub fn shutdown() -> ! { //todo 处理更多的退出情况
+    QEMU_EXIT_HANDLE.exit_success();
+}

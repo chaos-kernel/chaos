@@ -29,8 +29,6 @@
 
 use core::arch::{asm, global_asm};
 
-use board::QEMUExit;
-
 #[macro_use]
 extern crate log;
 
@@ -60,6 +58,7 @@ pub mod timer;
 pub mod trap;
 pub mod utils;
 
+use board::shutdown;
 use config::KERNEL_SPACE_OFFSET;
 use riscv::register::satp;
 use sbi::console_putchar;
@@ -142,7 +141,7 @@ pub fn rust_main() -> ! {
     task::run_tasks();
     println!("[kernel] All tasks finished successfully!");
     println!("[kernel] ChaOS is shutting down...");
-    crate::board::QEMU_EXIT_HANDLE.exit_success();
+    shutdown();
 }
 
 unsafe fn vf2_debug_print(s: &str) {
