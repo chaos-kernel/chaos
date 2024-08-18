@@ -56,6 +56,7 @@ pub const SYSCALL_GETTID: usize = 178;
 pub const SYSCALL_CLONE: usize = 220;
 pub const SYSCALL_EXECVE: usize = 221;
 pub const SYSCALL_WAIT4: usize = 260;
+pub const SYSCALL_PRLIMIT64: usize = 261;
 pub const SYSCALL_SET_PRIORITY: usize = 140;
 pub const SYSCALL_BRK: usize = 214;
 pub const SYSCALL_MUNMAP: usize = 215;
@@ -207,6 +208,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[3] as *const SignalFlags,
         ),
         SYSCALL_SENDFILE => sys_sendfile(args[0], args[1], args[2], args[3]),
+        SYSCALL_PRLIMIT64 => 0,
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
