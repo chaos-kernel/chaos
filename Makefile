@@ -14,7 +14,7 @@ all: fmt
 	@echo "Copying kernel-qemu..."
 	@cp os/target/riscv64gc-unknown-none-elf/release/os.bin kernel-qemu
 
-vf2:
+vf2: fmt
 	@echo "Building user..."
 	@cd user && make build
 	@echo "Building os..."
