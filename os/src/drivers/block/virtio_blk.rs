@@ -121,6 +121,7 @@ impl VirtIOBlock {
     #[allow(unused)]
     /// Create a new VirtIOBlock driver with VIRTIO0 base_addr for virtio_blk device
     pub fn new() -> Self {
+        debug!("VirtIOBlock::new()");
         unsafe {
             let header = &mut *(VIRTIO0 as *mut VirtIOHeader);
             let blk = Self(Mutex::new(

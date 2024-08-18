@@ -11,6 +11,7 @@ pub const MMIO: &[(usize, usize, MapPermission)] = &[
     (0x17040000, 0x10000, PERMISSION_RW),     // RTC
     (0xc000000, 0x4000000, PERMISSION_RW),    //PLIC
     (0x00_1000_0000, 0x10000, PERMISSION_RW), // UART
+    (0x16020000, 0x10000, PERMISSION_RW),     // sdio1
 ];
 
 pub type BlockDeviceImpl = crate::drivers::block::SDCard;
