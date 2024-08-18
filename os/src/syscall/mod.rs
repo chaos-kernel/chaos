@@ -12,137 +12,72 @@
 ///
 pub mod errno;
 
-/// getcwd syscall
 pub const SYSCALL_GETCWD: usize = 17;
-/// dup syscall
 pub const SYSCALL_DUP: usize = 23;
-/// dup3 syscall
 pub const SYSCALL_DUP3: usize = 24;
-/// fcntl syscall
 pub const SYSCALL_FCNTL: usize = 25;
-/// ioctl syscall
 pub const SYSCALL_IOCTL: usize = 29;
-/// mkdirat syscall
 pub const SYSCALL_MKDIRAT: usize = 34;
-/// unlinkat syscall
 pub const SYSCALL_UNLINKAT: usize = 35;
-/// linkat syscall
 pub const SYSCALL_LINKAT: usize = 37;
-/// umount2 syscall
 pub const SYSCALL_UMOUNT2: usize = 39;
-/// mount syscall
 pub const SYSCALL_MOUNT: usize = 40;
-/// chdir syscall
 pub const SYSCALL_CHDIR: usize = 49;
-/// openat syscall
 pub const SYSCALL_OPENAT: usize = 56;
-/// close syscall
 pub const SYSCALL_CLOSE: usize = 57;
-/// getdents64 syscall
 pub const SYSCALL_GETDENTS64: usize = 61;
-/// read syscall
 pub const SYSCALL_READ: usize = 63;
-/// write syscall
 pub const SYSCALL_WRITE: usize = 64;
-/// writev syscall
 pub const SYSCALL_WRITEV: usize = 66;
-/// sendfile syscall
 pub const SYSCALL_SENDFILE: usize = 71;
-/// ppol syscall
 pub const SYSCALL_PPOLL: usize = 73;
-/// fstat syscall
 pub const SYSCALL_FSTAT: usize = 80;
-/// exit syscall
 pub const SYSCALL_EXIT: usize = 93;
-/// exit group syscall
 pub const SYSCALL_EXIT_GROUP: usize = 94;
-/// set tid syscall
 pub const SYSCALL_SETTID: usize = 96;
-/// sleep syscall
 pub const SYSCALL_SLEEP: usize = 101;
-/// clock gettime syscall
 pub const SYSCALL_CLOCK_GETTIME: usize = 113;
-/// yield syscall
 pub const SYSCALL_YIELD: usize = 124;
-/// kill syscall
 pub const SYSCALL_KILL: usize = 129;
-/// sigaction syscall
 pub const SYSCALL_SIGACTION: usize = 134;
-/// sigprocmask syscall
 pub const SYSCALL_SIGPROCMASK: usize = 135;
-/// sigtimedwait syscall
 pub const SYSCALL_SIGTIMEDWAIT: usize = 137;
-/// sigreturn syscall
 pub const SYSCALL_SIGRETURN: usize = 139;
-/// times syscall
 pub const SYSCALL_TIMES: usize = 153;
-/// uname syscall
 pub const SYSCALL_UNAME: usize = 160;
-/// gettimeofday syscall
 pub const SYSCALL_GETTIMEOFDAY: usize = 169;
-/// getpid syscall
 pub const SYSCALL_GETPID: usize = 172;
-/// getppid syscall
 pub const SYSCALL_GETPPID: usize = 173;
-/// getuid syscall
 pub const SYSCALL_GETUID: usize = 174;
-/// get euid syscall
 pub const SYSCALL_GETEUID: usize = 175;
-/// getgid syscall
 pub const SYSCALL_GETGID: usize = 176;
-/// getegid syscall
 pub const SYSCALL_GETEGID: usize = 177;
-/// gettid syscall
 pub const SYSCALL_GETTID: usize = 178;
-/// fork syscall
 pub const SYSCALL_CLONE: usize = 220;
-/// exec syscall
 pub const SYSCALL_EXECVE: usize = 221;
-/// waitpid syscall
 pub const SYSCALL_WAIT4: usize = 260;
-/// set priority syscall
 pub const SYSCALL_SET_PRIORITY: usize = 140;
-/// sbrk syscall
 pub const SYSCALL_BRK: usize = 214;
-/// munmap syscall
 pub const SYSCALL_MUNMAP: usize = 215;
-/// mmap syscall
 pub const SYSCALL_MMAP: usize = 222;
-/// spawn syscall
 pub const SYSCALL_SPAWN: usize = 400;
 /*
-/// mail read syscall
 pub const SYSCALL_MAIL_READ: usize = 401;
-/// mail write syscall
 pub const SYSCALL_MAIL_WRITE: usize = 402;
 */
-/// pipe syscall
 pub const SYSCALL_PIPE: usize = 59;
-/// task info syscall
 pub const SYSCALL_TASK_INFO: usize = 410;
-/// thread_create syscall
 pub const SYSCALL_THREAD_CREATE: usize = 460;
-/// waittid syscall
 pub const SYSCALL_WAITTID: usize = 462;
-/// mutex_create syscall
 pub const SYSCALL_MUTEX_CREATE: usize = 463;
-/// mutex_lock syscall
 pub const SYSCALL_MUTEX_LOCK: usize = 464;
-/// mutex_unlock syscall
 pub const SYSCALL_MUTEX_UNLOCK: usize = 466;
-/// semaphore_create syscall
 pub const SYSCALL_SEMAPHORE_CREATE: usize = 467;
-/// semaphore_up syscall
 pub const SYSCALL_SEMAPHORE_UP: usize = 468;
-/// enable deadlock detect syscall
 pub const SYSCALL_ENABLE_DEADLOCK_DETECT: usize = 469;
-/// semaphore_down syscall
 pub const SYSCALL_SEMAPHORE_DOWN: usize = 470;
-/// condvar_create syscall
 pub const SYSCALL_CONDVAR_CREATE: usize = 471;
-/// condvar_signal syscall
 pub const SYSCALL_CONDVAR_SIGNAL: usize = 472;
-/// condvar_wait syscallca
 pub const SYSCALL_CONDVAR_WAIT: usize = 473;
 
 mod fs;
