@@ -58,10 +58,11 @@ pub mod timer;
 pub mod trap;
 pub mod utils;
 
-use board::shutdown;
+use board::{shutdown, CLOCK_FREQ};
 use config::KERNEL_SPACE_OFFSET;
 use riscv::register::satp;
 use sbi::console_putchar;
+use timer::{get_time, get_time_ms};
 
 #[cfg(feature = "qemu")]
 global_asm!(include_str!("entry.S"));
@@ -111,6 +112,16 @@ pub fn fake_main() {
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
+    #[cfg(feature = "visionfive2")]
+    // sleep for 5 seconds
+    {
+        let start_time = get_time_ms();
+        loop {
+            if get_time_ms() - start_time > 5000 {
+                break;
+            }
+        }
+    }
     println!("Hello, world!\n");
     show_logo();
     clear_bss();
