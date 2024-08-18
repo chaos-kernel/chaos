@@ -50,6 +50,7 @@ pub struct TaskControlBlock {
     /// mutable
     inner: UPSafeCell<TaskControlBlockInner>,
 }
+
 pub struct TaskControlBlockInner {
     /// memory set(address space)
     pub memory_set:       MemorySet,
@@ -106,6 +107,13 @@ impl TaskControlBlock {
         &self, file: &'static str, line: u32,
     ) -> RefMut<'_, TaskControlBlockInner> {
         self.inner.exclusive_access(file, line)
+    }
+    /// 使用闭包访问内部数据
+    pub fn inner_handler<F, R>(&self, handler: F) -> R
+    where
+        F: FnOnce(&mut TaskControlBlockInner) -> R,
+    {
+        handler(&mut self.inner.exclusive_access(file!(), line!()))
     }
     /// Get the address of app's page table
     pub fn get_user_token(&self) -> usize {
