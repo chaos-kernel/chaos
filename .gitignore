@@ -20,5 +20,6 @@ pushall.sh
 sdcard-riscv.img
 testcases-backup
 kernel-qemu
+kernel-vf2
 sbi-qemu
 .DS_Store

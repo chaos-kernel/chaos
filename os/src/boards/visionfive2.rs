@@ -12,7 +12,7 @@ pub const MMIO: &[(usize, usize, MapPermission)] = &[
     (0x00_1000_0000, 0x10000, PERMISSION_RX), // UART
 ];
 
-pub type BlockDeviceImpl = crate::drivers::SDcard;
+pub type BlockDeviceImpl = crate::drivers::block::SDCard;
 
 pub fn shutdown() -> ! {
     core::intrinsics::abort()

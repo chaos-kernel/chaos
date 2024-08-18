@@ -1,5 +1,6 @@
 //! virtio_blk device driver
 
+mod vf2_sd;
 mod virtio_blk;
 
 use alloc::sync::Arc;
