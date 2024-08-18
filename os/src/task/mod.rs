@@ -46,7 +46,6 @@ pub use task::{TaskControlBlock, TaskStatus};
 
 use self::manager::add_block_task;
 use crate::{
-    board::QEMUExit,
     fs::{defs::OpenFlags, open_file, ROOT_INODE},
     sbi::shutdown,
     timer::remove_timer,

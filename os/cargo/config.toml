@@ -13,5 +13,9 @@ replace-with = "vendored-sources"
 git = "https://github.com/rcore-os/riscv"
 replace-with = "vendored-sources"
 
+[source."git+https://github.com/repnop/fdt"]
+git = "https://github.com/repnop/fdt"
+replace-with = "vendored-sources"
+
 [source.vendored-sources]
 directory = "vendor"

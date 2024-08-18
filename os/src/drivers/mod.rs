@@ -1,6 +1,6 @@
 //! block device driver
 
+mod SDcard;
 pub mod block;
-mod sdcard;
 
 pub use block::BLOCK_DEVICE;

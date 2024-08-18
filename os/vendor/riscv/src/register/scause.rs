@@ -3,13 +3,10 @@
 use bit_field::BitField;
 use core::mem::size_of;
 
-/**
- * scause register
- * 最高位为 1 表示 interrupt，为 0 表示 exception，其余位置表示错误码
- */
+/// scause register
 #[derive(Clone, Copy)]
 pub struct Scause {
-    bits: usize,  
+    bits: usize,
 }
 
 /// Trap Cause
