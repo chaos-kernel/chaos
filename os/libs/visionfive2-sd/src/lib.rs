@@ -69,24 +69,24 @@ fn send_cmd<T: SDIo, S: SleepOps>(
         let res = wait_ms_util_can_send_data::<_, S>(io);
         assert!(res)
     }
-    info!("send cmd type:{:?}, value:{:#?}", cmd_type, cmd);
+    // info!("send cmd type:{:?}, value:{:#?}", cmd_type, cmd);
     // write arg
     write_reg(io, ARG_REG, arg.into());
     write_reg(io, CMD_REG, cmd.into());
     // Wait for cmd accepted
     let command_accept = wait_ms_util_can_send_cmd::<_, S>(io);
-    info!("command accepted {}", command_accept);
+    // info!("command accepted {}", command_accept);
 
     if cmd.response_expect() {
         let res = wait_ms_util_response::<_, S>(io);
-        debug!("wait_ms_util_response:{:?}", res);
+        // debug!("wait_ms_util_response:{:?}", res);
     }
 
     if cmd.data_expected() {
         let mut fifo_addr = FIFO_DATA_REG;
         match data_trans_type {
             DataTransType::Read(buffer) => {
-                trace!("data_expected read....");
+                // trace!("data_expected read....");
                 let mut buf_offset = 0;
                 S::sleep_ms_until(250, || {
                     let raw_int_status_reg =
@@ -94,7 +94,7 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     let int = raw_int_status_reg.int_status();
                     let mut raw_int_status = RawInterrupt::from(int);
                     if raw_int_status.rxdr() {
-                        debug!("RXDR....");
+                        // debug!("RXDR....");
                         while fifo_filled_cnt(io) >= 2 {
                             let data = read_fifo(io, fifo_addr);
                             for i in 0..8 {
@@ -106,11 +106,11 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     }
                     raw_int_status.dto() || raw_int_status.have_error()
                 });
-                info!(
-                    "buf_offset:{}, receive {} bytes",
-                    buf_offset,
-                    buf_offset * 8
-                );
+                // info!(
+                //     "buf_offset:{}, receive {} bytes",
+                //     buf_offset,
+                //     buf_offset * 8
+                // );
             }
             DataTransType::Write(buffer) => {
                 let mut buf_offset = 0;
@@ -118,7 +118,7 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     let raw_int_status = read_reg(io, RAW_INT_STATUS_REG);
                     let mut raw_int_status = RawInterrupt::from(raw_int_status as u16);
                     if raw_int_status.txdr() {
-                        debug!("TXDR....");
+                        // debug!("TXDR....");
                         // Hard coded FIFO depth
                         while fifo_filled_cnt(io) < 120 && buf_offset < buffer.len() {
                             let mut data: u64 = 0;
@@ -132,13 +132,13 @@ fn send_cmd<T: SDIo, S: SleepOps>(
                     }
                     raw_int_status.dto() || raw_int_status.have_error()
                 });
-                info!("buf_offset:{}, send {} bytes", buf_offset, buf_offset * 8);
+                // info!("buf_offset:{}, send {} bytes", buf_offset, buf_offset * 8);
             }
             _ => {
                 panic!("Not implemented")
             }
         }
-        debug!("Current FIFO count: {}", fifo_filled_cnt(io));
+        // debug!("Current FIFO count: {}", fifo_filled_cnt(io));
     }
     // Clear interrupt by writing 1
     let raw_int_status = read_reg(io, RAW_INT_STATUS_REG);
@@ -193,11 +193,11 @@ fn reset_clock<T: SDIo, S: SleepOps>(io: &mut T) {
         CmdArg::new(0),
         DataTransType::None,
     );
-    info!(
-        "now clk enable {:#?}",
-        ClockEnableReg::from(read_reg(io, CLOCK_ENABLE_REG))
-    );
-    pprintln!("reset clock success");
+    // info!(
+    //     "now clk enable {:#?}",
+    //     ClockEnableReg::from(read_reg(io, CLOCK_ENABLE_REG))
+    // );
+    // pprintln!("reset clock success");
 }
 
 fn reset_fifo<T: SDIo>(io: &mut T) {
@@ -205,7 +205,7 @@ fn reset_fifo<T: SDIo>(io: &mut T) {
     // todo!(why write to fifo data)?
     // write_reg(CTRL_REG,ctrl.raw());
     write_reg(io, FIFO_DATA_REG, ctrl.into());
-    pprintln!("reset fifo success");
+    // pprintln!("reset fifo success");
 }
 
 fn reset_dma<T: SDIo>(io: &mut T) {
@@ -218,7 +218,7 @@ fn reset_dma<T: SDIo>(io: &mut T) {
         .with_use_internal_dmac(false);
     // ctrl.dma_enable().set(u1!(0));
     write_reg(io, CTRL_REG, ctrl.into());
-    pprintln!("reset dma success");
+    // pprintln!("reset dma success");
 }
 
 fn set_transaction_size<T: SDIo>(io: &mut T, blk_size: u32, byte_count: u32) {
@@ -229,7 +229,7 @@ fn set_transaction_size<T: SDIo>(io: &mut T, blk_size: u32, byte_count: u32) {
 }
 
 fn test_read<T: SDIo, S: SleepOps>(io: &mut T) {
-    pprintln!("test read, try read 0 block");
+    // pprintln!("test read, try read 0 block");
     set_transaction_size(io, 512, 512);
     let cmd17 = CmdReg::from(Cmd::ReadSingleBlock);
     let arg = CmdArg::new(0);
@@ -242,9 +242,9 @@ fn test_read<T: SDIo, S: SleepOps>(io: &mut T) {
         DataTransType::Read(&mut buffer),
     )
     .unwrap();
-    info!("Current FIFO count: {}", fifo_filled_cnt(io));
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io));
     let byte_slice = buffer.as_slice();
-    pprintln!("sd header 16bytes: {:x?}", &byte_slice[..2]);
+    // pprintln!("sd header 16bytes: {:x?}", &byte_slice[..2]);
 }
 
 /// for test driver
@@ -265,7 +265,7 @@ fn test_write_read<T: SDIo, S: SleepOps>(io: &mut T) {
     )
     .unwrap();
     // info!("resp csr: {:#?}",resp[0]); //csr reg
-    info!("Current FIFO count: {}", fifo_filled_cnt(io));
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io));
     // read a block data
     let cmd17 = CmdReg::from(Cmd::ReadSingleBlock);
     let arg = CmdArg::new(0);
@@ -279,9 +279,9 @@ fn test_write_read<T: SDIo, S: SleepOps>(io: &mut T) {
     )
     .unwrap();
     // info!("resp csr: {:#?}",resp[0]); //csr reg
-    info!("Current FIFO count: {}", fifo_filled_cnt(io));
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io));
     let byte_slice = buffer.as_slice();
-    debug!("Head 16 bytes: {:#x?}", &byte_slice[..2]);
+    // debug!("Head 16 bytes: {:#x?}", &byte_slice[..2]);
 }
 
 // send acmd51 to read csr reg
@@ -302,10 +302,10 @@ fn check_bus_width<T: SDIo, S: SleepOps>(io: &mut T, rca: u32) -> usize {
         CmdArg::new(0),
         DataTransType::Read(&mut buffer),
     );
-    info!("Current FIFO count: {}", fifo_filled_cnt(io)); //2
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io)); //2
     let resp = u64::from_be(read_fifo(io, FIFO_DATA_REG));
-    pprintln!("Bus width supported: {:b}", (resp >> 48) & 0xF);
-    info!("Current FIFO count: {}", fifo_filled_cnt(io)); //0
+    // pprintln!("Bus width supported: {:b}", (resp >> 48) & 0xF);
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io)); //0
     0
 }
 
@@ -320,7 +320,7 @@ fn check_csd<T: SDIo, S: SleepOps>(io: &mut T, rca: u32) {
     )
     .unwrap();
     let status = resp[0];
-    pprintln!("status: {:b}", status);
+    // pprintln!("status: {:b}", status);
 }
 
 fn select_card<T: SDIo, S: SleepOps>(io: &mut T, rca: u32) {
@@ -328,7 +328,7 @@ fn select_card<T: SDIo, S: SleepOps>(io: &mut T, rca: u32) {
     let cmd_arg = CmdArg::new(rca << 16);
     let resp = send_cmd::<_, S>(io, Cmd::SelectCard, cmd7, cmd_arg, DataTransType::None).unwrap();
     let r1 = resp[0];
-    info!("status: {:b}", r1);
+    // info!("status: {:b}", r1);
 }
 
 fn check_rca<T: SDIo, S: SleepOps>(io: &mut T) -> u32 {
@@ -342,8 +342,8 @@ fn check_rca<T: SDIo, S: SleepOps>(io: &mut T) -> u32 {
     )
     .unwrap();
     let rca = resp[0] >> 16;
-    info!("rca: {:#x}", rca);
-    info!("card status: {:b}", resp[0] & 0xffff);
+    // info!("rca: {:#x}", rca);
+    // info!("card status: {:b}", resp[0] & 0xffff);
     rca
 }
 
@@ -364,9 +364,9 @@ fn check_cid<T: SDIo, S: SleepOps>(io: &mut T) {
             | (resp[3] as u128) << 96;
         let cid = Cid::new(resp);
         #[cfg(feature = "alloc")]
-        pprintln!("cid: {}", cid.fmt());
+        // pprintln!("cid: {}", cid.fmt());
         #[cfg(not(feature = "alloc"))]
-        pprintln!("cid: {:?}", cid);
+        // pprintln!("cid: {:?}", cid);
     }
 }
 
@@ -376,12 +376,12 @@ fn check_version<T: SDIo, S: SleepOps>(io: &mut T) -> u8 {
     let cmd8_arg = CmdArg::new(0x1aa);
     let resp = send_cmd::<_, S>(io, Cmd::SendIfCond, cmd8, cmd8_arg, DataTransType::None).unwrap();
     if (resp[0] & 0xaa) == 0 {
-        error!("card {} unusable", 0);
-        pprintln!("card version: 1.0");
+        // error!("card {} unusable", 0);
+        // pprintln!("card version: 1.0");
         return 1;
     }
-    pprintln!("card voltage: {:#x?}", resp[0]);
-    pprintln!("card version: 2.0");
+    // pprintln!("card voltage: {:#x?}", resp[0]);
+    // pprintln!("card version: 2.0");
     2
 }
 
@@ -394,14 +394,14 @@ fn check_big_support<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
         let cmd41_arg = CmdArg::new((1 << 30) | (1 << 24) | 0xFF8000);
         let resp =
             send_cmd::<_, S>(io, Cmd::SdSendOpCond, cmd41, cmd41_arg, DataTransType::None).unwrap();
-        info!("ocr: {:#x?}", resp[0]);
+        // info!("ocr: {:#x?}", resp[0]);
         let ocr = resp[0];
         if ocr.get_bit(31) {
-            pprintln!("card is ready");
+            // pprintln!("card is ready");
             if ocr.get_bit(30) {
-                pprintln!("card is high capacity");
+                // pprintln!("card is high capacity");
             } else {
-                pprintln!("card is standard capacity");
+                // pprintln!("card is standard capacity");
             }
             break;
         }
@@ -413,30 +413,30 @@ fn check_big_support<T: SDIo, S: SleepOps>(io: &mut T) -> bool {
 fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     // read DETECT_REG
     let detect = read_reg(io, CDETECT_REG);
-    info!("detect: {:#?}", CDetectReg::new(detect));
+    // info!("detect: {:#?}", CDetectReg::new(detect));
     // read POWER_REG
     let power = read_reg(io, POWER_REG);
-    info!("power: {:#?}", PowerReg::new(power));
+    // info!("power: {:#?}", PowerReg::new(power));
     // read CLOCK_ENABLE_REG
     let clock_enable = read_reg(io, CLOCK_ENABLE_REG);
-    info!("clock_enable: {:#?}", ClockEnableReg::from(clock_enable));
+    // info!("clock_enable: {:#?}", ClockEnableReg::from(clock_enable));
     // read CARD_TYPE_REG
     let card_type = read_reg(io, CTYPE_REG);
-    info!("card_type: {:#?}", CardTypeReg::from(card_type));
+    // info!("card_type: {:#?}", CardTypeReg::from(card_type));
     // read Control Register
     let control = read_reg(io, CTRL_REG);
-    info!("control: {:#?}", ControlReg::from(control));
+    // info!("control: {:#?}", ControlReg::from(control));
     // read  bus mode register
     let bus_mode = read_reg(io, BUS_MODE_REG);
-    info!("bus_mode(DMA): {:#?}", BusModeReg::from(bus_mode));
+    // info!("bus_mode(DMA): {:#?}", BusModeReg::from(bus_mode));
     // read DMA Descriptor List Base Address Register
     let dma_desc_base_lower = read_reg(io, DBADDRL_REG);
     let dma_desc_base_upper = read_reg(io, DBADDRU_REG);
     let dma_desc_base: usize = dma_desc_base_lower as usize | (dma_desc_base_upper as usize) << 32;
-    info!("dma_desc_base: {:#x?}", dma_desc_base);
+    // info!("dma_desc_base: {:#x?}", dma_desc_base);
     // read clock divider register
     let clock_divider = read_reg(io, CLK_DIVIDER_REG);
-    info!("clock_divider: {:#?}", ClockDividerReg::from(clock_divider));
+    // info!("clock_divider: {:#?}", ClockDividerReg::from(clock_divider));
 
     // reset card clock to 400Mhz
     reset_clock::<_, S>(io);
@@ -451,7 +451,7 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     reset_dma(io);
 
     let ctrl = ControlReg::from(read_reg(io, CTRL_REG));
-    info!("ctrl: {:#?}", ctrl);
+    // info!("ctrl: {:#?}", ctrl);
 
     // go idle state
     let cmd0 = CmdReg::from(Cmd::GoIdleState);
@@ -463,7 +463,7 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
         CmdArg::new(0),
         DataTransType::None,
     );
-    pprintln!("card is in idle state");
+    // pprintln!("card is in idle state");
 
     check_version::<_, S>(io);
 
@@ -471,7 +471,7 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
 
     check_cid::<_, S>(io);
     let rca = check_rca::<_, S>(io);
-    pprintln!("rca: {:#x?}", rca);
+    // pprintln!("rca: {:#x?}", rca);
     check_csd::<_, S>(io, rca);
 
     // let raw_int_status = RawInterruptStatusReg::from(read_reg(io,RAW_INT_STATUS_REG));
@@ -482,7 +482,7 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     select_card::<_, S>(io, rca);
 
     let status = StatusReg::from(read_reg(io, STATUS_REG));
-    info!("Now FIFO Count is {}", status.fifo_count());
+    // info!("Now FIFO Count is {}", status.fifo_count());
 
     // check bus width
     check_bus_width::<_, S>(io, rca);
@@ -490,13 +490,13 @@ fn init_sdcard<T: SDIo, S: SleepOps>(io: &mut T) {
     test_read::<_, S>(io);
     // test_write_read();
 
-    info!("CTRL_REG: {:#?}", ControlReg::from(read_reg(io, CTRL_REG)));
+    // info!("CTRL_REG: {:#?}", ControlReg::from(read_reg(io, CTRL_REG)));
     let raw_int_status = RawInterruptStatusReg::from(read_reg(io, RAW_INT_STATUS_REG));
-    info!("RAW_INT_STATUS_REG: {:#?}", raw_int_status);
+    // info!("RAW_INT_STATUS_REG: {:#?}", raw_int_status);
     // Clear interrupt by writing 1
     write_reg(io, RAW_INT_STATUS_REG, raw_int_status.into());
 
-    pprintln!("init sd success");
+    // pprintln!("init sd success");
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -535,7 +535,7 @@ fn read_block<T: SDIo, S: SleepOps>(io: &mut T, block: usize, buf: &mut [u8]) ->
         DataTransType::Read(buf),
     )
     .unwrap();
-    info!("Current FIFO count: {}", fifo_filled_cnt(io));
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io));
     Ok(buf.len())
 }
 
@@ -552,7 +552,7 @@ fn write_block<T: SDIo, S: SleepOps>(io: &mut T, block: usize, buf: &[u8]) -> Re
         DataTransType::Write(buf),
     )
     .unwrap();
-    info!("Current FIFO count: {}", fifo_filled_cnt(io));
+    // info!("Current FIFO count: {}", fifo_filled_cnt(io));
     Ok(buf.len())
 }
 
