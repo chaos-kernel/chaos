@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use ext4_rs::BlockDevice;
+use ext4_rs::{BlockDevice, BLOCK_SIZE};
 use spin::Mutex;
 use visionfive2_sd::*;
 
@@ -54,13 +54,23 @@ impl SDCard {
 
 impl BlockDevice for SDCard {
     fn read_offset(&self, offset: usize) -> Vec<u8> {
-        let mut buf = [0u8; BLOCK_SZ];
-        let block_id = offset / BLOCK_SZ;
-        self.0.lock().read_block(block_id, &mut buf);
-        buf[offset % BLOCK_SZ..].to_vec()
+        let mut buf = [0u8; BLOCK_SIZE];
+        let mut block_id = offset / BLOCK_SZ;
+        let mut buf_offset = 0;
+        for _ in 0..8 {
+            self.0.lock().read_block(block_id, buf[buf_offset..buf_offset + BLOCK_SZ].as_mut());
+            block_id += 1;
+            buf_offset += BLOCK_SZ;
+        }
+        buf[offset % BLOCK_SIZE..].to_vec()
     }
     fn write_offset(&self, offset: usize, data: &[u8]) {
-        let block_id = offset / BLOCK_SZ;
-        self.0.lock().write_block(block_id, data);
+        let mut block_id = offset / BLOCK_SZ;
+        let mut data_offset = 0;
+        for _ in 0..8 {
+            self.0.lock().write_block(block_id, data[data_offset..data_offset + BLOCK_SZ].as_ref());
+            block_id += 1;
+            data_offset += BLOCK_SZ;
+        }
     }
 }
