@@ -65,7 +65,8 @@ impl BlockDevice for SDCard {
             block_id += 1;
             buf_offset += BLOCK_SZ;
         }
-        buf[offset % BLOCK_SIZE..].to_vec()
+        // debug!("read_offset = {:#x}, buf = {:x?}", offset, buf);
+        buf[offset % BLOCK_SZ..].to_vec()
     }
     fn write_offset(&self, offset: usize, data: &[u8]) {
         let mut block_id = offset / BLOCK_SZ;

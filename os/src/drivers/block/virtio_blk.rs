@@ -85,6 +85,7 @@ impl ext4_rs::BlockDevice for VirtIOBlock {
             .lock()
             .read_blocks(offset / BLOCK_SZ, &mut buf)
             .expect("Error when reading VirtIOBlk");
+        // debug!("read_offset = {:#x}, buf = {:x?}", offset, buf);
         buf[offset % BLOCK_SZ..].to_vec()
     }
     fn write_offset(&self, offset: usize, data: &[u8]) {
