@@ -363,9 +363,9 @@ fn check_cid<T: SDIo, S: SleepOps>(io: &mut T) {
             | (resp[2] as u128) << 64
             | (resp[3] as u128) << 96;
         let cid = Cid::new(resp);
-        #[cfg(feature = "alloc")]
+        // #[cfg(feature = "alloc")]
         // pprintln!("cid: {}", cid.fmt());
-        #[cfg(not(feature = "alloc"))]
+        // #[cfg(not(feature = "alloc"))]
         // pprintln!("cid: {:?}", cid);
     }
 }
