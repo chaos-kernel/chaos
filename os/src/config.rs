@@ -25,7 +25,7 @@ pub const KERNEL_SPACE_END: usize = 0xFFFF_FFFF_FFFF_FFFF;
 /// the virtual addr of trap context
 pub const TRAP_CONTEXT_BASE: usize = USER_SPACE_END - PAGE_SIZE * 2 + 1;
 /// qemu board info
-pub use crate::board::{CLOCK_FREQ, MMIO};
+pub use crate::boards::{CLOCK_FREQ, MMIO};
 /// Big stride (lcm of 2..20)
 pub const BIG_STRIDE: usize = 232792560;
 /// system name

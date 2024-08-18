@@ -1,7 +1,7 @@
 use riscv::register::sstatus;
 
 use crate::{
-    board::CLOCK_FREQ,
+    boards::CLOCK_FREQ,
     task::{current_task, suspend_current_and_run_next},
     timer::{get_time, NSEC_PER_SEC},
 };

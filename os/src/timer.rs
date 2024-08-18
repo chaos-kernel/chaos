@@ -165,7 +165,7 @@ pub fn set_next_trigger() {
 /// sleep for `ms` milliseconds not suspend current task
 pub fn sleep_ms(ms: usize) {
     let end_time = get_time_ms() + ms;
-    while get_time_ms() < end_time {};
+    while get_time_ms() < end_time {}
 }
 
 /// sleep until for `ms` milliseconds not suspend current task

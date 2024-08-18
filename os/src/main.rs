@@ -37,8 +37,7 @@ extern crate alloc;
 #[macro_use]
 extern crate bitflags;
 
-#[path = "boards/qemu.rs"]
-mod board;
+mod boards;
 
 #[macro_use]
 mod console;
@@ -58,7 +57,7 @@ pub mod timer;
 pub mod trap;
 pub mod utils;
 
-use board::{shutdown, CLOCK_FREQ};
+use boards::{shutdown, CLOCK_FREQ};
 use config::KERNEL_SPACE_OFFSET;
 use riscv::register::satp;
 use sbi::console_putchar;

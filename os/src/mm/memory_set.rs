@@ -31,7 +31,7 @@ use super::{
     VirtPageNum,
 };
 use crate::{
-    board::CLOCK_FREQ,
+    boards::CLOCK_FREQ,
     config::{
         KERNEL_SPACE_OFFSET,
         MEMORY_END,
