@@ -2,7 +2,6 @@
 
 use alloc::{collections::BinaryHeap, sync::Arc};
 use core::{
-    arch,
     cmp::Ordering,
     ops::{Add, AddAssign, Sub},
 };
@@ -14,7 +13,7 @@ use crate::{
     config::CLOCK_FREQ,
     sbi::set_timer,
     sync::UPSafeCell,
-    task::{current_task, wakeup_task, TaskControlBlock},
+    task::{current_task, suspend_current_and_run_next, wakeup_task, TaskControlBlock},
 };
 ///纳秒转换关系
 pub const NSEC_PER_SEC: usize = 1_000_000_000;
@@ -161,6 +160,23 @@ pub fn get_time_us() -> usize {
 /// Set the next timer interrupt
 pub fn set_next_trigger() {
     set_timer(get_time() + CLOCK_FREQ / TICKS_PER_SEC);
+}
+
+pub fn sleep_ms(ms: usize) {
+    let end_time = get_time() + ms * CLOCK_FREQ / 1000;
+    while get_time() < end_time {
+        suspend_current_and_run_next();
+    }
+}
+
+pub fn sleep_ms_until(ms: usize, mut f: impl FnMut() -> bool) {
+    let end_time = get_time() + ms * CLOCK_FREQ / 1000;
+    while get_time() < end_time {
+        if f() {
+            return;
+        }
+        suspend_current_and_run_next();
+    }
 }
 
 /// condvar for timer

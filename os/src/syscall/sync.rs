@@ -1,7 +1,7 @@
+use riscv::register::sstatus;
 use crate::{
     board::CLOCK_FREQ,
-    mm::{translated_ref, translated_refmut},
-    task::{current_task, current_user_token, suspend_current_and_run_next},
+    task::{current_task, suspend_current_and_run_next},
     timer::{get_time, NSEC_PER_SEC},
 };
 /// sleep syscall
@@ -16,25 +16,32 @@ pub fn sys_sleep(time_req: *const u64, time_remain: *mut u64) -> isize {
         let current_time = get_time();
         current_time >= end_time
     }
-    let token = current_user_token();
-    let sec = *translated_ref(token, time_req);
-    let nano_sec = *translated_ref(token, unsafe { time_req.add(1) });
-    let end_time =
-        get_time() + sec as usize * CLOCK_FREQ + nano_sec as usize * CLOCK_FREQ / NSEC_PER_SEC;
+    unsafe {
+        sstatus::set_sum();
+        let sec = *time_req;
+        let nano_sec = *time_req.add(1);
+        sstatus::clear_sum();
+        let end_time =
+            get_time() + sec as usize * CLOCK_FREQ + nano_sec as usize * CLOCK_FREQ / NSEC_PER_SEC;
 
-    loop {
-        if is_end(end_time) {
-            break;
-        } else {
-            suspend_current_and_run_next()
+        loop {
+            if is_end(end_time) {
+                break;
+            } else {
+                suspend_current_and_run_next()
+            }
         }
-    }
-    if time_remain as usize != 0 {
-        *translated_refmut(token, time_remain) = 0;
-        *translated_refmut(token, unsafe { time_remain.add(1) }) = 0;
+
+        sstatus::set_sum();
+        if time_remain as usize != 0 {
+            *time_remain = 0;
+            *time_remain.add(1) = 0;
+        }
+        sstatus::clear_sum();
     }
     0
 }
+
 
 // /// mutex create syscall
 // pub fn sys_mutex_create(blocking: bool) -> isize {
