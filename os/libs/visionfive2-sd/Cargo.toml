@@ -1,0 +1,15 @@
+[package]
+name = "visionfive2-sd"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.17"
+preprint = "0.1.0"
+bitfield-struct = "0.8.0"   # no unsafe coe
+
+
+[features]
+alloc = []

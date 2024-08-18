@@ -1,0 +1,24 @@
+[package]
+name = "testos"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0"
+spin = "0.9"
+preprint = "0.1.0"
+fatfs = { git = "https://github.com/os-module/rust-fatfs.git", default-features = false, features = [
+    "alloc",
+    "lfn",
+] }
+
+visionfive2-sd = { path = "../../../visionfive2-sd" }
+riscv = "0"
+buddy_system_allocator = "0.8.0"
+
+#vf2_driver = { path = "../vf2_driver" }
+jtable = { git = "https://github.com/os-module/eebpf.git" }
+naked-function = "0.1.5"
+paste = "1.0.15"

@@ -1,0 +1,78 @@
+单个static atomic的影响:
+atomic		static keys
+1863180us	1603466us	13.94
+1862927us	1603440us	13.93
+1863036us	1603458us	13.93
+
+avg = 1863047us
+
+static keys	atomic
+1605054us	1861353us	13.77
+1604889us	1861388us	13.78
+1605057us	1605057us	13.77
+
+avg = 1605000us
+=> 13.85%
+
+
+
+多个static atomic的影响:
+100 epoch for maybe_modify, 1000 key check
+for i in 0..100 {
+	for _ in 0..1000 {
+		if [] == true {
+			count +=1
+		}
+	}
+	maybe_modify()
+	for _ in 0..1000 {
+		if [] == true {
+			count +=1
+		}
+	}
+}
+
+atomic		static keys
+170719us	162238us	4.97
+170991us	162221us	5.13
+171043us	162219us	5.16
+
+avg = 170917us
+
+static keys	atomic
+164091us	169222us	3.03
+164428us	169212us	2.83
+164389us	169222us	2.86
+
+avg = 164302us
+=> 3.8%
+
+
+for i in 0..10 {
+        for _ in 0..100 {
+        	if [] == true{
+        		count +=1
+        	}
+        	maybe_modify()
+        }
+}	
+
+
+atomic	static keys
+2035588us	1772564us	12.92
+2035594us	1772585us	12.92
+2035034us	1772570us	12.90
+
+avg = 2035405us
+
+static keys	atomic
+1605288us	1603604us	0.10
+1605217us	1603608us	0.10
+1605076us	1603621us	0.09
+
+avg = 1605193us
+=> 21.13
+
+
+
+

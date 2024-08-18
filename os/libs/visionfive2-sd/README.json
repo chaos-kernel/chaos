@@ -1,0 +1,10 @@
+{
+    "name": "visionfive2-sd",
+    "description": "This is a simple SD card driver for the StarFive2 board.",
+    "authors": [{
+      "name": "chenlinfeng ",
+      "email": "chenlinfeng25@outlook.com"
+    }],
+    "keywords": ["sd-card", "starfive2"],
+    "doc_url": "https://github.com/kern-crates/visionfive2-sd/blob/main/README.md"
+  }

@@ -103,6 +103,7 @@ const VIRT_TEST: u64 = 0x100000;
 
 pub const QEMU_EXIT_HANDLE: RISCV64 = RISCV64::new(VIRT_TEST);
 
-pub fn shutdown() -> ! { //todo 处理更多的退出情况
+pub fn shutdown() -> ! {
+    //todo 处理更多的退出情况
     QEMU_EXIT_HANDLE.exit_success();
 }

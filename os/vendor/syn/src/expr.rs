@@ -1741,6 +1741,8 @@ pub(crate) mod parsing {
             input.parse().map(Expr::Continue)
         } else if input.peek(Token![return]) {
             input.parse().map(Expr::Return)
+        } else if input.peek(Token![become]) {
+            expr_become(input)
         } else if input.peek(token::Bracket) {
             array_or_repeat(input)
         } else if input.peek(Token![let]) {
@@ -1851,7 +1853,8 @@ pub(crate) mod parsing {
         input: ParseStream,
         #[cfg(feature = "full")] allow_struct: AllowStruct,
     ) -> Result<Expr> {
-        let (qself, path) = path::parsing::qpath(input, true)?;
+        let expr_style = true;
+        let (qself, path) = path::parsing::qpath(input, expr_style)?;
         rest_of_path_or_macro_or_struct(
             qself,
             path,
@@ -2394,6 +2397,16 @@ pub(crate) mod parsing {
     }
 
     #[cfg(feature = "full")]
+    fn expr_become(input: ParseStream) -> Result<Expr> {
+        let begin = input.fork();
+        input.parse::<Token![become]>()?;
+        if can_begin_expr(input) {
+            input.parse::<Expr>()?;
+        }
+        Ok(Expr::Verbatim(verbatim::between(&begin, input)))
+    }
+
+    #[cfg(feature = "full")]
     #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     impl Parse for ExprTryBlock {
         fn parse(input: ParseStream) -> Result<Self> {
@@ -2672,7 +2685,8 @@ pub(crate) mod parsing {
     #[cfg_attr(docsrs, doc(cfg(feature = "parsing")))]
     impl Parse for ExprStruct {
         fn parse(input: ParseStream) -> Result<Self> {
-            let (qself, path) = path::parsing::qpath(input, true)?;
+            let expr_style = true;
+            let (qself, path) = path::parsing::qpath(input, expr_style)?;
             expr_struct_helper(input, qself, path)
         }
     }
@@ -2839,7 +2853,8 @@ pub(crate) mod parsing {
             #[cfg(feature = "full")]
             let attrs = input.call(Attribute::parse_outer)?;
 
-            let (qself, path) = path::parsing::qpath(input, true)?;
+            let expr_style = true;
+            let (qself, path) = path::parsing::qpath(input, expr_style)?;
 
             Ok(ExprPath { attrs, qself, path })
         }
@@ -2998,6 +3013,7 @@ pub(crate) mod printing {
     use crate::fixup::FixupContext;
     use crate::op::BinOp;
     use crate::path;
+    use crate::path::printing::PathStyle;
     use crate::precedence::Precedence;
     use crate::token;
     #[cfg(feature = "full")]
@@ -3611,7 +3627,13 @@ pub(crate) mod printing {
         );
         e.dot_token.to_tokens(tokens);
         e.method.to_tokens(tokens);
-        e.turbofish.to_tokens(tokens);
+        if let Some(turbofish) = &e.turbofish {
+            path::printing::print_angle_bracketed_generic_arguments(
+                tokens,
+                turbofish,
+                PathStyle::Expr,
+            );
+        }
         e.paren_token.surround(tokens, |tokens| {
             e.args.to_tokens(tokens);
         });
@@ -3631,7 +3653,7 @@ pub(crate) mod printing {
     impl ToTokens for ExprPath {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             outer_attrs_to_tokens(&self.attrs, tokens);
-            path::printing::print_path(tokens, &self.qself, &self.path);
+            path::printing::print_qpath(tokens, &self.qself, &self.path, PathStyle::Expr);
         }
     }
 
@@ -3718,7 +3740,7 @@ pub(crate) mod printing {
     impl ToTokens for ExprStruct {
         fn to_tokens(&self, tokens: &mut TokenStream) {
             outer_attrs_to_tokens(&self.attrs, tokens);
-            path::printing::print_path(tokens, &self.qself, &self.path);
+            path::printing::print_qpath(tokens, &self.qself, &self.path, PathStyle::Expr);
             self.brace_token.surround(tokens, |tokens| {
                 self.fields.to_tokens(tokens);
                 if let Some(dot2_token) = &self.dot2_token {
