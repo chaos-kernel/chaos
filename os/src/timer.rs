@@ -22,7 +22,11 @@ pub const NSEC_PER_MSEC: usize = 1_000_000;
 ///纳秒转换关系
 pub const NSEC_PER_USEC: usize = 1_000;
 /// The number of ticks per second
+#[cfg(feature = "qemu")]
 const TICKS_PER_SEC: usize = 10;
+
+#[cfg(feature = "visionfive2")]
+const TICKS_PER_SEC: usize = 1;
 /// The number of milliseconds per second
 const MSEC_PER_SEC: usize = 1000;
 
