@@ -54,3 +54,20 @@ __user_entry:
     # back to user stack
     ld sp, 2*8(sp)
     sret
+
+__wait_return:
+    # a0: *TrapContext in user space(Constant); a1: user space token
+    # switch to user space
+    csrw satp, a1
+    sfence.vma
+    # csrw sscratch, a0
+    # mv sp, a0
+    # # now sp points to TrapContext in user space, start restoring based on it
+    # # restore general purpose registers except x0/sp/tp
+    # ld x3, 3*8(sp)
+    # .set n, 5
+    # .rept 27
+    #     LOAD_GP %n
+    #     .set n, n+1
+    # .endr
+    ret

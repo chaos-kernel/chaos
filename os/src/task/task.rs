@@ -110,9 +110,7 @@ impl TaskControlBlock {
     }
     /// 使用闭包访问内部数据
     pub fn inner_handler<F, R>(&self, handler: F) -> R
-    where
-        F: FnOnce(&mut TaskControlBlockInner) -> R,
-    {
+    where F: FnOnce(&mut TaskControlBlockInner) -> R {
         handler(&mut self.inner.exclusive_access(file!(), line!()))
     }
     /// Get the address of app's page table
@@ -368,7 +366,6 @@ impl TaskControlBlock {
     }
 
     pub fn fork(self: &Arc<Self>) -> usize {
-        error!("fork: pid[{}]", self.pid.0);
         trace!("[kernel]: sys_fork");
         let pid = pid_alloc();
         warn!("fork: pid[{}]", pid.0);

@@ -104,8 +104,6 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let task = take_current_task().unwrap();
     let mut task_inner = task.inner_exclusive_access(file!(), line!());
     let tid = task.tid;
-    // record exit code
-    task_inner.exit_code = Some(exit_code);
     // here we do not remove the thread since we are still using the kstack
     // it will be deallocated when sys_waittid is called
     // drop(task_inner);
@@ -120,6 +118,10 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     // however, if this is the main thread of current process
     // the process should terminate at once
     if tid == task.pid.0 {
+        debug!(
+            "kernel: exit_current_and_run_next: main thread exit: {}",
+            tid
+        );
         let pid = task.pid.0;
         if pid == IDLE_PID {
             println!(

@@ -8,7 +8,7 @@ use super::errno::{EINVAL, EPERM, SUCCESS};
 use crate::{
     config::*,
     fs::{defs::OpenFlags, dentry, open_file, ROOT_INODE},
-    mm::{translated_byte_buffer, translated_refmut},
+    mm::{translated_byte_buffer, translated_refmut, VirtAddr},
     syscall::errno::{ECHILD, ENOENT, ESRCH},
     task::{
         current_task,
@@ -22,6 +22,7 @@ use crate::{
         CSIGNAL,
     },
     timer::{get_time_ms, get_time_us},
+    trap,
     utils::string::c_ptr_to_string,
 };
 
@@ -309,7 +310,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             // ++++ release child PCB
             if !exit_code_ptr.is_null() {
                 unsafe { sstatus::set_sum() };
-
+                debug!("kernel:sys_waitpid: exit_code_ptr is not null");
                 unsafe {
                     *exit_code_ptr = exit_code;
                 }
@@ -325,6 +326,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
                 return 0;
             } else {
                 suspend_current_and_run_next();
+                trap::wait_return();
                 //block_current_and_run_next();
             }
         }
