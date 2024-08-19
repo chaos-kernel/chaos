@@ -162,6 +162,13 @@ pub fn get_time_us() -> usize {
 }
 
 /// Set the next timer interrupt
+#[cfg(feature = "visionfive2")]
+pub fn set_next_trigger() {
+    set_timer(get_time() + CLOCK_FREQ / TICKS_PER_SEC);
+}
+
+/// Set the next timer interrupt
+#[cfg(feature = "qemu")]
 pub fn set_next_trigger() {
     set_timer(get_time() + CLOCK_FREQ / TICKS_PER_SEC);
 }

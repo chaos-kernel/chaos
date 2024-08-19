@@ -58,10 +58,11 @@ pub mod trap;
 pub mod utils;
 
 use boards::{shutdown, CLOCK_FREQ};
-use config::KERNEL_SPACE_OFFSET;
+use config::{KERNEL_SPACE_OFFSET, MEMORY_END};
 use riscv::register::satp;
 use sbi::console_putchar;
 use timer::{get_time, get_time_ms, sleep_ms};
+use utils::platform_info::{init_dtb, machine_info, machine_info_from_dtb};
 
 #[cfg(feature = "qemu")]
 global_asm!(include_str!("entry.S"));
@@ -122,7 +123,15 @@ pub fn rust_main() -> ! {
     info!("logging init done");
     let satp = satp::read();
     info!(" satp: {:#x}", satp.bits());
-    mm::init();
+    #[cfg(feature = "visionfive2")]
+    init_dtb(None);
+    #[cfg(feature = "qemu")]
+    init_dtb(None);
+    let machine_info = machine_info();
+    #[cfg(feature = "visionfive2")]
+    mm::init(machine_info.memory.end);
+    #[cfg(feature = "qemu")]
+    mm::init(MEMORY_END);
     info!("mm init done");
     mm::remap_test();
     info!("mm remap test done");

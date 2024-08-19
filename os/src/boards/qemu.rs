@@ -6,7 +6,7 @@
 //! CLOCK_FREQ
 
 /// clock frequency
-pub const CLOCK_FREQ: usize = 12500000;
+pub const CLOCK_FREQ: usize = 1250_0000;
 //pub const MEMORY_END: usize = 0x801000000;
 
 pub const PERMISSION_RW: MapPermission = MapPermission::union(MapPermission::R, MapPermission::W);

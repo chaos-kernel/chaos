@@ -120,13 +120,13 @@ lazy_static! {
         unsafe { UPSafeCell::new(FrameAllocatorImpl::new()) };
 }
 
-pub fn init_frame_allocator() {
+pub fn init_frame_allocator(memory_end: usize) {
     extern "C" {
         fn ekernel();
     }
     debug!(
         "init_frame_allocator: ekernel={:#x} memory_end={:#x}",
-        ekernel as usize, MEMORY_END
+        ekernel as usize, memory_end
     );
     debug!(
         "PhysAddr::from(ekernel as usize)={:?}",
@@ -134,11 +134,11 @@ pub fn init_frame_allocator() {
     );
     debug!(
         "PhysAddr::from(MEMORY_END)={:?}",
-        PhysAddr::from(MEMORY_END)
+        PhysAddr::from(memory_end)
     );
     FRAME_ALLOCATOR.exclusive_access(file!(), line!()).init(
         PhysAddr::from(KernelAddr::from(ekernel as usize)).ceil(),
-        PhysAddr::from(KernelAddr::from(MEMORY_END)).floor(),
+        PhysAddr::from(KernelAddr::from(memory_end)).floor(),
     );
 }
 

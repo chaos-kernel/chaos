@@ -31,11 +31,11 @@ pub use page_table::{
 };
 
 /// initiate heap allocator, frame allocator and kernel space
-pub fn init() {
+pub fn init(memory_end: usize) {
     debug!("heap allocator initialize");
     heap_allocator::init_heap();
     debug!("frame allocator initialize");
-    frame_allocator::init_frame_allocator();
+    frame_allocator::init_frame_allocator(memory_end);
     debug!("kernel space initialize");
     KERNEL_SPACE.exclusive_access(file!(), line!()).activate();
 }

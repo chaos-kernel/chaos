@@ -9,7 +9,12 @@ pub const KERNEL_STACK_SIZE: usize = 4096 * 8;
 /// kernel heap size
 pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x500;
 /// physical memory end address
+#[cfg(feature = "qemu")]
 pub const MEMORY_END: usize = 0xffff_ffc0_88000000;
+
+#[cfg(feature = "visionfive2")]
+pub const MEMORY_END: usize = 0xffff_ffc0_88000000;
+
 /// page size : 4KB
 pub const PAGE_SIZE: usize = 0x1000;
 /// page size bits: 12

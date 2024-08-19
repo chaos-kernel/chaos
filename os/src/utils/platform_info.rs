@@ -81,6 +81,11 @@ pub fn machine_info_from_dtb(ptr: usize) -> MachineInfo {
     walk_dt(fdt)
 }
 
+pub fn machine_info() -> MachineInfo {
+    let ptr = unsafe { DTB.unwrap() };
+    machine_info_from_dtb(ptr)
+}
+
 // Walk the device-tree and get machine information
 fn walk_dt(fdt: Fdt) -> MachineInfo {
     let mut machine = MachineInfo {
