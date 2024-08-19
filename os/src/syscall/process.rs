@@ -325,6 +325,7 @@ pub fn sys_wait4(pid: isize, exit_code_ptr: *mut i32, option: u32, _ru: usize) -
             if option.contains(WaitOption::WNOHANG) {
                 return 0;
             } else {
+                debug!("kernel:sys_waitpid: suspend_current_and_run_next");
                 suspend_current_and_run_next();
                 trap::wait_return();
                 //block_current_and_run_next();

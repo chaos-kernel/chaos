@@ -26,6 +26,7 @@ impl File for Stdin {
         loop {
             c = console_getchar();
             if c == 0 {
+                debug!("stdin: no char, suspend and run next");
                 suspend_current_and_run_next();
                 continue;
             } else {

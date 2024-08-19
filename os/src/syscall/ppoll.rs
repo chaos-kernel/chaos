@@ -53,6 +53,12 @@ bitflags! {
 pub fn sys_ppoll(
     fds: *mut PollFd, nfds: usize, tmo_p: *const TimeSpec, sigmask: *const SignalFlags,
 ) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_ppoll",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
+
     let token = current_user_token();
     // log!("[sys_ppoll] nfds = {}", nfds);
     // oldsig in kernel space
@@ -96,6 +102,7 @@ pub fn sys_ppoll(
                 None => continue,
             }
         }
+        done += 1;
         if done > 0 {
             break;
         }
@@ -125,6 +132,7 @@ use core::str::Bytes;
 
 use super::signal::sys_sigprocmask;
 use crate::{
+    syscall::errno::SUCCESS,
     task::{
         current_task,
         current_user_token,
@@ -286,6 +294,7 @@ pub fn pselect(
 
         drop(inner);
         drop(task);
+        debug!("kernel: pselect suspend_current_and_run_next");
         suspend_current_and_run_next();
     }
     let task = current_task().unwrap();

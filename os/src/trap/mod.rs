@@ -107,6 +107,7 @@ pub fn trap_handler() -> ! {
             cx.sepc += 4;
             syscall_num = cx.x[17] as i32;
             // get system call return value
+            debug!("syscall_num = {}", syscall_num);
             result = syscall(
                 cx.x[17],
                 [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]],
@@ -137,6 +138,7 @@ pub fn trap_handler() -> ! {
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
             set_next_trigger();
             check_timer();
+            debug!("Interrupt::SupervisorTimer suspend_current_and_run_next");
             suspend_current_and_run_next();
             debug!("back from timer interrupt");
         }

@@ -4,7 +4,7 @@ use alloc::{
 };
 
 use super::{file::File, inode::Stat};
-use crate::{mm::UserBuffer, sync::UPSafeCell, task::suspend_current_and_run_next};
+use crate::{mm::UserBuffer, sync::UPSafeCell, task::suspend_current_and_run_next, trap};
 
 /// IPC pipe
 pub struct Pipe {
@@ -32,7 +32,7 @@ impl Pipe {
     }
 }
 
-const RING_BUFFER_SIZE: usize = 32;
+const RING_BUFFER_SIZE: usize = 3200;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum RingBufferStatus {
@@ -147,10 +147,13 @@ impl File for Pipe {
                     return already_read;
                 }
                 drop(ring_buffer);
+                debug!("kernel: Pipe::read suspend_current_and_run_next");
                 suspend_current_and_run_next();
+                trap::wait_return();
                 continue;
             }
             for _ in 0..loop_read {
+                info!("kernel: start read byte from pipe");
                 if let Some(byte_ref) = buf_iter.next() {
                     *byte_ref = ring_buffer.read_byte();
                     warn!("read byte: {}", *byte_ref as char);
@@ -188,6 +191,7 @@ impl File for Pipe {
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);
+                debug!("kernel: Pipe::write suspend_current_and_run_next");
                 suspend_current_and_run_next();
                 continue;
             }
