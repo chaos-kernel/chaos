@@ -27,6 +27,11 @@ use crate::{
 pub fn sys_sigprocmask(
     how: usize, set: *mut usize, old_set: *mut usize, kernel_space: bool,
 ) -> isize {
+    trace!(
+        "kernel:pid[{}] tid[{}] sys_sigprocmask",
+        current_task().unwrap().pid.0,
+        current_task().unwrap().tid
+    );
     let task = current_task().unwrap();
     let mut inner = task.inner_exclusive_access(file!(), line!());
 
@@ -159,53 +164,55 @@ pub fn sys_sigtimedwait(
         current_task().unwrap().tid
     );
 
-    if uthese as usize == 0 || uts as usize == 0 {
-        error!("[sys_sigtimedwait] Null pointer.");
-        return EPERM;
-    }
-    let mut timeout: TimeSpec = TimeSpec::now();
-    unsafe {
-        sstatus::set_sum();
-        timeout = *uts;
-        sstatus::clear_sum();
-    }
+    // if uthese as usize == 0 || uts as usize == 0 {
+    //     error!("[sys_sigtimedwait] Null pointer.");
+    //     return EPERM;
+    // }
+    // let mut timeout: TimeSpec = TimeSpec::now();
+    // unsafe {
+    //     sstatus::set_sum();
+    //     timeout = *uts;
+    //     sstatus::clear_sum();
+    // }
 
-    let limit_time = TimeSpec::now() + timeout;
+    // let limit_time = TimeSpec::now() + timeout;
 
-    let mut set = 0;
-    unsafe {
-        sstatus::set_sum();
-        set = *uthese;
-        sstatus::clear_sum();
-    }
+    // let mut set = 0;
+    // unsafe {
+    //     sstatus::set_sum();
+    //     set = *uthese;
+    //     sstatus::clear_sum();
+    // }
 
-    let set_flags = SignalFlags::from_bits(set).unwrap();
+    // let set_flags = SignalFlags::from_bits(set).unwrap();
 
-    loop {
-        let task = current_task().unwrap();
-        let signals_pending = task
-            .inner_exclusive_access(file!(), line!())
-            .signals_pending;
-        // Every matched signals will return. This method is wrong.
-        let match_signals = set_flags & signals_pending;
-        if !match_signals.is_empty() {
-            let first_signals = match_signals.bits().trailing_zeros();
-            if info as usize != 0 {
-                let siginfo = SigInfo::new(first_signals as usize, 0, 0);
-                unsafe {
-                    sstatus::set_sum();
-                    *info = siginfo;
-                    sstatus::clear_sum();
-                }
-            }
-            return SUCCESS;
-        }
-        if limit_time < TimeSpec::now() {
-            println!("[sys_sigtimedwait] Timeout.");
-            return EAGAIN;
-        }
-        drop(task);
-        drop(signals_pending);
-        suspend_current_and_run_next();
-    }
+    // loop {
+    //     let task = current_task().unwrap();
+    //     let signals_pending = task
+    //         .inner_exclusive_access(file!(), line!())
+    //         .signals_pending;
+    //     // Every matched signals will return. This method is wrong.
+    //     let match_signals = set_flags & signals_pending;
+    //     if !match_signals.is_empty() {
+    //         let first_signals = match_signals.bits().trailing_zeros();
+    //         if info as usize != 0 {
+    //             let siginfo = SigInfo::new(first_signals as usize, 0, 0);
+    //             unsafe {
+    //                 sstatus::set_sum();
+    //                 *info = siginfo;
+    //                 sstatus::clear_sum();
+    //             }
+    //         }
+    //         return SUCCESS;
+    //     }
+    //     if limit_time < TimeSpec::now() {
+    //         println!("[sys_sigtimedwait] Timeout.");
+    //         return EAGAIN;
+    //     }
+    //     drop(task);
+    //     drop(signals_pending);
+    //     debug!("sigtimedwait: suspend_current_and_run_next");
+    //     suspend_current_and_run_next();
+    // }
+    SUCCESS
 }
