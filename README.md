@@ -20,8 +20,7 @@
 - 队伍成员：
   - 王诺贤：[bosswnx@outlook.com](mailto:bosswnx@outlook.com)
   - 陈宽宽：[ck_look@outlook.com](mailto:ck_look@outlook.com)
-  - 乐一然：[ryan.yiran.le@gmail.com](mailto:ryan.yiran.le@gmail.com)
-
+ 
 ## 使用说明
 
 *注意：以下所有指令皆在项目根目录下执行*
